@@ -1,25 +1,11 @@
 // ⚠️ AUTO-GENERATED FILE — do not edit manually.
-import { Barcode } from "./entities/barcode/Barcode";
-import { ConnectorDevice } from "./entities/connectorDevice/ConnectorDevice";
-import { ExternalAccount } from "./entities/externalAccount/ExternalAccount";
-import { ExternalLibraryEntry } from "./entities/externalLibraryEntry/ExternalLibraryEntry";
-import { GameExternalMapping } from "./entities/gameExternalMapping/GameExternalMapping";
-import { GameRelease } from "./entities/gameRelease/GameRelease";
-import { GameTitle } from "./entities/gameTitle/GameTitle";
-import { Item } from "./entities/item/Item";
-import { ItemMovement } from "./entities/itemMovement/ItemMovement";
-import { Loan } from "./entities/loan/Loan";
-import { Location } from "./entities/location/Location";
-import { Party } from "./entities/party/Party";
-import { Platform } from "./entities/platform/Platform";
+import { Restaurant } from "./entities/restaurant/Restaurant";
 import { Session } from "./entities/session/Session";
-import { SimilarTitlePair } from "./entities/similarTitlePair/SimilarTitlePair";
-import { SyncJob } from "./entities/syncJob/SyncJob";
 import { User } from "./entities/user/User";
-import { SplitLocalMultiplayerModes1740000000000 } from "../../migrations/1740000000000-SplitLocalMultiplayerModes";
+import { CreateRestaurant1740100000000 } from "../../migrations/1740100000000-CreateRestaurant";
 
-export const entities = [Barcode, ConnectorDevice, ExternalAccount, ExternalLibraryEntry, GameExternalMapping, GameRelease, GameTitle, Item, ItemMovement, Loan, Location, Party, Platform, Session, SimilarTitlePair, SyncJob, User];
+export const entities = [Restaurant, Session, User];
 
-export const migrations = [SplitLocalMultiplayerModes1740000000000];
+export const migrations = [CreateRestaurant1740100000000];
 
 export const subscribers = [];

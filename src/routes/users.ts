@@ -1,9 +1,6 @@
 import express, {Request, Response} from 'express';
 
 import * as userController from "../controller/userController";
-import * as itemService from "../modules/database/services/ItemService";
-import * as loanService from "../modules/database/services/LoanService";
-import * as locationService from "../modules/database/services/LocationService";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import settings from "../modules/settings";
@@ -21,21 +18,14 @@ app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
     }
-    const ownerId = req.session.user.id;
-    
-    // Get summary data for the dashboard
-    const items = await itemService.getAllItems(ownerId);
-    const locations = await locationService.getAllLocations(ownerId);
-    const activeLoans = await loanService.getActiveLoans(ownerId);
-    const overdueLoans = await loanService.getOverdueLoans(ownerId);
-    
+
     renderer.renderWithData(res, 'users/dashboard', {
-        itemCount: items.length,
-        locationCount: locations.length,
-        activeLoanCount: activeLoans.length,
-        overdueLoanCount: overdueLoans.length,
-        recentItems: items.slice(0, 5),
-        activeLoans: activeLoans.slice(0, 5),
+        itemCount: 0,
+        locationCount: 0,
+        activeLoanCount: 0,
+        overdueLoanCount: 0,
+        recentItems: [],
+        activeLoans: [],
     });
 }));
 
@@ -94,7 +84,7 @@ app.post('/forgot-password', asyncHandler(async (req: Request, res: Response) =>
 // Passwort zurücksetzen: Formular anzeigen
 app.get('/reset-password/:token', asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
-    const token = req.params.token;
+    const token = req.params.token as string;
     await userController.checkPasswordForgotToken(token);
     renderer.renderWithData(res, 'users/reset-password', {token});  // Zeige das Passwort-Reset-Formular an
 }));
@@ -102,14 +92,14 @@ app.get('/reset-password/:token', asyncHandler(async (req: Request, res: Respons
 // Passwort zurücksetzen: Neues Passwort speichern
 app.post('/reset-password/:token', asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
-    await userController.resetPassword(req.params.token, req.body);
+    await userController.resetPassword(req.params.token as string, req.body);
     renderer.renderSuccess(res, 'Your password has been successfully reset')
 }));
 
 // Aktivierungs-Link
 app.get('/activate/:token', asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
-    await userController.activateAccount(req.params.token);
+    await userController.activateAccount(req.params.token as string);
     renderer.renderSuccess(res, 'Your account has been activated. You can log in now.')
 }));
 

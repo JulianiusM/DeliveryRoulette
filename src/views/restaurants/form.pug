@@ -1,0 +1,120 @@
+//- views/restaurants/form.pug – Create / Edit Restaurant
+extends ../layout
+
+block meta
+    if data && data.editing
+        title Edit Restaurant | DeliveryRoulette
+    else
+        title New Restaurant | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-shop.me-2
+        if data && data.editing
+            | Edit Restaurant
+        else
+            | New Restaurant
+
+block content
+    - const d = data || {}
+    - const editing = d.editing || false
+    - const formAction = editing ? `/restaurants/${d.id}/edit` : '/restaurants/new'
+
+    form.row.gy-3(action=formAction method="post")
+        //── Name ────────────────────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="name")
+                i.bi.bi-shop.me-1
+                | Name&nbsp;*
+            input#name.form-control.text-bg-dark(
+                type="text"
+                name="name"
+                maxlength="150"
+                value=(d.name || '')
+                placeholder="Restaurant name"
+                required)
+
+        //── Address Line 1 ─────────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="addressLine1")
+                i.bi.bi-geo-alt.me-1
+                | Address Line 1&nbsp;*
+            input#addressLine1.form-control.text-bg-dark(
+                type="text"
+                name="addressLine1"
+                maxlength="255"
+                value=(d.addressLine1 || '')
+                placeholder="Street and number"
+                required)
+
+        //── Address Line 2 ─────────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="addressLine2")
+                i.bi.bi-geo.me-1
+                | Address Line 2
+            input#addressLine2.form-control.text-bg-dark(
+                type="text"
+                name="addressLine2"
+                maxlength="255"
+                value=(d.addressLine2 || '')
+                placeholder="Apartment, suite, etc.")
+
+        //── City ────────────────────────────────────────
+        .col-md-4
+            label.form-label.mb-1(for="city")
+                i.bi.bi-building.me-1
+                | City&nbsp;*
+            input#city.form-control.text-bg-dark(
+                type="text"
+                name="city"
+                maxlength="100"
+                value=(d.city || '')
+                placeholder="City"
+                required)
+
+        //── Postal Code ────────────────────────────────
+        .col-md-4
+            label.form-label.mb-1(for="postalCode")
+                i.bi.bi-mailbox.me-1
+                | Postal Code&nbsp;*
+            input#postalCode.form-control.text-bg-dark(
+                type="text"
+                name="postalCode"
+                maxlength="20"
+                value=(d.postalCode || '')
+                placeholder="Postal code"
+                required)
+
+        //── Country ────────────────────────────────────
+        .col-md-4
+            label.form-label.mb-1(for="country")
+                i.bi.bi-globe.me-1
+                | Country
+            input#country.form-control.text-bg-dark(
+                type="text"
+                name="country"
+                maxlength="100"
+                value=(d.country || '')
+                placeholder="Country")
+
+        //── Active ────────────────────────────────────
+        if editing
+            .col-12
+                .form-check
+                    input#isActive.form-check-input(
+                        type="checkbox"
+                        name="isActive"
+                        checked=d.isActive)
+                    label.form-check-label(for="isActive") Active
+
+        //── Buttons ──────────────────────────────────
+        .col-12.d-flex.gap-2.mt-2
+            button.btn.btn-success(type="submit")
+                i.bi.bi-check-lg.me-1
+                if editing
+                    | Save Changes
+                else
+                    | Create Restaurant
+            a.btn.btn-outline-light(href="/restaurants")
+                i.bi.bi-x-lg.me-1
+                | Cancel

@@ -1,0 +1,52 @@
+//- views/restaurants/detail.pug – Restaurant Detail
+extends ../layout
+
+block meta
+    title #{data.restaurant.name} | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-shop.me-2
+        | #{data.restaurant.name}
+
+block content
+    - const r = data.restaurant
+
+    .row.g-4
+        .col-md-8
+            .card.text-bg-dark.border-secondary
+                .card-header
+                    i.bi.bi-geo-alt.me-2
+                    | Address
+                .card-body
+                    p.mb-1 #{r.addressLine1}
+                    if r.addressLine2
+                        p.mb-1 #{r.addressLine2}
+                    p.mb-0 #{r.postalCode} #{r.city}
+                    if r.country
+                        p.mb-0 #{r.country}
+
+        .col-md-4
+            .card.text-bg-dark.border-secondary
+                .card-header
+                    i.bi.bi-info-circle.me-2
+                    | Info
+                .card-body
+                    p.mb-2
+                        | Status:&nbsp;
+                        if r.isActive
+                            span.badge.text-bg-success Active
+                        else
+                            span.badge.text-bg-secondary Inactive
+                    p.text-white-50.mb-1
+                        small Created: #{new Date(r.createdAt).toLocaleDateString()}
+                    p.text-white-50.mb-0
+                        small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
+
+    .d-flex.gap-2.mt-4
+        a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)
+            i.bi.bi-pencil.me-1
+            | Edit
+        a.btn.btn-outline-light(href="/restaurants")
+            i.bi.bi-arrow-left.me-1
+            | Back to list

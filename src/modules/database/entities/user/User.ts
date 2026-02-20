@@ -31,13 +31,13 @@ export class User {
         name: "created_at",
         default: () => "CURRENT_TIMESTAMP",
     })
-    createdAt: Date;
+    createdAt!: Date;
 
     @Column("timestamp", {
         name: "updated_at",
         default: () => "CURRENT_TIMESTAMP",
     })
-    updatedAt: Date;
+    updatedAt!: Date;
 
     @Column("varchar", {name: "activation_token", nullable: true, length: 255})
     activationToken?: string | null;
