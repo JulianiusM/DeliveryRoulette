@@ -1,6 +1,6 @@
-# Inventory Management Architecture
+# DeliveryRoulette Architecture
 
-This document describes the overall architecture, design patterns, and technical decisions in the Inventory Management application.
+This document describes the overall architecture, design patterns, and technical decisions in the DeliveryRoulette application.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This document describes the overall architecture, design patterns, and technical
 
 ## System Overview
 
-Inventory Management is a **monolithic web application** for item cataloging and tracking with the following characteristics:
+DeliveryRoulette is a **monolithic web application** for item cataloging and tracking with the following characteristics:
 
 - **Backend**: Node.js + Express.js + TypeScript
 - **Database**: MariaDB with TypeORM
@@ -340,8 +340,8 @@ declare global {
     }
 }
 
-window.InventoryApp = window.InventoryApp || {};
-window.InventoryApp.init = init;
+window.DeliveryRouletteApp = window.DeliveryRouletteApp || {};
+window.DeliveryRouletteApp.init = init;
 ```
 
 ### Client-Side Principles

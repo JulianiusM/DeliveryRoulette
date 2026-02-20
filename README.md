@@ -1,13 +1,36 @@
-# Delivery Roulette (DE) - Backlog bootstrap
+# DeliveryRoulette
 
-This package contains:
-- docs/ARCHITECTURE.md (reference architecture)
-- docs/GITHUB_SPEC.md (high-level spec)
-- docs/issues/*.md (issue bodies)
-- create_issues.sh (creates labels, milestones, issues via gh CLI)
+A restaurant suggestion application built with Node.js, Express, TypeScript, and MariaDB.
 
-Usage (from your repository root):
-1) Copy this package contents into your repository (at least docs/ and create_issues.sh)
-2) Ensure gh CLI is installed and authenticated: gh auth login
-3) Run: ./create_issues.sh
-4) Run: ./link_dependencies.sh (rewrites the 'Dependencies' section in each issue to link to the created issue numbers)
+## Tech Stack
+
+- **Backend**: Node.js + Express.js + TypeScript
+- **Database**: MariaDB with TypeORM
+- **Frontend**: Server-rendered Pug templates + Bootstrap (dark theme)
+- **Authentication**: OIDC (OpenID Connect) + local login
+- **Testing**: Jest + Playwright
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 24
+- MariaDB >= 10.4
+
+### Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Configure your database (see `docs/DEVELOPMENT.md`)
+4. Build: `npm run build`
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development Guide](docs/DEVELOPMENT.md)
+- [Testing Guide](docs/TESTING_GUIDE.md)
+- [Configuration](docs/CONFIGURATION.md)
+
+## License
+
+All rights reserved.

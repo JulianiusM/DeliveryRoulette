@@ -1,7 +1,7 @@
 # UI Redesign Summary
 
 ## Overview
-Complete UI redesign of the Inventory Management application following modern UX patterns with Bootstrap dark theme. The redesign focuses on responsiveness, usability, and scalability.
+Complete UI redesign of the DeliveryRoulette application following modern UX patterns with Bootstrap dark theme. The redesign focuses on responsiveness, usability, and scalability.
 
 ## Key Improvements
 

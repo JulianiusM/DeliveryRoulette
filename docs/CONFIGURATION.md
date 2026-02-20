@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This document describes the configuration system and available settings for the Inventory Management application.
+This document describes the configuration system and available settings for the DeliveryRoulette application.
 
 ## Settings Module
 

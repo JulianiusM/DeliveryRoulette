@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions for Inventory Management
+# GitHub Copilot Instructions for DeliveryRoulette
 
 This is the main instruction file for GitHub Copilot. Additional detailed guidelines are organized in modular files:
 

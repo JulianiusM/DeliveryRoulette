@@ -16,7 +16,7 @@
 
 ## Testing with Database
 
-- Unit/integration tests use `surveyor_test` database
-- E2E tests use `surveyor_e2e` database (name must contain 'e2e')
+- Unit/integration tests use `deliveryroulette_test` database
+- E2E tests use `deliveryroulette_e2e` database (name must contain 'e2e')
 - Use the provided datasource mocks in tests
 - Database tests run serially to avoid conflicts
