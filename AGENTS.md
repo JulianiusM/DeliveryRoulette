@@ -1,10 +1,10 @@
-# AI Agent Guide for Inventory Management
+# AI Agent Guide for DeliveryRoulette
 
-This document provides guidance for AI coding agents working on the Inventory Management project. Whether you're using GitHub Copilot, Cursor, Claude, or another AI assistant, this guide will help you understand the project structure and conventions.
+This document provides guidance for AI coding agents working on the DeliveryRoulette project. Whether you're using GitHub Copilot, Cursor, Claude, or another AI assistant, this guide will help you understand the project structure and conventions.
 
 ## Project Overview
 
-Inventory Management is a TypeScript-based item cataloging and tracking application with comprehensive testing and documentation. The project uses:
+DeliveryRoulette is a TypeScript-based item cataloging and tracking application with comprehensive testing and documentation. The project uses:
 
 - **Backend**: Express.js + TypeORM + MariaDB
 - **Frontend**: Pug templates + Bootstrap (dark theme) + Vanilla TypeScript
@@ -14,11 +14,11 @@ Inventory Management is a TypeScript-based item cataloging and tracking applicat
 
 ### Core Features
 
-- **Items**: Catalog items with type, condition, tags, serial numbers, and barcodes
-- **Locations**: Hierarchical location management (rooms, shelves, boxes, bins)
-- **Barcodes**: Map barcodes/QR codes to items for quick lookup via camera scanning
-- **Lending**: Track loans with counterparties, due dates, and condition notes
-- **Scanning**: Camera-based barcode/QR code scanning using ZXing library
+- **Restaurants**: Restaurant management with cuisine types, dietary tags, and delivery options
+- **Menus**: Menu management with categories and items
+- **Suggestions**: Random restaurant suggestion engine
+- **Diet Preferences**: Tag-based dietary preference system
+- **Provider Integration**: External delivery provider connectors
 
 ## Quick Start for AI Agents
 
@@ -65,8 +65,7 @@ All configuration constants are centralized in `src/modules/settings.ts`:
 ## Key Directories
 
 ```
-inventory-management/
-├── docs/                # Documentation
+DeliveryRoulette/├── docs/                # Documentation
 │   ├── README.md            # Documentation index
 │   ├── ARCHITECTURE.md      # System architecture
 │   ├── DEVELOPMENT.md       # Development guide
@@ -336,8 +335,8 @@ npm run e2e
 ### Database
 
 Tests use two databases:
-- `inventory_test` - Unit and integration tests
-- `inventory_e2e` - E2E tests (name must contain 'e2e')
+- `deliveryroulette_test` - Unit and integration tests
+- `deliveryroulette_e2e` - E2E tests (name must contain 'e2e')
 
 Configuration:
 - `tests/.env.test` - Unit/integration test config
@@ -417,7 +416,7 @@ This file serves as the primary guide. Read it along with:
 
 ## Documentation Structure
 
-Inventory Management has comprehensive, well-organized documentation:
+DeliveryRoulette has comprehensive, well-organized documentation:
 
 ### For Developers
 - **[docs/README.md](docs/README.md)** - Documentation navigation

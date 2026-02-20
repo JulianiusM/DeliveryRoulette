@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This document describes the configuration system and available settings for the Inventory Management application.
+This document describes the configuration system and available settings for the DeliveryRoulette application.
 
 ## Settings Module
 
@@ -151,7 +151,7 @@ export DB_NAME=mydb
 For E2E tests, use the `E2E_` prefix:
 
 ```bash
-export E2E_DB_NAME=surveyor_e2e
+export E2E_DB_NAME=deliveryroulette_e2e
 export E2E_TOKEN_EXPIRATION_MS=1800000
 ```
 

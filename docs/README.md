@@ -1,6 +1,6 @@
-# Inventory Management Documentation
+# DeliveryRoulette Documentation
 
-Welcome to the Inventory Management documentation. This directory contains comprehensive documentation for developers, testers, and AI agents working on the Inventory Management application.
+Welcome to the DeliveryRoulette documentation. This directory contains comprehensive documentation for developers, testers, and AI agents working on the DeliveryRoulette application.
 
 ## Documentation Structure
 
@@ -38,7 +38,7 @@ Welcome to the Inventory Management documentation. This directory contains compr
 
 ### 👥 For End Users
 
-- **[user-guide/README.md](user-guide/README.md)** - Complete user guide for the inventory management app
+- **[user-guide/README.md](user-guide/README.md)** - Complete user guide for the DeliveryRoulette app
 
 ### 📋 Reference
 

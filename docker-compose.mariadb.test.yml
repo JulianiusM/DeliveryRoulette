@@ -2,13 +2,13 @@ version: '3.8'
 services:
   mariadb:
     image: mariadb:10.11
-    container_name: surveyor-mariadb-test
+    container_name: deliveryroulette-mariadb-test
     restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: surveyor_test
-      MARIADB_USER: surveyor
-      MARIADB_PASSWORD: surveyor
+      MARIADB_DATABASE: deliveryroulette_test
+      MARIADB_USER: deliveryroulette
+      MARIADB_PASSWORD: deliveryroulette
     ports:
       - "3306:3306"
     healthcheck:

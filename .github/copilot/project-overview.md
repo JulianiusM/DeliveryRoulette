@@ -1,6 +1,6 @@
 # Project Overview
 
-Surveyor is a TypeScript-based survey management application built with:
+DeliveryRoulette is a TypeScript-based survey management application built with:
 
 - Express.js for the web server
 - TypeORM for database operations

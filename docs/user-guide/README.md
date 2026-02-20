@@ -1,6 +1,6 @@
-# Inventory Management User Guide
+# DeliveryRoulette User Guide
 
-Welcome to Inventory Management! This guide will help you get started with cataloging your items, organizing locations, scanning barcodes, and tracking loans.
+Welcome to DeliveryRoulette! This guide will help you get started with cataloging your items, organizing locations, scanning barcodes, and tracking loans.
 
 ## Table of Contents
 

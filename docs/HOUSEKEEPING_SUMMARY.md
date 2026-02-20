@@ -5,7 +5,7 @@
 
 ## Overview
 
-This document summarizes the comprehensive housekeeping performed on the Surveyor repository as requested in the housekeeping issue. All four major tasks have been completed successfully.
+This document summarizes the comprehensive housekeeping performed on the DeliveryRoulette repository as requested in the housekeeping issue. All four major tasks have been completed successfully.
 
 ---
 

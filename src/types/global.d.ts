@@ -7,7 +7,7 @@ export {};
 
 declare global {
     interface Window {
-        InventoryApp: {
+        DeliveryRouletteApp: {
             init?: () => void;
             // Add more functions/properties if needed
             // Entity IDs from server

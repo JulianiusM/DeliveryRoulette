@@ -36,20 +36,20 @@ afterAll(() => {
 });
 
 /**
- * Mock window.Surveyor global object
+ * Mock window.DeliveryRouletteApp global object
  * This is injected by the backend in production but needs to be mocked in tests
  */
 beforeEach(() => {
-    // Reset window.Surveyor to clean state
+    // Reset window.DeliveryRouletteApp to clean state
     // Preserve init function if it was set by a module
-    if (!window.Surveyor) {
-        (window as any).Surveyor = {};
+    if (!window.DeliveryRouletteApp) {
+        (window as any).DeliveryRouletteApp = {};
     }
-    const existingInit = window.Surveyor.init;
+    const existingInit = window.DeliveryRouletteApp.init;
     // Reset properties but preserve init
-    window.Surveyor.rawPermissions = undefined;
-    window.Surveyor.permissions = undefined;
-    window.Surveyor.init = existingInit; // Always set, even if undefined
+    window.DeliveryRouletteApp.rawPermissions = undefined;
+    window.DeliveryRouletteApp.permissions = undefined;
+    window.DeliveryRouletteApp.init = existingInit; // Always set, even if undefined
 
     // Mock scrollIntoView (not available in jsdom)
     Element.prototype.scrollIntoView = jest.fn();

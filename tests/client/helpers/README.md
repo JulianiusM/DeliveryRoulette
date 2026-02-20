@@ -29,7 +29,7 @@ describe('My Component', () => {
 - ✅ Clears `document.body.innerHTML`
 - ✅ Resets all Jest mocks
 - ✅ Clears response queues
-- ✅ Resets `window.Surveyor`
+- ✅ Resets `window.DeliveryRouletteApp`
 - ✅ Mocks `window.location`
 
 ### 2. Response Queue System (Automatic Initialization)
@@ -156,7 +156,7 @@ describe('Component Test', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         jest.clearAllMocks();
-        (window as any).Surveyor = {};
+        (window as any).DeliveryRouletteApp = {};
         delete (window as any).location;
         (window as any).location = { reload: jest.fn() };
     });

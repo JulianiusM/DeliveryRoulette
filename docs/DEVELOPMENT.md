@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers the development workflow, tools, and best practices for contributing to Inventory Management.
+This guide covers the development workflow, tools, and best practices for contributing to DeliveryRoulette.
 
 ## Table of Contents
 
@@ -29,8 +29,8 @@ This guide covers the development workflow, tools, and best practices for contri
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/JulianiusM/InventoryManagement.git
-   cd InventoryManagement
+   git clone https://github.com/JulianiusM/DeliveryRoulette.git
+   cd DeliveryRoulette
    ```
 
 2. **Install dependencies:**
@@ -78,7 +78,7 @@ Install these extensions:
 ## Project Structure
 
 ```
-inventory-management/
+DeliveryRoulette/
 ├── src/                        # Application source code
 │   ├── controller/             # Business logic controllers
 │   ├── middleware/             # Express middleware
@@ -555,9 +555,9 @@ Create `.env` file:
 ```env
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=surveyor
-DB_PASS=surveyor
-DB_NAME=surveyor
+DB_USER=deliveryroulette
+DB_PASS=deliveryroulette
+DB_NAME=deliveryroulette
 SESSION_SECRET=your-secret-key
 OIDC_ISSUER=https://your-oidc-provider
 ```
