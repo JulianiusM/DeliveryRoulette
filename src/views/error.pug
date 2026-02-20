@@ -1,8 +1,8 @@
-//- views/error.pug – überarbeitete Fehlerseite
+//- views/error.pug – Error page
 extends layout
 
 block meta
-    title Error | Inventory Management
+    title Error | Delivery Roulette
 
 block title
     h1.card-header.text-center.bg-danger.text-light
@@ -18,7 +18,7 @@ block content
             if code
                 |  (Status #{code})
 
-    //── Stack Trace (nur in Entwicklung) ─────────────────
+    //── Stack Trace (development only) ─────────────────
     if error && error.stack
         details.mb-0
             summary.text-warning

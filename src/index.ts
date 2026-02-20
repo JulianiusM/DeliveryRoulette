@@ -1,1 +1,1 @@
-console.log('Happy developing ✨')
+export {default} from './app';

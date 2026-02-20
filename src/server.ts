@@ -1,21 +1,13 @@
 import http from 'http';
-import settings from './modules/settings';
-import {initDataSource} from "./modules/database/dataSource";
+
+const PORT = parseInt(process.env.APP_PORT || '3000', 10);
 
 async function bootstrap() {
     try {
-        console.log('🔧 Initializing database connection...');
-        await settings.read();
-        await initDataSource();
-
-        // Recover stale sync jobs from previous run
-        const {recoverStaleSyncJobs} = await import('./modules/games/GameSyncService');
-        await recoverStaleSyncJobs();
-
         const {default: app} = await import('./app');
         const server = http.createServer(app);
-        server.listen(settings.value.appPort, () => {
-            console.log(`🚀 Server listening on ${settings.value.rootUrl}`);
+        server.listen(PORT, () => {
+            console.log(`🚀 Server listening on http://localhost:${PORT}`);
         });
     } catch (err) {
         console.error('❌ Failed to initialize app:', err);
