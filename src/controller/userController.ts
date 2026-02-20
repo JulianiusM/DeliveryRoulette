@@ -69,7 +69,6 @@ export async function loginUser(body: any, session: Request["session"]) {
     }
 
     session.user = user;
-    session.guest = undefined;
     await persistSession(session);
 }
 

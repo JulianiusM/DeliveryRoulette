@@ -31,7 +31,6 @@ export function formatAmount(amount: number): string {
 export function resolveActorLabel(session: Request['session'] | undefined | null): string {
     if (session?.user?.name) return session.user.name;
     if (session?.user?.username) return session.user.username;
-    if (session?.guest?.username) return session.guest.username;
     return 'an organizer';
 }
 
@@ -169,12 +168,9 @@ export function maskEmail(email?: string | null) {
 
 export async function performAPIAction(req: Request, action: {
     actionUser: (body: any, userId: number) => Promise<void>,
-    actionGuest: (body: any, guestId: number) => Promise<void>,
 }) {
     const userId = req.session.user?.id;
-    const guestId = req.session.guest?.id;
     if (userId) await action.actionUser(req.body, userId);
-    else if (guestId) await action.actionGuest(req.body, guestId);
     else throw new APIError('Unknown user', {}, 401);
 }
 

@@ -113,7 +113,6 @@ export async function callback(req: Request) {
 
     // Clear transient OIDC artifacts
     req.session.oidc = undefined;
-    req.session.guest = undefined;
 
     await persistSession(req.session);
 }

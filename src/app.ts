@@ -61,7 +61,6 @@ app.use(flash());
 
 app.use(function (req: Request, res: Response, next: NextFunction) {
     res.locals.user = req.session.user;
-    res.locals.guest = req.session.guest;
     res.locals.version = version;
     res.locals.settings = {
         localLoginEnabled: settings.value.localLoginEnabled,

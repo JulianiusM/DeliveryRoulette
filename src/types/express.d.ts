@@ -3,12 +3,6 @@ import {User} from "../modules/database/entities/user/User";
 import {Settings} from "../modules/settings";
 import {TokenEndpointResponse} from "openid-client";
 
-declare module "express-flash" {
-    import {RequestHandler} from "express";
-    function flash(): RequestHandler;
-    export default flash;
-}
-
 declare module "express" {
     // Inject additional properties on express.Request
     interface Request {
