@@ -13,5 +13,5 @@ export function init(): void {
 }
 
 // Expose to global scope
-if (!window.InventoryApp) window.InventoryApp = {};
-window.InventoryApp.init = init;
+if (!window.DeliveryRouletteApp) window.DeliveryRouletteApp = {};
+window.DeliveryRouletteApp.init = init;
