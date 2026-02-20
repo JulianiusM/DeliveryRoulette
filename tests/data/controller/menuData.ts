@@ -144,6 +144,11 @@ export const createItemInvalidData = [
         input: {name: 'Bad Item', price: '10', currency: 'EURO'},
         expectedError: 'Currency code must be at most 3 characters.',
     },
+    {
+        description: 'rejects currency longer than 3 chars without price',
+        input: {name: 'Bad Item', currency: 'EURO'},
+        expectedError: 'Currency code must be at most 3 characters.',
+    },
 ];
 
 export const updateItemValidData = [

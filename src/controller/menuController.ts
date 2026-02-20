@@ -53,7 +53,7 @@ export async function createItem(categoryId: string, body: any): Promise<MenuIte
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Price must be a valid number.', returnInfo);
     }
 
-    if (parsedPrice !== null && currency && currency.trim().length > 3) {
+    if (currency && currency.trim().length > 3) {
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Currency code must be at most 3 characters.', returnInfo);
     }
 
@@ -79,7 +79,7 @@ export async function updateItem(id: string, body: any): Promise<MenuItem | null
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Price must be a valid number.', returnInfo);
     }
 
-    if (parsedPrice !== null && currency && currency.trim().length > 3) {
+    if (currency && currency.trim().length > 3) {
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Currency code must be at most 3 characters.', returnInfo);
     }
 
