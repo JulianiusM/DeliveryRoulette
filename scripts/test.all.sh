@@ -44,7 +44,7 @@ for arg in "$@"; do
 done
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║     Surveyor - Complete Test Suite Setup          ║${NC}"
+echo -e "${BLUE}║     DeliveryRoulette - Complete Test Suite Setup  ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -91,8 +91,8 @@ echo ""
 # Step 4: Configure MariaDB
 echo -e "${YELLOW}[4/9]${NC} Configuring MariaDB..."
 mysql -h 127.0.0.1 -uroot -proot -e "SET GLOBAL sql_mode='';" 2>/dev/null
-mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS surveyor_e2e;" 2>/dev/null
-mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON surveyor_e2e.* TO 'surveyor'@'%';" 2>/dev/null
+mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS deliveryroulette_e2e;" 2>/dev/null
+mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON deliveryroulette_e2e.* TO 'deliveryroulette'@'%';" 2>/dev/null
 mysql -h 127.0.0.1 -uroot -proot -e "FLUSH PRIVILEGES;" 2>/dev/null
 echo -e "${GREEN}✓${NC} MariaDB configured"
 echo ""

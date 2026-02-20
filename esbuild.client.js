@@ -56,7 +56,7 @@ async function build() {
         target: ['es2020'],
         format: 'esm',
         platform: 'browser',
-        globalName: 'Surveyor', // exposes your functions for pug
+        globalName: 'DeliveryRoulette', // exposes your functions for pug
         logLevel: 'info',
         plugins: [importPathRewritePlugin],
         metafile: true,        // (optional) inspect what’s emitted

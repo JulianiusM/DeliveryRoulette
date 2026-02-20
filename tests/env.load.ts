@@ -15,5 +15,5 @@ process.env.TEST_DB_HOST ??= '127.0.0.1';
 process.env.TEST_DB_PORT ??= '3306';
 process.env.TEST_DB_USER ??= 'root';
 process.env.TEST_DB_PASSWORD ??= 'password';
-process.env.TEST_DB_NAME ??= 'surveyor_test';
+process.env.TEST_DB_NAME ??= 'deliveryroulette_test';
 process.env.TEST_DB_LOGGING ??= 'false';

@@ -17,9 +17,9 @@ jobs:
         image: mariadb:10.11
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: surveyor_test
-          MYSQL_USER: surveyor
-          MYSQL_PASSWORD: surveyor
+          MYSQL_DATABASE: deliveryroulette_test
+          MYSQL_USER: deliveryroulette
+          MYSQL_PASSWORD: deliveryroulette
         ports:
           - 3306:3306
         options: >-
@@ -67,10 +67,10 @@ jobs:
 
       - name: Create databases and grant privileges
         run: |
-          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS surveyor_test;"
-          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS surveyor_e2e;"
-          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON surveyor_test.* TO 'surveyor'@'%' IDENTIFIED BY 'surveyor';"
-          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON surveyor_e2e.* TO 'surveyor'@'%' IDENTIFIED BY 'surveyor';"
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS deliveryroulette_test;"
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS deliveryroulette_e2e;"
+          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON deliveryroulette_test.* TO 'deliveryroulette'@'%' IDENTIFIED BY 'deliveryroulette';"
+          mysql -h 127.0.0.1 -uroot -proot -e "GRANT ALL ON deliveryroulette_e2e.* TO 'deliveryroulette'@'%' IDENTIFIED BY 'deliveryroulette';"
           mysql -h 127.0.0.1 -uroot -proot -e "FLUSH PRIVILEGES;"
 
       - name: Create tests/.env.test
@@ -79,9 +79,9 @@ jobs:
           cat > tests/.env.test <<'EOF'
           TEST_DB_HOST=127.0.0.1
           TEST_DB_PORT=3306
-          TEST_DB_USER=surveyor
-          TEST_DB_PASSWORD=surveyor
-          TEST_DB_NAME=surveyor_test
+          TEST_DB_USER=deliveryroulette
+          TEST_DB_PASSWORD=deliveryroulette
+          TEST_DB_NAME=deliveryroulette_test
           TEST_DB_LOGGING=false
           EOF
           echo "Wrote tests/.env.test"
@@ -101,9 +101,9 @@ jobs:
           # E2E DB (guard requires name to contain 'e2e')
           E2E_DB_HOST=127.0.0.1
           E2E_DB_PORT=3306
-          E2E_DB_USER=surveyor
-          E2E_DB_PASSWORD=surveyor
-          E2E_DB_NAME=surveyor_e2e
+          E2E_DB_USER=deliveryroulette
+          E2E_DB_PASSWORD=deliveryroulette
+          E2E_DB_NAME=deliveryroulette_e2e
 
           # Seeded admin for tests
           E2E_ADMIN_USERNAME=tester
