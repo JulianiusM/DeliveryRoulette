@@ -14,7 +14,7 @@ describe('Event Registration', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         jest.clearAllMocks();
-        (window as any).Surveyor = {};
+        (window as any).DeliveryRouletteApp = {};
     });
     
     test('registers for event successfully', async () => {

@@ -334,7 +334,7 @@ export function init(): void {
 // Expose via window
 declare global {
     interface Window {
-        InventoryApp: {
+        DeliveryRouletteApp: {
             init: () => void;
         };
     }
