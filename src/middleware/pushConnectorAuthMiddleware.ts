@@ -6,7 +6,6 @@
 
 import {NextFunction, Request, Response} from 'express';
 import rateLimit, {ipKeyGenerator} from 'express-rate-limit';
-import * as connectorDeviceService from '../modules/database/services/ConnectorDeviceService';
 import {ExpectedError} from '../modules/lib/errors';
 import settings from '../modules/settings';
 
@@ -46,22 +45,8 @@ export async function requirePushConnectorAuth(
         throw new ExpectedError('Invalid device token', 'error', 401);
     }
     
-    const device = await connectorDeviceService.verifyDeviceToken(token);
-    
-    if (!device) {
-        throw new ExpectedError('Invalid or revoked device token', 'error', 401);
-    }
-    
-    // Attach device info to request
-    req.connectorDevice = {
-        deviceId: device.id,
-        accountId: device.externalAccountId,
-        userId: device.externalAccount.owner.id,
-        deviceName: device.name,
-        provider: device.externalAccount.provider,
-    };
-    
-    next();
+    // TODO: implement connector device verification when connector features are added
+    throw new ExpectedError('Connector device authentication is not yet implemented', 'error', 501);
 }
 
 /**

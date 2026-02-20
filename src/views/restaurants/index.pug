@@ -1,0 +1,73 @@
+//- views/restaurants/index.pug – Restaurant List
+extends ../layout
+
+block meta
+    title Restaurants | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-shop.me-2
+        | Restaurants
+
+block content
+    - const restaurants = (data && data.restaurants) || []
+    - const search = (data && data.search) || ''
+    - const active = (data && data.active) || ''
+
+    //── Search & Filter ──────────────────────────────────
+    form.row.g-2.mb-4(method="GET" action="/restaurants")
+        .col-md-6
+            .input-group
+                span.input-group-text.text-bg-dark
+                    i.bi.bi-search
+                input.form-control.text-bg-dark(
+                    type="text"
+                    name="search"
+                    placeholder="Search by name or city..."
+                    value=search)
+        .col-md-4
+            select.form-select.text-bg-dark(name="active")
+                option(value="" selected=(active === '')) All
+                option(value="true" selected=(active === 'true')) Active only
+                option(value="false" selected=(active === 'false')) Inactive only
+        .col-md-2.d-grid
+            button.btn.btn-primary(type="submit")
+                i.bi.bi-funnel.me-1
+                | Filter
+
+    //── Add button ──────────────────────────────────
+    .d-flex.justify-content-end.mb-3
+        a.btn.btn-success(href="/restaurants/new")
+            i.bi.bi-plus-lg.me-1
+            | Add Restaurant
+
+    //── Restaurant table ────────────────────────────
+    if restaurants.length === 0
+        .text-center.text-white-50.py-4
+            i.bi.bi-shop.d-block.display-4.mb-2
+            p No restaurants found.
+    else
+        .table-responsive
+            table.table.table-dark.table-hover
+                thead
+                    tr
+                        th Name
+                        th City
+                        th Status
+                        th Actions
+                tbody
+                    each r in restaurants
+                        tr
+                            td
+                                a.text-white(href=`/restaurants/${r.id}`) #{r.name}
+                            td #{r.city}
+                            td
+                                if r.isActive
+                                    span.badge.text-bg-success Active
+                                else
+                                    span.badge.text-bg-secondary Inactive
+                            td
+                                a.btn.btn-sm.btn-outline-light.me-1(href=`/restaurants/${r.id}`)
+                                    i.bi.bi-eye
+                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/edit`)
+                                    i.bi.bi-pencil
