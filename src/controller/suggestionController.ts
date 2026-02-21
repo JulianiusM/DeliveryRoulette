@@ -1,7 +1,7 @@
 import * as suggestionService from "../modules/database/services/SuggestionService";
 import * as userDietPrefService from "../modules/database/services/UserDietPreferenceService";
 import * as userPrefService from "../modules/database/services/UserPreferenceService";
-import {ExpectedError} from "../modules/lib/errors";
+import {APIError} from "../modules/lib/errors";
 import {SuggestionFilters, SuggestionResult} from "../modules/database/services/SuggestionService";
 
 // ── Types ───────────────────────────────────────────────────
@@ -100,9 +100,9 @@ export async function processSuggestion(body: {
     const result = await suggestionService.suggest(filters);
 
     if (!result) {
-        throw new ExpectedError(
+        throw new APIError(
             'No restaurants match your filters. Try adjusting your preferences.',
-            'info',
+            {},
             404,
         );
     }

@@ -10,7 +10,7 @@ import {
     formDataDefaults,
 } from '../data/controller/suggestionData';
 import {setupMock} from '../keywords/common/controllerKeywords';
-import {ExpectedError} from '../../src/modules/lib/errors';
+import {APIError} from '../../src/modules/lib/errors';
 
 // Mock the SuggestionService
 jest.mock('../../src/modules/database/services/SuggestionService');
@@ -85,7 +85,7 @@ describe('SuggestionController', () => {
 
             await expect(
                 suggestionController.processSuggestion(testCase.input)
-            ).rejects.toThrow(ExpectedError);
+            ).rejects.toThrow(APIError);
 
             await expect(
                 suggestionController.processSuggestion(testCase.input)
