@@ -44,6 +44,20 @@ app.post('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
     res.redirect(`/restaurants/${restaurant.id}`);
 }));
 
+// ── Provider Reference routes ───────────────────────────────
+
+// POST /restaurants/:id/providers - Add provider reference
+app.post('/:id/providers', asyncHandler(async (req: Request, res: Response) => {
+    await restaurantController.addProviderRef(req.params.id, req.body);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// POST /restaurants/:id/providers/:refId/delete - Remove provider reference
+app.post('/:id/providers/:refId/delete', asyncHandler(async (req: Request, res: Response) => {
+    await restaurantController.removeProviderRef(req.params.id, req.params.refId);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
 // ── Menu Category routes ────────────────────────────────────
 
 // GET /restaurants/:id/menu/categories/new

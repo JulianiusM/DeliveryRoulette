@@ -9,6 +9,10 @@ import {
     updateRestaurantValidData,
     updateRestaurantInvalidData,
 } from '../data/controller/restaurantData';
+import {
+    addProviderRefValidData,
+    addProviderRefInvalidData,
+} from '../data/controller/providerRefData';
 import {setupMock, verifyMockCall, verifyResult} from '../keywords/common/controllerKeywords';
 import {ValidationError, ExpectedError} from '../../src/modules/lib/errors';
 
@@ -20,11 +24,18 @@ import * as restaurantService from '../../src/modules/database/services/Restaura
 jest.mock('../../src/modules/database/services/MenuService');
 import * as menuService from '../../src/modules/database/services/MenuService';
 
+// Mock the RestaurantProviderRefService (used by getRestaurantDetail)
+jest.mock('../../src/modules/database/services/RestaurantProviderRefService');
+import * as providerRefService from '../../src/modules/database/services/RestaurantProviderRefService';
+
 const mockCreateRestaurant = restaurantService.createRestaurant as jest.Mock;
 const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
 const mockListRestaurants = restaurantService.listRestaurants as jest.Mock;
 const mockListCategoriesByRestaurant = menuService.listCategoriesByRestaurant as jest.Mock;
+const mockListByRestaurant = providerRefService.listByRestaurant as jest.Mock;
+const mockAddProviderRef = providerRefService.addProviderRef as jest.Mock;
+const mockRemoveProviderRef = providerRefService.removeProviderRef as jest.Mock;
 
 // Import controller after mocking
 import * as restaurantController from '../../src/controller/restaurantController';
@@ -80,11 +91,13 @@ describe('RestaurantController', () => {
         test('returns restaurant with categories', async () => {
             setupMock(mockGetRestaurantById, sampleRestaurant);
             setupMock(mockListCategoriesByRestaurant, []);
+            setupMock(mockListByRestaurant, []);
 
             const result = await restaurantController.getRestaurantDetail('test-uuid');
 
             expect(result.restaurant).toEqual(sampleRestaurant);
             expect(result.categories).toEqual([]);
+            expect(result.providerRefs).toEqual([]);
         });
 
         test('throws ExpectedError when restaurant not found', async () => {
@@ -171,6 +184,70 @@ describe('RestaurantController', () => {
                     city: 'City',
                     postalCode: '12345',
                 })
+            ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('addProviderRef', () => {
+        test.each(addProviderRefValidData)('$description', async (testCase) => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockAddProviderRef, {id: 'ref-uuid', restaurantId: 'test-uuid', ...testCase.expected, status: 'active'});
+
+            const result = await restaurantController.addProviderRef('test-uuid', testCase.input);
+
+            verifyMockCall(mockAddProviderRef, {restaurantId: 'test-uuid', ...testCase.expected});
+            expect(result).toMatchObject(testCase.expected);
+        });
+
+        test.each(addProviderRefInvalidData)('$description', async (testCase) => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+
+            await expect(
+                restaurantController.addProviderRef('test-uuid', testCase.input)
+            ).rejects.toThrow(ExpectedError);
+
+            await expect(
+                restaurantController.addProviderRef('test-uuid', testCase.input)
+            ).rejects.toMatchObject({
+                message: testCase.expectedError,
+            });
+
+            expect(mockAddProviderRef).not.toHaveBeenCalled();
+        });
+
+        test('throws ExpectedError when restaurant not found', async () => {
+            setupMock(mockGetRestaurantById, null);
+
+            await expect(
+                restaurantController.addProviderRef('bad-id', {providerKey: 'test', url: 'https://example.com'})
+            ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('removeProviderRef', () => {
+        test('removes provider ref successfully', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockRemoveProviderRef, true);
+
+            await restaurantController.removeProviderRef('test-uuid', 'ref-uuid');
+
+            verifyMockCall(mockRemoveProviderRef, 'ref-uuid', 'test-uuid');
+        });
+
+        test('throws ExpectedError when provider ref not found', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockRemoveProviderRef, false);
+
+            await expect(
+                restaurantController.removeProviderRef('test-uuid', 'bad-ref-id')
+            ).rejects.toThrow(ExpectedError);
+        });
+
+        test('throws ExpectedError when restaurant not found', async () => {
+            setupMock(mockGetRestaurantById, null);
+
+            await expect(
+                restaurantController.removeProviderRef('bad-id', 'ref-uuid')
             ).rejects.toThrow(ExpectedError);
         });
     });

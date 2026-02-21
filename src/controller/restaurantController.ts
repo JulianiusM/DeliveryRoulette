@@ -1,7 +1,9 @@
 import * as restaurantService from "../modules/database/services/RestaurantService";
 import * as menuService from "../modules/database/services/MenuService";
+import * as providerRefService from "../modules/database/services/RestaurantProviderRefService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
+import {RestaurantProviderRef} from "../modules/database/entities/restaurant/RestaurantProviderRef";
 import {MenuCategory} from "../modules/database/entities/menu/MenuCategory";
 
 const LIST_TEMPLATE = 'restaurants/index';
@@ -32,10 +34,11 @@ export async function listRestaurants(options: {
     return {restaurants, search: options.search, active: options.activeFilter};
 }
 
-export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]}> {
+export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]}> {
     const restaurant = await requireRestaurant(id);
     const categories = await menuService.listCategoriesByRestaurant(restaurant.id);
-    return {restaurant, categories};
+    const providerRefs = await providerRefService.listByRestaurant(restaurant.id);
+    return {restaurant, categories, providerRefs};
 }
 
 export async function getRestaurantEditData(id: string): Promise<object> {
@@ -112,4 +115,35 @@ export async function updateRestaurant(id: string, body: any): Promise<Restauran
         throw new ExpectedError('Restaurant not found', 'error', 404);
     }
     return restaurant;
+}
+
+// ── Provider References ─────────────────────────────────────
+
+export async function addProviderRef(restaurantId: string, body: any): Promise<RestaurantProviderRef> {
+    await requireRestaurant(restaurantId);
+
+    const {providerKey, externalId, url} = body;
+
+    if (!providerKey || !providerKey.trim()) {
+        throw new ExpectedError('Provider key is required.', 'error', 400);
+    }
+    if (!url || !url.trim()) {
+        throw new ExpectedError('URL is required.', 'error', 400);
+    }
+
+    return await providerRefService.addProviderRef({
+        restaurantId,
+        providerKey: providerKey.trim(),
+        externalId: externalId?.trim() || null,
+        url: url.trim(),
+    });
+}
+
+export async function removeProviderRef(restaurantId: string, refId: string): Promise<void> {
+    await requireRestaurant(restaurantId);
+
+    const removed = await providerRefService.removeProviderRef(refId, restaurantId);
+    if (!removed) {
+        throw new ExpectedError('Provider reference not found', 'error', 404);
+    }
 }

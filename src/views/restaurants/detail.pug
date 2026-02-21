@@ -44,6 +44,59 @@ block content
                     p.text-white-50.mb-0
                         small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
 
+    //── Provider References Section ──────────────────────────
+    - const providerRefs = data.providerRefs || []
+    .card.text-bg-dark.border-secondary.mt-4
+        .card-header.d-flex.justify-content-between.align-items-center
+            span
+                i.bi.bi-link-45deg.me-2
+                | Provider References
+            button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addProviderForm")
+                i.bi.bi-plus-lg.me-1
+                | Add Provider
+        .card-body
+            #addProviderForm.collapse.mb-3
+                form(method="POST" action=`/restaurants/${r.id}/providers`)
+                    .row.g-2
+                        .col-md-3
+                            input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key (e.g. uber_eats)" required)
+                        .col-md-3
+                            input.form-control.form-control-sm(type="text" name="externalId" placeholder="External ID (optional)")
+                        .col-md-4
+                            input.form-control.form-control-sm(type="url" name="url" placeholder="URL" required)
+                        .col-md-2
+                            button.btn.btn-sm.btn-success.w-100(type="submit")
+                                i.bi.bi-plus-lg.me-1
+                                | Add
+
+            if providerRefs.length === 0
+                .text-center.text-white-50.py-3
+                    i.bi.bi-link-45deg.d-block.display-6.mb-2
+                    p No provider references yet.
+            else
+                .table-responsive
+                    table.table.table-dark.table-hover.mb-0
+                        thead
+                            tr
+                                th Provider
+                                th External ID
+                                th URL
+                                th Status
+                                th Actions
+                        tbody
+                            each ref in providerRefs
+                                tr
+                                    td #{ref.providerKey}
+                                    td.text-white-50 #{ref.externalId || '—'}
+                                    td
+                                        a.text-info(href=ref.url target="_blank" rel="noopener noreferrer") #{ref.url}
+                                    td
+                                        span.badge(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
+                                    td
+                                        form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
+                                            button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove")
+                                                i.bi.bi-trash
+
     //── Menu Section ─────────────────────────────────────
     .card.text-bg-dark.border-secondary.mt-4
         .card-header.d-flex.justify-content-between.align-items-center
