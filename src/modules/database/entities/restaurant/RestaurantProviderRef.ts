@@ -25,7 +25,7 @@ export class RestaurantProviderRef {
     @Column("timestamp", {name: "last_sync_at", nullable: true})
     lastSyncAt?: Date | null;
 
-    @Column("varchar", {name: "status", length: 50, default: "'active'"})
+    @Column("varchar", {name: "status", length: 50, default: "active"})
     status!: string;
 
     @Column("timestamp", {
