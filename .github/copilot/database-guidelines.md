@@ -11,6 +11,7 @@
 
 - Always create migrations for schema changes
 - Never use `synchronize: true` in production
+- All migrations must be idempotent and work even after the database is created using syncronize: true
 - Test migrations with both up and down operations
 - Place migrations in `src/migrations/`
 
