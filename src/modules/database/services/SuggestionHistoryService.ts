@@ -30,7 +30,7 @@ export async function getRecentRestaurantIds(userId?: number | null): Promise<st
         .orderBy('sh.suggested_at', 'DESC')
         .limit(limit);
 
-    if (userId) {
+    if (userId !== null && userId !== undefined) {
         qb.where('sh.user_id = :userId', {userId});
     } else {
         qb.where('sh.user_id IS NULL');
