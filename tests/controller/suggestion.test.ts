@@ -28,12 +28,18 @@ import * as userDietPrefService from '../../src/modules/database/services/UserDi
 jest.mock('../../src/modules/database/services/UserPreferenceService');
 import * as userPrefService from '../../src/modules/database/services/UserPreferenceService';
 
+// Mock the UserRestaurantPreferenceService
+jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
+import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
+
 const mockSuggest = suggestionService.suggest as jest.Mock;
 const mockGetRecentRestaurantIds = suggestionHistoryService.getRecentRestaurantIds as jest.Mock;
 const mockRecordSuggestion = suggestionHistoryService.recordSuggestion as jest.Mock;
 const mockGetAllDietTags = userDietPrefService.getAllDietTags as jest.Mock;
 const mockGetEffectiveDietFilterIds = userDietPrefService.getEffectiveDietFilterIds as jest.Mock;
 const mockGetByUserId = userPrefService.getByUserId as jest.Mock;
+const mockGetDoNotSuggestRestaurantIds = userRestaurantPrefService.getDoNotSuggestRestaurantIds as jest.Mock;
+const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
 
 // Import controller after mocking
 import * as suggestionController from '../../src/controller/suggestionController';
@@ -44,6 +50,10 @@ describe('SuggestionController', () => {
         // Default: no recent history
         mockGetRecentRestaurantIds.mockResolvedValue([]);
         mockRecordSuggestion.mockResolvedValue({});
+        // Default: no do-not-suggest restaurants
+        mockGetDoNotSuggestRestaurantIds.mockResolvedValue([]);
+        // Default: no favorites
+        mockGetFavoriteRestaurantIds.mockResolvedValue([]);
     });
 
     describe('getSuggestionFormData', () => {
@@ -154,6 +164,72 @@ describe('SuggestionController', () => {
             ).rejects.toThrow(APIError);
 
             expect(mockRecordSuggestion).not.toHaveBeenCalled();
+        });
+
+        test('passes do-not-suggest restaurant IDs for logged-in user', async () => {
+            mockGetDoNotSuggestRestaurantIds.mockResolvedValue(['r-blocked-1']);
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r-ok', name: 'Good Place'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({}, 10);
+
+            expect(mockGetDoNotSuggestRestaurantIds).toHaveBeenCalledWith(10);
+            expect(mockSuggest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    doNotSuggestIds: ['r-blocked-1'],
+                })
+            );
+        });
+
+        test('passes empty do-not-suggest list for anonymous user', async () => {
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r1', name: 'Test'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({});
+
+            expect(mockGetDoNotSuggestRestaurantIds).not.toHaveBeenCalled();
+            expect(mockSuggest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    doNotSuggestIds: [],
+                })
+            );
+        });
+
+        test('passes favorite restaurant IDs for logged-in user', async () => {
+            mockGetFavoriteRestaurantIds.mockResolvedValue(['r-fav-1', 'r-fav-2']);
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r-fav-1', name: 'Fav Place'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({}, 5);
+
+            expect(mockGetFavoriteRestaurantIds).toHaveBeenCalledWith(5);
+            expect(mockSuggest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    favoriteIds: ['r-fav-1', 'r-fav-2'],
+                })
+            );
+        });
+
+        test('passes empty favorites list for anonymous user', async () => {
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r1', name: 'Test'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({});
+
+            expect(mockGetFavoriteRestaurantIds).not.toHaveBeenCalled();
+            expect(mockSuggest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    favoriteIds: [],
+                })
+            );
         });
     });
 });

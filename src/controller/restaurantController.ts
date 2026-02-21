@@ -2,6 +2,7 @@ import * as restaurantService from "../modules/database/services/RestaurantServi
 import * as menuService from "../modules/database/services/MenuService";
 import * as providerRefService from "../modules/database/services/RestaurantProviderRefService";
 import * as dietOverrideService from "../modules/database/services/DietOverrideService";
+import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
 import {RestaurantProviderRef} from "../modules/database/entities/restaurant/RestaurantProviderRef";
@@ -28,21 +29,47 @@ async function requireRestaurant(id: string): Promise<Restaurant> {
 export async function listRestaurants(options: {
     search?: string;
     activeFilter?: string;
-}): Promise<{restaurants: Restaurant[]; search?: string; active?: string}> {
+    favoritesOnly?: boolean;
+    userId?: number;
+}): Promise<{restaurants: Restaurant[]; search?: string; active?: string; favoritesOnly?: boolean; favoriteIds: string[]}> {
     let isActive: boolean | undefined;
     if (options.activeFilter === 'true') isActive = true;
     else if (options.activeFilter === 'false') isActive = false;
 
     const restaurants = await restaurantService.listRestaurants({search: options.search, isActive});
-    return {restaurants, search: options.search, active: options.activeFilter};
+
+    // Get user's favorite restaurant IDs
+    let favoriteIds: string[] = [];
+    if (options.userId) {
+        favoriteIds = await userRestaurantPrefService.getFavoriteRestaurantIds(options.userId);
+    }
+
+    // Filter to favorites only if requested
+    const favoriteSet = new Set(favoriteIds);
+    const filtered = options.favoritesOnly && favoriteIds.length > 0
+        ? restaurants.filter(r => favoriteSet.has(r.id))
+        : restaurants;
+
+    return {restaurants: filtered, search: options.search, active: options.activeFilter, favoritesOnly: options.favoritesOnly, favoriteIds};
 }
 
-export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]}> {
+export async function getRestaurantDetail(id: string, userId?: number): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]; isFavorite: boolean; doNotSuggest: boolean}> {
     const restaurant = await requireRestaurant(id);
     const categories = await menuService.listCategoriesByRestaurant(restaurant.id);
     const providerRefs = await providerRefService.listByRestaurant(restaurant.id);
     const dietSuitability = await dietOverrideService.computeEffectiveSuitability(restaurant.id);
-    return {restaurant, categories, providerRefs, dietSuitability};
+
+    let isFavorite = false;
+    let doNotSuggest = false;
+    if (userId) {
+        const pref = await userRestaurantPrefService.getByUserAndRestaurant(userId, restaurant.id);
+        if (pref) {
+            isFavorite = !!pref.isFavorite;
+            doNotSuggest = !!pref.doNotSuggest;
+        }
+    }
+
+    return {restaurant, categories, providerRefs, dietSuitability, isFavorite, doNotSuggest};
 }
 
 export async function getRestaurantEditData(id: string): Promise<object> {
@@ -182,4 +209,16 @@ export async function removeDietOverride(restaurantId: string, overrideId: strin
     if (!removed) {
         throw new ExpectedError('Diet override not found.', 'error', 404);
     }
+}
+
+// ── User Restaurant Preferences ─────────────────────────────
+
+export async function toggleFavorite(restaurantId: string, userId: number): Promise<void> {
+    await requireRestaurant(restaurantId);
+    await userRestaurantPrefService.toggleFavorite(userId, restaurantId);
+}
+
+export async function toggleDoNotSuggest(restaurantId: string, userId: number): Promise<void> {
+    await requireRestaurant(restaurantId);
+    await userRestaurantPrefService.toggleDoNotSuggest(userId, restaurantId);
 }

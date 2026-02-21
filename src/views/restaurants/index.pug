@@ -13,10 +13,12 @@ block content
     - const restaurants = (data && data.restaurants) || []
     - const search = (data && data.search) || ''
     - const active = (data && data.active) || ''
+    - const favoritesOnly = (data && data.favoritesOnly) || false
+    - const favoriteIds = (data && data.favoriteIds) || []
 
     //── Search & Filter ──────────────────────────────────
     form.row.g-2.mb-4(method="GET" action="/restaurants")
-        .col-md-6
+        .col-md-5
             .input-group
                 span.input-group-text.text-bg-dark
                     i.bi.bi-search
@@ -25,11 +27,17 @@ block content
                     name="search"
                     placeholder="Search by name or city..."
                     value=search)
-        .col-md-4
+        .col-md-3
             select.form-select.text-bg-dark(name="active")
                 option(value="" selected=(active === '')) All
                 option(value="true" selected=(active === 'true')) Active only
                 option(value="false" selected=(active === 'false')) Inactive only
+        .col-md-2
+            .form-check.mt-2
+                input.form-check-input(type="checkbox" name="favorites" value="true" id="favoritesFilter" checked=favoritesOnly)
+                label.form-check-label(for="favoritesFilter")
+                    i.bi.bi-star-fill.text-warning.me-1
+                    | Favorites
         .col-md-2.d-grid
             button.btn.btn-primary(type="submit")
                 i.bi.bi-funnel.me-1
@@ -59,6 +67,8 @@ block content
                     each r in restaurants
                         tr
                             td
+                                if favoriteIds.includes(r.id)
+                                    i.bi.bi-star-fill.text-warning.me-1
                                 a.text-white(href=`/restaurants/${r.id}`) #{r.name}
                             td #{r.city}
                             td

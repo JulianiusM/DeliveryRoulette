@@ -55,6 +55,36 @@ describe('SuggestionService', () => {
             const result = suggestionService.pickRandom(items);
             expect(items).toContain(result);
         });
+
+        test('returns an element when favoriteIds provided but empty', () => {
+            const items = [{id: 'a'}, {id: 'b'}];
+            const result = suggestionService.pickRandom(items, new Set(), i => i.id);
+            expect(items).toContain(result);
+        });
+
+        test('works without getId when no favorites', () => {
+            const items = ['a', 'b', 'c'];
+            const result = suggestionService.pickRandom(items);
+            expect(items).toContain(result);
+        });
+
+        test('boosts favorites in selection pool', () => {
+            // With favorites boosting, 'a' appears twice in pool of 4
+            // Run many times to verify favorite appears more often
+            const items = [{id: 'a'}, {id: 'b'}, {id: 'c'}];
+            const favoriteIds = new Set(['a']);
+            const counts: Record<string, number> = {a: 0, b: 0, c: 0};
+
+            for (let i = 0; i < 1000; i++) {
+                const result = suggestionService.pickRandom(items, favoriteIds, item => item.id);
+                if (result) counts[result.id]++;
+            }
+
+            // 'a' should appear roughly 2/4 = 50% of the time (vs 1/3 ≈ 33% without boost)
+            // Use a loose threshold: 'a' should be picked more than 'b' or 'c'
+            expect(counts.a).toBeGreaterThan(counts.b);
+            expect(counts.a).toBeGreaterThan(counts.c);
+        });
     });
 
     describe('checkDietCompatibility', () => {
@@ -292,6 +322,55 @@ describe('SuggestionService', () => {
             expect(result).not.toBeNull();
             expect(result!.restaurant.id).toBe('r1');
             expect(result!.reason.totalCandidates).toBe(1);
+        });
+
+        test('do-not-suggest: hard-excludes restaurants with no fallback (no diet)', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Do-not-suggest r1 and r2, only r3 should remain
+            const result = await suggestionService.suggest({doNotSuggestIds: ['r1', 'r2']});
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r3');
+        });
+
+        test('do-not-suggest: returns null when all restaurants are excluded', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Exclude all restaurants via do-not-suggest - no fallback
+            const result = await suggestionService.suggest({doNotSuggestIds: ['r1', 'r2', 'r3']});
+            expect(result).toBeNull();
+        });
+
+        test('do-not-suggest: applied before diet filtering', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // r2 supports vegan but is do-not-suggest; r1 also supports vegan
+            mockComputeEffectiveSuitability
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'override'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+                ]);
+
+            // r2 is do-not-suggest, so only r1 and r3 are candidates for diet check
+            const result = await suggestionService.suggest({
+                dietTagIds: ['tag-vegan'],
+                doNotSuggestIds: ['r2'],
+            });
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r1');
+            // r2 should never be checked for diet compatibility
+            expect(mockComputeEffectiveSuitability).toHaveBeenCalledTimes(2);
         });
     });
 });
