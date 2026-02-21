@@ -18,9 +18,11 @@ export function init(): void {
 }
 
 async function runSuggestion(): Promise<void> {
-    const resultSection = document.getElementById('suggestionResult')!;
-    const emptyState = document.getElementById('emptyState')!;
-    const spinner = document.getElementById('suggestionSpinner')!;
+    const resultSection = document.getElementById('suggestionResult');
+    const emptyState = document.getElementById('emptyState');
+    const spinner = document.getElementById('suggestionSpinner');
+
+    if (!resultSection || !emptyState || !spinner) return;
 
     // Gather filters from the form
     const dietCheckboxes = document.querySelectorAll<HTMLInputElement>('input[name="dietTagIds"]:checked');
@@ -38,7 +40,6 @@ async function runSuggestion(): Promise<void> {
         renderResult(data);
         resultSection.classList.remove('d-none');
     } catch (err: any) {
-        emptyState.classList.add('d-none');
         showInlineAlert('info', err.message || 'No restaurants match your filters.');
     } finally {
         spinner.classList.add('d-none');
