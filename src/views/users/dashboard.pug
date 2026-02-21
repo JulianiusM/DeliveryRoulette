@@ -16,6 +16,7 @@ block content
     - const overdueLoanCount = (data && data.overdueLoanCount) || 0
     - const recentItems = (data && data.recentItems) || []
     - const activeLoans = (data && data.activeLoans) || []
+    - const preferences = (data && data.preferences) || {}
 
     //- Stats cards
     .row.row-cols-2.row-cols-md-4.g-3.mb-4
@@ -62,6 +63,37 @@ block content
         a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/loans")
             i.bi.bi-arrow-left-right
             | Lending
+
+    //- User preferences summary
+    if preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
+        .card.text-bg-dark.border-secondary.mb-4
+            .card-header.d-flex.justify-content-between.align-items-center
+                span
+                    i.bi.bi-gear.me-2
+                    | Your Preferences
+                a.btn.btn-sm.btn-outline-light(href="/users/settings")
+                    i.bi.bi-pencil.me-1
+                    | Edit
+            .card-body
+                .row
+                    if preferences.deliveryArea
+                        .col-md-4
+                            strong.text-white-50
+                                i.bi.bi-geo-alt.me-1
+                                | Delivery Area
+                            p.mb-0 #{preferences.deliveryArea}
+                    if preferences.cuisineIncludes
+                        .col-md-4
+                            strong.text-white-50
+                                i.bi.bi-hand-thumbs-up.me-1
+                                | Preferred Cuisines
+                            p.mb-0 #{preferences.cuisineIncludes}
+                    if preferences.cuisineExcludes
+                        .col-md-4
+                            strong.text-white-50
+                                i.bi.bi-hand-thumbs-down.me-1
+                                | Excluded Cuisines
+                            p.mb-0 #{preferences.cuisineExcludes}
 
     .row.g-4
         //- Recent items

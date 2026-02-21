@@ -1,6 +1,7 @@
 import express, {Request, Response} from 'express';
 
 import * as userController from "../controller/userController";
+import * as settingsController from "../controller/settingsController";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import settings from "../modules/settings";
@@ -19,6 +20,8 @@ app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
         return res.redirect('/users/login');
     }
 
+    const preferences = await settingsController.getSettings(req.session.user.id);
+
     renderer.renderWithData(res, 'users/dashboard', {
         itemCount: 0,
         locationCount: 0,
@@ -26,6 +29,7 @@ app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
         overdueLoanCount: 0,
         recentItems: [],
         activeLoans: [],
+        preferences,
     });
 }));
 
@@ -101,6 +105,24 @@ app.get('/activate/:token', asyncHandler(async (req: Request, res: Response) => 
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.activateAccount(req.params.token as string);
     renderer.renderSuccess(res, 'Your account has been activated. You can log in now.')
+}));
+
+// User preferences / settings
+app.get('/settings', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    const data = await settingsController.getSettings(req.session.user.id);
+    renderer.renderWithData(res, 'users/settings', data);
+}));
+
+app.post('/settings', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    await settingsController.saveSettings(req.session.user.id, req.body);
+    req.flash('success', 'Settings saved successfully');
+    res.redirect('/users/settings');
 }));
 
 app.get('/oidc/login', asyncHandler(async (req: Request, res: Response) => {
