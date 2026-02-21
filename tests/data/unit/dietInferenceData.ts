@@ -31,7 +31,7 @@ export const normalizeTextData = [
         expected: 'hello world',
     },
     {
-        description: 'handles combined normalisation',
+        description: 'handles combined normalization',
         input: '  VEGAN  Friendly   Menu  ',
         expected: 'vegan friendly menu',
     },

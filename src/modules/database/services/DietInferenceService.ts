@@ -64,7 +64,7 @@ export const DIET_KEYWORD_RULES: Record<string, string[]> = {
 // ── Text normalisation ────────────────────────────────────
 
 /**
- * Normalise text for keyword matching.
+ * Normalize text for keyword matching.
  * Lower-cases, collapses whitespace, and strips surrounding whitespace.
  */
 export function normalizeText(text: string): string {
