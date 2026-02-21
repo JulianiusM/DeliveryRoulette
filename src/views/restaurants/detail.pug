@@ -11,6 +11,7 @@ block title
 
 block content
     - const r = data.restaurant
+    - const categories = data.categories || []
 
     .row.g-4
         .col-md-8
@@ -42,6 +43,63 @@ block content
                         small Created: #{new Date(r.createdAt).toLocaleDateString()}
                     p.text-white-50.mb-0
                         small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
+
+    //── Menu Section ─────────────────────────────────────
+    .card.text-bg-dark.border-secondary.mt-4
+        .card-header.d-flex.justify-content-between.align-items-center
+            span
+                i.bi.bi-menu-button-wide.me-2
+                | Menu
+            a.btn.btn-sm.btn-success(href=`/restaurants/${r.id}/menu/categories/new`)
+                i.bi.bi-plus-lg.me-1
+                | Add Category
+        .card-body
+            if categories.length === 0
+                .text-center.text-white-50.py-3
+                    i.bi.bi-menu-button-wide.d-block.display-6.mb-2
+                    p No menu categories yet.
+            else
+                each cat in categories
+                    .card.text-bg-dark.border-secondary.mb-3
+                        .card-header.d-flex.justify-content-between.align-items-center
+                            span
+                                i.bi.bi-list-ul.me-2
+                                | #{cat.name}
+                                if !cat.isActive
+                                    span.badge.text-bg-secondary.ms-2 Inactive
+                            .d-flex.gap-1
+                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/items/new` title="Add Item")
+                                    i.bi.bi-plus-lg
+                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/edit` title="Edit Category")
+                                    i.bi.bi-pencil
+                        .card-body
+                            - const items = cat.items || []
+                            if items.length === 0
+                                p.text-white-50.mb-0 No items in this category.
+                            else
+                                .table-responsive
+                                    table.table.table-dark.table-hover.mb-0
+                                        thead
+                                            tr
+                                                th Name
+                                                th Description
+                                                th Price
+                                                th Actions
+                                        tbody
+                                            each item in items
+                                                tr
+                                                    td #{item.name}
+                                                    td.text-white-50 #{item.description || '—'}
+                                                    td
+                                                        if item.price != null
+                                                            | #{parseFloat(item.price).toFixed(2)}
+                                                            if item.currency
+                                                                |  #{item.currency}
+                                                        else
+                                                            span.text-white-50 —
+                                                    td
+                                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit` title="Edit Item")
+                                                            i.bi.bi-pencil
 
     .d-flex.gap-2.mt-4
         a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)

@@ -1,0 +1,69 @@
+//- views/restaurants/menu/categoryForm.pug – Create / Edit Menu Category
+extends ../../layout
+
+block meta
+    if data && data.editing
+        title Edit Category | DeliveryRoulette
+    else
+        title New Category | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-list-ul.me-2
+        if data && data.editing
+            | Edit Category
+        else
+            | New Category
+
+block content
+    - const d = data || {}
+    - const editing = d.editing || false
+    - const restaurantId = d.restaurantId
+    - const formAction = editing ? `/restaurants/${restaurantId}/menu/categories/${d.id}/edit` : `/restaurants/${restaurantId}/menu/categories/new`
+
+    form.row.gy-3(action=formAction method="post")
+        //── Name ────────────────────────────────────────
+        .col-md-8
+            label.form-label.mb-1(for="name")
+                i.bi.bi-list-ul.me-1
+                | Name&nbsp;*
+            input#name.form-control.text-bg-dark(
+                type="text"
+                name="name"
+                maxlength="150"
+                value=(d.name || '')
+                placeholder="Category name"
+                required)
+
+        //── Sort Order ─────────────────────────────────
+        .col-md-4
+            label.form-label.mb-1(for="sortOrder")
+                i.bi.bi-sort-numeric-down.me-1
+                | Sort Order
+            input#sortOrder.form-control.text-bg-dark(
+                type="number"
+                name="sortOrder"
+                value=(d.sortOrder != null ? d.sortOrder : 0)
+                placeholder="0")
+
+        //── Active ────────────────────────────────────
+        if editing
+            .col-12
+                .form-check
+                    input#isActive.form-check-input(
+                        type="checkbox"
+                        name="isActive"
+                        checked=d.isActive)
+                    label.form-check-label(for="isActive") Active
+
+        //── Buttons ──────────────────────────────────
+        .col-12.d-flex.gap-2.mt-2
+            button.btn.btn-success(type="submit")
+                i.bi.bi-check-lg.me-1
+                if editing
+                    | Save Changes
+                else
+                    | Create Category
+            a.btn.btn-outline-light(href=`/restaurants/${restaurantId}`)
+                i.bi.bi-x-lg.me-1
+                | Cancel

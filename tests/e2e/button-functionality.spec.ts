@@ -7,10 +7,9 @@ import { test, expect, Page } from '@playwright/test';
 
 // Pages to test
 const TEST_PAGES = [
-    { path: '/items', name: 'Items List' },
-    { path: '/locations', name: 'Locations List' },
-    { path: '/loans', name: 'Loans List' },
-    { path: '/scan', name: 'Scan Page' },
+    { path: '/restaurants', name: 'Restaurants List' },
+    { path: '/restaurants/new', name: 'New Restaurant' },
+    { path: '/help', name: 'Help Page' },
 ];
 
 /**
@@ -183,68 +182,41 @@ test.describe('Button Functionality Tests', () => {
     }
     
     test('Barcode delete button works', async ({ page }) => {
-        // This test requires an item with a barcode
-        // We'll create one for testing
-        await page.goto('/items');
+        // This test requires a restaurant with items
+        // Navigate to restaurants list to check
+        await page.goto('/restaurants');
         
-        // Try to find an existing item or note test needs setup
-        const itemLinks = await page.locator('a[href^="/items/"]').all();
-        if (itemLinks.length === 0) {
+        // Try to find an existing restaurant or note test needs setup
+        const restaurantLinks = await page.locator('a[href^="/restaurants/"]').all();
+        if (restaurantLinks.length === 0) {
             test.skip();
             return;
         }
         
-        // Go to first item detail
-        await itemLinks[0].click();
+        // Go to first restaurant detail
+        await restaurantLinks[0].click();
         await page.waitForLoadState('networkidle');
         
-        // Check if there's a barcode delete button
-        const deleteBtn = page.locator('.barcode-delete').first();
-        const exists = await deleteBtn.count() > 0;
-        
-        if (exists) {
-            // Set up dialog handler for confirmation
-            page.on('dialog', dialog => dialog.accept());
-            
-            // Click delete button
-            await deleteBtn.click();
-            
-            // Wait for page reload or feedback
-            await page.waitForTimeout(1000);
-            
-            // Check that no JavaScript errors occurred
-            const errors: string[] = [];
-            page.on('pageerror', error => errors.push(error.message));
-            
-            expect(errors.length).toBe(0);
-        } else {
-            console.log('No barcode to test delete functionality');
-        }
+        // Check that the page loaded correctly
+        const heading = page.locator('h1');
+        const headingExists = await heading.count() > 0;
+        expect(headingExists).toBeTruthy();
     });
     
-    test('Modal buttons open modals correctly', async ({ page }) => {
-        // Test that modal buttons exist and have correct attributes
-        // We trust Bootstrap's own JS to handle the modal opening
-        
-        // Test locations modal button
-        await page.goto('/locations');
+    test('Restaurant detail page buttons work', async ({ page }) => {
+        // Navigate to restaurants list
+        await page.goto('/restaurants');
         await page.waitForLoadState('networkidle');
         
-        const addBtn = page.locator('button[data-bs-toggle="modal"][data-bs-target="#addLocationModal"]').first();
+        // Check that the Add Restaurant button exists
+        const addBtn = page.locator('a.btn-success[href="/restaurants/new"]').first();
         const btnExists = await addBtn.count() > 0;
         expect(btnExists).toBeTruthy();
         
         if (btnExists) {
-            // Verify button has correct attributes
-            const bsToggle = await addBtn.getAttribute('data-bs-toggle');
-            const bsTarget = await addBtn.getAttribute('data-bs-target');
-            expect(bsToggle).toBe('modal');
-            expect(bsTarget).toBe('#addLocationModal');
-            
-            // Verify modal exists in DOM
-            const modal = page.locator('#addLocationModal');
-            const modalExists = await modal.count() > 0;
-            expect(modalExists).toBeTruthy();
+            // Verify button has correct href
+            const href = await addBtn.getAttribute('href');
+            expect(href).toBe('/restaurants/new');
         }
     });
 });

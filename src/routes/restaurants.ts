@@ -1,28 +1,22 @@
 import express, {Request, Response} from 'express';
 
 import * as restaurantController from "../controller/restaurantController";
-import * as restaurantService from "../modules/database/services/RestaurantService";
+import * as menuController from "../controller/menuController";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
-import {ExpectedError} from "../modules/lib/errors";
 
 const app = express.Router();
 
 // GET /restaurants - List restaurants with search and active filter
 app.get('/', asyncHandler(async (req: Request, res: Response) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const activeFilter = req.query.active;
-
-    let isActive: boolean | undefined;
-    if (activeFilter === 'true') isActive = true;
-    else if (activeFilter === 'false') isActive = false;
-
-    const restaurants = await restaurantService.listRestaurants({search, isActive});
-    renderer.renderWithData(res, 'restaurants/index', {restaurants, search, active: activeFilter});
+    const activeFilter = typeof req.query.active === 'string' ? req.query.active : undefined;
+    const data = await restaurantController.listRestaurants({search, activeFilter});
+    renderer.renderWithData(res, 'restaurants/index', data);
 }));
 
 // GET /restaurants/new - Show create form
-app.get('/new', asyncHandler(async (req: Request, res: Response) => {
+app.get('/new', asyncHandler(async (_req: Request, res: Response) => {
     renderer.renderWithData(res, 'restaurants/form', {editing: false});
 }));
 
@@ -34,39 +28,72 @@ app.post('/new', asyncHandler(async (req: Request, res: Response) => {
 
 // GET /restaurants/:id - Show detail page
 app.get('/:id', asyncHandler(async (req: Request, res: Response) => {
-    const restaurant = await restaurantService.getRestaurantById(req.params.id as string);
-    if (!restaurant) {
-        throw new ExpectedError('Restaurant not found', 'error', 404);
-    }
-    renderer.renderWithData(res, 'restaurants/detail', {restaurant});
+    const data = await restaurantController.getRestaurantDetail(req.params.id);
+    renderer.renderWithData(res, 'restaurants/detail', data);
 }));
 
 // GET /restaurants/:id/edit - Show edit form
 app.get('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
-    const restaurant = await restaurantService.getRestaurantById(req.params.id as string);
-    if (!restaurant) {
-        throw new ExpectedError('Restaurant not found', 'error', 404);
-    }
-    renderer.renderWithData(res, 'restaurants/form', {
-        editing: true,
-        id: restaurant.id,
-        name: restaurant.name,
-        addressLine1: restaurant.addressLine1,
-        addressLine2: restaurant.addressLine2,
-        city: restaurant.city,
-        postalCode: restaurant.postalCode,
-        country: restaurant.country,
-        isActive: restaurant.isActive,
-    });
+    const data = await restaurantController.getRestaurantEditData(req.params.id);
+    renderer.renderWithData(res, 'restaurants/form', data);
 }));
 
 // POST /restaurants/:id/edit - Update restaurant
 app.post('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
-    const restaurant = await restaurantController.updateRestaurant(req.params.id as string, req.body);
-    if (!restaurant) {
-        throw new ExpectedError('Restaurant not found', 'error', 404);
-    }
+    const restaurant = await restaurantController.updateRestaurant(req.params.id, req.body);
     res.redirect(`/restaurants/${restaurant.id}`);
+}));
+
+// ── Menu Category routes ────────────────────────────────────
+
+// GET /restaurants/:id/menu/categories/new
+app.get('/:id/menu/categories/new', asyncHandler(async (req: Request, res: Response) => {
+    const data = await menuController.getCategoryFormData(req.params.id);
+    renderer.renderWithData(res, 'restaurants/menu/categoryForm', data);
+}));
+
+// POST /restaurants/:id/menu/categories/new
+app.post('/:id/menu/categories/new', asyncHandler(async (req: Request, res: Response) => {
+    await menuController.createCategory(req.params.id, req.body);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// GET /restaurants/:id/menu/categories/:catId/edit
+app.get('/:id/menu/categories/:catId/edit', asyncHandler(async (req: Request, res: Response) => {
+    const data = await menuController.getCategoryEditData(req.params.id, req.params.catId);
+    renderer.renderWithData(res, 'restaurants/menu/categoryForm', data);
+}));
+
+// POST /restaurants/:id/menu/categories/:catId/edit
+app.post('/:id/menu/categories/:catId/edit', asyncHandler(async (req: Request, res: Response) => {
+    await menuController.updateCategory(req.params.id, req.params.catId, req.body);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// ── Menu Item routes ────────────────────────────────────────
+
+// GET /restaurants/:id/menu/categories/:catId/items/new
+app.get('/:id/menu/categories/:catId/items/new', asyncHandler(async (req: Request, res: Response) => {
+    const data = await menuController.getItemFormData(req.params.id, req.params.catId);
+    renderer.renderWithData(res, 'restaurants/menu/itemForm', data);
+}));
+
+// POST /restaurants/:id/menu/categories/:catId/items/new
+app.post('/:id/menu/categories/:catId/items/new', asyncHandler(async (req: Request, res: Response) => {
+    await menuController.createItem(req.params.id, req.params.catId, req.body);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// GET /restaurants/:id/menu/items/:itemId/edit
+app.get('/:id/menu/items/:itemId/edit', asyncHandler(async (req: Request, res: Response) => {
+    const data = await menuController.getItemEditData(req.params.id, req.params.itemId);
+    renderer.renderWithData(res, 'restaurants/menu/itemForm', data);
+}));
+
+// POST /restaurants/:id/menu/items/:itemId/edit
+app.post('/:id/menu/items/:itemId/edit', asyncHandler(async (req: Request, res: Response) => {
+    await menuController.updateItem(req.params.id, req.params.itemId, req.body);
+    res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 export default app;
