@@ -2,7 +2,7 @@
  * Test data for DietOverrideService effective suitability computation
  */
 
-/** Sample reasons JSON with matched items for testing */
+/** Sample reasons JSON representing a typical heuristic result with two matched menu items. */
 export const sampleReasonsJson = JSON.stringify({
     matchedItems: [
         {itemId: 'item-1', itemName: 'Vegan Burger', keywords: ['vegan']},
@@ -12,7 +12,7 @@ export const sampleReasonsJson = JSON.stringify({
     matchRatio: 0.2,
 });
 
-/** Empty reasons JSON (no matched items) */
+/** Reasons JSON with no matched items — used to test zero-score inference scenarios. */
 export const emptyReasonsJson = JSON.stringify({
     matchedItems: [],
     totalMenuItems: 5,
