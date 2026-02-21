@@ -81,12 +81,13 @@ describe('SuggestionController', () => {
         test.each(processSuggestionValidData)('$description', async (testCase) => {
             setupMock(mockSuggest, testCase.suggestResult);
 
-            const result = await suggestionController.processSuggestion(testCase.input);
+            const data = await suggestionController.processSuggestion(testCase.input);
 
-            expect(result.restaurant.name).toBe(testCase.expectedRestaurantName);
-            expect(result.restaurant.id).toBeDefined();
-            expect(result.reason).toBeDefined();
-            expect(result.reason.totalCandidates).toBeGreaterThan(0);
+            expect(data.result.restaurant.name).toBe(testCase.expectedRestaurantName);
+            expect(data.result.restaurant.id).toBeDefined();
+            expect(data.result.reason).toBeDefined();
+            expect(data.result.reason.totalCandidates).toBeGreaterThan(0);
+            expect(data.filters).toBeDefined();
         });
 
         test.each(processSuggestionNoMatchData)('$description', async (testCase) => {
@@ -154,6 +155,26 @@ describe('SuggestionController', () => {
             ).rejects.toThrow(APIError);
 
             expect(mockRecordSuggestion).not.toHaveBeenCalled();
+        });
+
+        test('returns filters for reroll alongside result', async () => {
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r1', name: 'Test'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            const data = await suggestionController.processSuggestion({
+                dietTagIds: ['tag-vegan', 'tag-gf'],
+                cuisineIncludes: 'Italian, Thai',
+                cuisineExcludes: 'Burger',
+            });
+
+            expect(data.filters).toEqual({
+                dietTagIds: ['tag-vegan', 'tag-gf'],
+                cuisineIncludes: 'Italian, Thai',
+                cuisineExcludes: 'Burger',
+            });
+            expect(data.result.restaurant.id).toBe('r1');
         });
     });
 });

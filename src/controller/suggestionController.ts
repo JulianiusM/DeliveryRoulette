@@ -35,6 +35,15 @@ export interface SuggestionResultData {
     };
 }
 
+export interface SuggestionResultPageData {
+    result: SuggestionResultData;
+    filters: {
+        dietTagIds: string[];
+        cuisineIncludes: string;
+        cuisineExcludes: string;
+    };
+}
+
 // ── Helpers ─────────────────────────────────────────────────
 
 /**
@@ -85,7 +94,7 @@ export async function processSuggestion(body: {
     dietTagIds?: string | string[];
     cuisineIncludes?: string;
     cuisineExcludes?: string;
-}, userId?: number | null): Promise<SuggestionResultData> {
+}, userId?: number | null): Promise<SuggestionResultPageData> {
     // Normalize dietTagIds to array
     let dietTagIds: string[] = [];
     if (body.dietTagIds) {
@@ -116,7 +125,14 @@ export async function processSuggestion(body: {
     // Record suggestion in history
     await suggestionHistoryService.recordSuggestion(result.restaurant.id, userId);
 
-    return formatResult(result);
+    return {
+        result: formatResult(result),
+        filters: {
+            dietTagIds,
+            cuisineIncludes: body.cuisineIncludes || '',
+            cuisineExcludes: body.cuisineExcludes || '',
+        },
+    };
 }
 
 /**
