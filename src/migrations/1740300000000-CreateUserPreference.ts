@@ -1,4 +1,4 @@
-import {MigrationInterface, QueryRunner, Table, TableForeignKey} from "typeorm";
+import {MigrationInterface, QueryRunner, Table} from "typeorm";
 
 export class CreateUserPreference1740300000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
@@ -45,29 +45,20 @@ export class CreateUserPreference1740300000000 implements MigrationInterface {
                         default: "CURRENT_TIMESTAMP",
                     },
                 ],
+                foreignKeys: [
+                    {
+                        columnNames: ["user_id"],
+                        referencedTableName: "users",
+                        referencedColumnNames: ["id"],
+                        onDelete: "CASCADE",
+                    },
+                ],
             }),
-            true
-        );
-
-        await queryRunner.createForeignKey(
-            "user_preferences",
-            new TableForeignKey({
-                columnNames: ["user_id"],
-                referencedTableName: "users",
-                referencedColumnNames: ["id"],
-                onDelete: "CASCADE",
-            })
+            true,
         );
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        const table = await queryRunner.getTable("user_preferences");
-        if (table) {
-            const foreignKey = table.foreignKeys.find(fk => fk.columnNames.indexOf("user_id") !== -1);
-            if (foreignKey) {
-                await queryRunner.dropForeignKey("user_preferences", foreignKey);
-            }
-        }
-        await queryRunner.dropTable("user_preferences");
+        await queryRunner.dropTable("user_preferences", true);
     }
 }
