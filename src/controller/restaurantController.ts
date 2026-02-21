@@ -1,10 +1,13 @@
 import * as restaurantService from "../modules/database/services/RestaurantService";
 import * as menuService from "../modules/database/services/MenuService";
 import * as providerRefService from "../modules/database/services/RestaurantProviderRefService";
+import * as dietOverrideService from "../modules/database/services/DietOverrideService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
 import {RestaurantProviderRef} from "../modules/database/entities/restaurant/RestaurantProviderRef";
 import {MenuCategory} from "../modules/database/entities/menu/MenuCategory";
+import {DietManualOverride} from "../modules/database/entities/diet/DietManualOverride";
+import {EffectiveSuitability} from "../modules/database/services/DietOverrideService";
 
 const LIST_TEMPLATE = 'restaurants/index';
 const FORM_TEMPLATE = 'restaurants/form';
@@ -34,11 +37,12 @@ export async function listRestaurants(options: {
     return {restaurants, search: options.search, active: options.activeFilter};
 }
 
-export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]}> {
+export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]}> {
     const restaurant = await requireRestaurant(id);
     const categories = await menuService.listCategoriesByRestaurant(restaurant.id);
     const providerRefs = await providerRefService.listByRestaurant(restaurant.id);
-    return {restaurant, categories, providerRefs};
+    const dietSuitability = await dietOverrideService.computeEffectiveSuitability(restaurant.id);
+    return {restaurant, categories, providerRefs, dietSuitability};
 }
 
 export async function getRestaurantEditData(id: string): Promise<object> {
@@ -145,5 +149,37 @@ export async function removeProviderRef(restaurantId: string, refId: string): Pr
     const removed = await providerRefService.removeProviderRef(refId, restaurantId);
     if (!removed) {
         throw new ExpectedError('Provider reference not found.', 'error', 404);
+    }
+}
+
+// ── Diet Manual Overrides ───────────────────────────────────
+
+export async function addDietOverride(restaurantId: string, body: any, userId: number): Promise<DietManualOverride> {
+    await requireRestaurant(restaurantId);
+
+    const {dietTagId, supported, notes} = body;
+
+    if (!dietTagId || !dietTagId.trim()) {
+        throw new ExpectedError('Diet tag is required.', 'error', 400);
+    }
+    if (supported === undefined || supported === null || supported === '') {
+        throw new ExpectedError('Supported value is required.', 'error', 400);
+    }
+
+    return await dietOverrideService.addOverride({
+        restaurantId,
+        dietTagId: dietTagId.trim(),
+        supported: supported === 'true' || supported === true || supported === '1',
+        userId,
+        notes: notes?.trim() || null,
+    });
+}
+
+export async function removeDietOverride(restaurantId: string, overrideId: string): Promise<void> {
+    await requireRestaurant(restaurantId);
+
+    const removed = await dietOverrideService.removeOverride(overrideId, restaurantId);
+    if (!removed) {
+        throw new ExpectedError('Diet override not found.', 'error', 404);
     }
 }
