@@ -1,0 +1,135 @@
+//- views/suggest/index.pug – Suggestion Wizard (single-page AJAX)
+extends ../layout
+
+block meta
+    title Suggest a Restaurant | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-dice-5.me-2
+        | Suggest a Restaurant
+
+block content
+    - const d = data || {}
+    - const dietTags = d.dietTags || []
+    - const selectedDietTagIds = d.selectedDietTagIds || []
+
+    //── Step 1: Quick Suggest (primary action) ────────────
+    .text-center.mb-4
+        p.text-white-50.mb-3 Not sure what to eat? Let us pick for you!
+        button#suggestBtn.btn.btn-lg.btn-success.px-5.py-3
+            i.bi.bi-dice-5.me-2
+            | Suggest!
+
+    //── Loading Spinner ───────────────────────────────────
+    #suggestionSpinner.text-center.d-none.my-4
+        .spinner-border.text-success(role="status")
+            span.visually-hidden Loading...
+
+    //── Result Section (hidden until AJAX returns) ────────
+    #suggestionResult.d-none
+        .text-center.mb-3
+            h2.text-white
+                i.bi.bi-shop.me-2
+                span#resultName
+        .row.g-4
+            .col-md-6
+                .card.text-bg-dark.border-secondary
+                    .card-header
+                        i.bi.bi-geo-alt.me-2
+                        | Address
+                    .card-body
+                        pre#resultAddress.text-white.mb-0(style="white-space:pre-line; font-family:inherit;")
+
+            .col-md-6
+                .card.text-bg-dark.border-secondary
+                    .card-header
+                        i.bi.bi-info-circle.me-2
+                        | Why This Restaurant?
+                    .card-body
+                        #resultDiets.mb-2
+                        p.text-white-50.mb-0
+                            small#resultCandidates
+
+        .d-flex.justify-content-center.gap-2.mt-4
+            a#resultLink.btn.btn-primary(href="#")
+                i.bi.bi-eye.me-1
+                | View Restaurant
+            button#rerollBtn.btn.btn-success
+                i.bi.bi-dice-5.me-1
+                | Try Again
+
+    //── Empty State (shown before first suggestion) ───────
+    #emptyState
+
+    //── Optional Filters (collapsible) ────────────────────
+    .mt-4
+        .d-flex.justify-content-center
+            button.btn.btn-sm.btn-outline-secondary(
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#advancedFilters"
+                aria-expanded="false"
+                aria-controls="advancedFilters"
+            )
+                i.bi.bi-sliders.me-1
+                | Advanced Filters
+
+        #advancedFilters.collapse.mt-3
+            .row.g-4
+                //── Diet Filters ──────────────────────────
+                .col-md-6
+                    .card.text-bg-dark.border-secondary
+                        .card-header
+                            i.bi.bi-heart-pulse.me-2
+                            | Diet Requirements
+                            small.text-white-50.ms-2 (for group dining)
+                        .card-body
+                            if dietTags.length === 0
+                                p.text-white-50.mb-0 No diet tags available.
+                            else
+                                p.text-white-50.small.mb-2 Select diets that the restaurant must support — great for groups with mixed dietary needs.
+                                each tag in dietTags
+                                    .form-check.mb-2
+                                        input.form-check-input(
+                                            type="checkbox"
+                                            name="dietTagIds"
+                                            value=tag.id
+                                            id=`diet-${tag.key}`
+                                            checked=selectedDietTagIds.includes(tag.id)
+                                        )
+                                        label.form-check-label(for=`diet-${tag.key}`) #{tag.label}
+
+                //── Cuisine Filters ───────────────────────
+                .col-md-6
+                    .card.text-bg-dark.border-secondary
+                        .card-header
+                            i.bi.bi-cup-hot.me-2
+                            | Cuisine Filters
+                        .card-body
+                            .mb-3
+                                label.form-label.mb-1(for="cuisineIncludes")
+                                    i.bi.bi-plus-circle.me-1
+                                    | Include Cuisines
+                                input#cuisineIncludes.form-control.text-bg-dark(
+                                    type="text"
+                                    name="cuisineIncludes"
+                                    value=(d.cuisineIncludes || '')
+                                    placeholder="e.g. Italian, Sushi, Thai"
+                                )
+                                .form-text.text-white-50 Comma-separated. Only restaurants matching these names.
+
+                            .mb-0
+                                label.form-label.mb-1(for="cuisineExcludes")
+                                    i.bi.bi-dash-circle.me-1
+                                    | Exclude Cuisines
+                                input#cuisineExcludes.form-control.text-bg-dark(
+                                    type="text"
+                                    name="cuisineExcludes"
+                                    value=(d.cuisineExcludes || '')
+                                    placeholder="e.g. Fast Food, Burger"
+                                )
+                                .form-text.text-white-50 Comma-separated. Restaurants matching these names will be excluded.
+
+block scripts
+    script(type="module" src="/js/modules/suggest.gen.js")

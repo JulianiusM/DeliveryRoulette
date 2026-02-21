@@ -11,6 +11,7 @@ import apiRouter from './routes/api';
 import usersRouter from './routes/users';
 import helpRouter from './routes/help';
 import restaurantsRouter from './routes/restaurants';
+import suggestRouter from './routes/suggest';
 import settings from './modules/settings';
 import {handleGenericError} from './middleware/genericErrorHandler';
 
@@ -78,6 +79,7 @@ app.use('/api', apiRouter);
 app.use('/users', usersRouter);
 app.use('/help', helpRouter);
 app.use('/restaurants', restaurantsRouter);
+app.use('/suggest', suggestRouter);
 
 app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 
