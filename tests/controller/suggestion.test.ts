@@ -16,6 +16,10 @@ import {APIError} from '../../src/modules/lib/errors';
 jest.mock('../../src/modules/database/services/SuggestionService');
 import * as suggestionService from '../../src/modules/database/services/SuggestionService';
 
+// Mock the SuggestionHistoryService
+jest.mock('../../src/modules/database/services/SuggestionHistoryService');
+import * as suggestionHistoryService from '../../src/modules/database/services/SuggestionHistoryService';
+
 // Mock the UserDietPreferenceService
 jest.mock('../../src/modules/database/services/UserDietPreferenceService');
 import * as userDietPrefService from '../../src/modules/database/services/UserDietPreferenceService';
@@ -25,6 +29,8 @@ jest.mock('../../src/modules/database/services/UserPreferenceService');
 import * as userPrefService from '../../src/modules/database/services/UserPreferenceService';
 
 const mockSuggest = suggestionService.suggest as jest.Mock;
+const mockGetRecentRestaurantIds = suggestionHistoryService.getRecentRestaurantIds as jest.Mock;
+const mockRecordSuggestion = suggestionHistoryService.recordSuggestion as jest.Mock;
 const mockGetAllDietTags = userDietPrefService.getAllDietTags as jest.Mock;
 const mockGetEffectiveDietFilterIds = userDietPrefService.getEffectiveDietFilterIds as jest.Mock;
 const mockGetByUserId = userPrefService.getByUserId as jest.Mock;
@@ -35,6 +41,9 @@ import * as suggestionController from '../../src/controller/suggestionController
 describe('SuggestionController', () => {
     beforeEach(() => {
         jest.resetAllMocks();
+        // Default: no recent history
+        mockGetRecentRestaurantIds.mockResolvedValue([]);
+        mockRecordSuggestion.mockResolvedValue({});
     });
 
     describe('getSuggestionFormData', () => {
@@ -107,6 +116,44 @@ describe('SuggestionController', () => {
                     dietTagIds: ['tag-vegan'],
                 })
             );
+        });
+
+        test('passes recent restaurant IDs as excludeRestaurantIds', async () => {
+            mockGetRecentRestaurantIds.mockResolvedValue(['r-old-1', 'r-old-2']);
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r-new', name: 'New Place'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({}, 42);
+
+            expect(mockGetRecentRestaurantIds).toHaveBeenCalledWith(42);
+            expect(mockSuggest).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    excludeRestaurantIds: ['r-old-1', 'r-old-2'],
+                })
+            );
+        });
+
+        test('records suggestion in history after successful result', async () => {
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r1', name: 'Pizza Palace'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({}, 7);
+
+            expect(mockRecordSuggestion).toHaveBeenCalledWith('r1', 7);
+        });
+
+        test('does not record history when no match found', async () => {
+            setupMock(mockSuggest, null);
+
+            await expect(
+                suggestionController.processSuggestion({})
+            ).rejects.toThrow(APIError);
+
+            expect(mockRecordSuggestion).not.toHaveBeenCalled();
         });
     });
 });

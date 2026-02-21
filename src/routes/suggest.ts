@@ -15,7 +15,8 @@ app.get('/', asyncHandler(async (req: Request, res: Response) => {
 
 // POST /suggest - JSON API: returns a random matching restaurant
 app.post('/', asyncHandler(async (req: Request, res: Response) => {
-    const result = await suggestionController.processSuggestion(req.body);
+    const userId = (req.session as any)?.userId;
+    const result = await suggestionController.processSuggestion(req.body, userId);
     res.json(result);
 }));
 
