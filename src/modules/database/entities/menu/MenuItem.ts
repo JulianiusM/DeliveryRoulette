@@ -24,12 +24,12 @@ export class MenuItem {
     @Column("tinyint", {name: "is_active", width: 1, default: 1})
     isActive!: boolean;
 
-    @Column("varchar", {name: "category_id", length: 36})
-    categoryId!: string;
-
     @ManyToOne(() => MenuCategory, (cat) => cat.items, {onDelete: "CASCADE"})
     @JoinColumn({name: "category_id"})
     category!: MenuCategory;
+
+    @Column({name: "category_id"})
+    categoryId!: string;
 
     @Column("timestamp", {name: "created_at", default: () => "CURRENT_TIMESTAMP"})
     createdAt!: Date;

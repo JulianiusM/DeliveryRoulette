@@ -16,12 +16,12 @@ export class MenuCategory {
     @Column("tinyint", {name: "is_active", width: 1, default: 1})
     isActive!: boolean;
 
-    @Column("varchar", {name: "restaurant_id", length: 36})
-    restaurantId!: string;
-
     @ManyToOne(() => Restaurant, {onDelete: "CASCADE"})
     @JoinColumn({name: "restaurant_id"})
     restaurant!: Restaurant;
+
+    @Column({name: "restaurant_id"})
+    restaurantId!: string;
 
     @OneToMany(() => MenuItem, (item) => item.category, {eager: false})
     items!: MenuItem[];
