@@ -49,6 +49,26 @@ block content
                 placeholder="e.g. Fast Food, Sushi")
             .form-text.text-white-50 Comma-separated list of cuisines to exclude.
 
+        //── Diet Preferences ─────────────────────────
+        .col-12
+            label.form-label.mb-1
+                i.bi.bi-heart-pulse.me-1
+                | Diet Preferences
+            .form-text.text-white-50.mb-2 Select your dietary restrictions. These will be used as default filters for suggestions.
+            if d.dietTags && d.dietTags.length
+                .d-flex.flex-wrap.gap-3
+                    each tag in d.dietTags
+                        .form-check
+                            input.form-check-input(
+                                type="checkbox"
+                                name="dietTagIds"
+                                value=tag.id
+                                id=("diet-" + tag.key)
+                                checked=tag.selected)
+                            label.form-check-label(for=("diet-" + tag.key))= tag.label
+            else
+                p.text-white-50 No diet tags available. Run the diet tag seed script to add them.
+
         //── Buttons ──────────────────────────────────
         .col-12.d-flex.gap-2.mt-2
             button.btn.btn-success(type="submit")
