@@ -1,4 +1,4 @@
-import {MigrationInterface, QueryRunner, Table, TableForeignKey} from "typeorm";
+import {MigrationInterface, QueryRunner, Table} from "typeorm";
 
 export class CreateMenuCategoryAndItem1740200000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
@@ -46,18 +46,16 @@ export class CreateMenuCategoryAndItem1740200000000 implements MigrationInterfac
                         default: "CURRENT_TIMESTAMP",
                     },
                 ],
+                foreignKeys: [
+                    {
+                        columnNames: ["restaurant_id"],
+                        referencedTableName: "restaurants",
+                        referencedColumnNames: ["id"],
+                        onDelete: "CASCADE",
+                    },
+                ],
             }),
             true,
-        );
-
-        await queryRunner.createForeignKey(
-            "menu_categories",
-            new TableForeignKey({
-                columnNames: ["restaurant_id"],
-                referencedTableName: "restaurants",
-                referencedColumnNames: ["id"],
-                onDelete: "CASCADE",
-            }),
         );
 
         await queryRunner.createTable(
@@ -123,38 +121,21 @@ export class CreateMenuCategoryAndItem1740200000000 implements MigrationInterfac
                         default: "CURRENT_TIMESTAMP",
                     },
                 ],
+                foreignKeys: [
+                    {
+                        columnNames: ["category_id"],
+                        referencedTableName: "menu_categories",
+                        referencedColumnNames: ["id"],
+                        onDelete: "CASCADE",
+                    },
+                ],
             }),
             true,
-        );
-
-        await queryRunner.createForeignKey(
-            "menu_items",
-            new TableForeignKey({
-                columnNames: ["category_id"],
-                referencedTableName: "menu_categories",
-                referencedColumnNames: ["id"],
-                onDelete: "CASCADE",
-            }),
         );
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        const menuItemsTable = await queryRunner.getTable("menu_items");
-        if (menuItemsTable) {
-            const fk = menuItemsTable.foreignKeys.find(
-                (fk) => fk.columnNames.indexOf("category_id") !== -1,
-            );
-            if (fk) await queryRunner.dropForeignKey("menu_items", fk);
-        }
-        await queryRunner.dropTable("menu_items");
-
-        const menuCategoriesTable = await queryRunner.getTable("menu_categories");
-        if (menuCategoriesTable) {
-            const fk = menuCategoriesTable.foreignKeys.find(
-                (fk) => fk.columnNames.indexOf("restaurant_id") !== -1,
-            );
-            if (fk) await queryRunner.dropForeignKey("menu_categories", fk);
-        }
-        await queryRunner.dropTable("menu_categories");
+        await queryRunner.dropTable("menu_items", true);
+        await queryRunner.dropTable("menu_categories", true);
     }
 }
