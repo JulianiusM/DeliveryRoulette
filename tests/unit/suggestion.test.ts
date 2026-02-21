@@ -293,5 +293,54 @@ describe('SuggestionService', () => {
             expect(result!.restaurant.id).toBe('r1');
             expect(result!.reason.totalCandidates).toBe(1);
         });
+
+        test('do-not-suggest: hard-excludes restaurants with no fallback (no diet)', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Do-not-suggest r1 and r2, only r3 should remain
+            const result = await suggestionService.suggest({doNotSuggestIds: ['r1', 'r2']});
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r3');
+        });
+
+        test('do-not-suggest: returns null when all restaurants are excluded', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Exclude all restaurants via do-not-suggest - no fallback
+            const result = await suggestionService.suggest({doNotSuggestIds: ['r1', 'r2', 'r3']});
+            expect(result).toBeNull();
+        });
+
+        test('do-not-suggest: applied before diet filtering', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // r2 supports vegan but is do-not-suggest; r1 also supports vegan
+            mockComputeEffectiveSuitability
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'override'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+                ]);
+
+            // r2 is do-not-suggest, so only r1 and r3 are candidates for diet check
+            const result = await suggestionService.suggest({
+                dietTagIds: ['tag-vegan'],
+                doNotSuggestIds: ['r2'],
+            });
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r1');
+            // r2 should never be checked for diet compatibility
+            expect(mockComputeEffectiveSuitability).toHaveBeenCalledTimes(2);
+        });
     });
 });

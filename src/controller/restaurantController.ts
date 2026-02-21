@@ -2,6 +2,7 @@ import * as restaurantService from "../modules/database/services/RestaurantServi
 import * as menuService from "../modules/database/services/MenuService";
 import * as providerRefService from "../modules/database/services/RestaurantProviderRefService";
 import * as dietOverrideService from "../modules/database/services/DietOverrideService";
+import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
 import {RestaurantProviderRef} from "../modules/database/entities/restaurant/RestaurantProviderRef";
@@ -37,12 +38,23 @@ export async function listRestaurants(options: {
     return {restaurants, search: options.search, active: options.activeFilter};
 }
 
-export async function getRestaurantDetail(id: string): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]}> {
+export async function getRestaurantDetail(id: string, userId?: number): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]; isFavorite: boolean; doNotSuggest: boolean}> {
     const restaurant = await requireRestaurant(id);
     const categories = await menuService.listCategoriesByRestaurant(restaurant.id);
     const providerRefs = await providerRefService.listByRestaurant(restaurant.id);
     const dietSuitability = await dietOverrideService.computeEffectiveSuitability(restaurant.id);
-    return {restaurant, categories, providerRefs, dietSuitability};
+
+    let isFavorite = false;
+    let doNotSuggest = false;
+    if (userId) {
+        const pref = await userRestaurantPrefService.getByUserAndRestaurant(userId, restaurant.id);
+        if (pref) {
+            isFavorite = !!pref.isFavorite;
+            doNotSuggest = !!pref.doNotSuggest;
+        }
+    }
+
+    return {restaurant, categories, providerRefs, dietSuitability, isFavorite, doNotSuggest};
 }
 
 export async function getRestaurantEditData(id: string): Promise<object> {
@@ -182,4 +194,16 @@ export async function removeDietOverride(restaurantId: string, overrideId: strin
     if (!removed) {
         throw new ExpectedError('Diet override not found.', 'error', 404);
     }
+}
+
+// ── User Restaurant Preferences ─────────────────────────────
+
+export async function toggleFavorite(restaurantId: string, userId: number): Promise<void> {
+    await requireRestaurant(restaurantId);
+    await userRestaurantPrefService.toggleFavorite(userId, restaurantId);
+}
+
+export async function toggleDoNotSuggest(restaurantId: string, userId: number): Promise<void> {
+    await requireRestaurant(restaurantId);
+    await userRestaurantPrefService.toggleDoNotSuggest(userId, restaurantId);
 }

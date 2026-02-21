@@ -14,6 +14,8 @@ export interface SuggestionFilters {
     cuisineExcludes?: string[];
     /** Restaurant IDs to exclude (e.g. recently suggested) */
     excludeRestaurantIds?: string[];
+    /** Restaurant IDs marked do-not-suggest by the user (hard exclude, no fallback) */
+    doNotSuggestIds?: string[];
 }
 
 export interface DietMatchDetail {
@@ -124,16 +126,24 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
 
     if (activeRestaurants.length === 0) return null;
 
+    // Hard-exclude do-not-suggest restaurants (no fallback)
+    const doNotSuggestIds = new Set(filters.doNotSuggestIds ?? []);
+    const candidates = doNotSuggestIds.size > 0
+        ? activeRestaurants.filter(r => !doNotSuggestIds.has(r.id))
+        : activeRestaurants;
+
+    if (candidates.length === 0) return null;
+
     const dietTagIds = filters.dietTagIds ?? [];
     const excludeIds = new Set(filters.excludeRestaurantIds ?? []);
 
     // If no diet filters, pick randomly from active+cuisine-filtered restaurants
     if (dietTagIds.length === 0) {
         const filtered = excludeIds.size > 0
-            ? activeRestaurants.filter(r => !excludeIds.has(r.id))
-            : activeRestaurants;
+            ? candidates.filter(r => !excludeIds.has(r.id))
+            : candidates;
         // Fallback: if everything excluded, use full list
-        const pool = filtered.length > 0 ? filtered : activeRestaurants;
+        const pool = filtered.length > 0 ? filtered : candidates;
         const picked = pickRandom(pool);
         if (!picked) return null;
         return {
@@ -147,7 +157,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
 
     // Filter by diet compatibility
     const compatible: Array<{restaurant: Restaurant; matchedDiets: DietMatchDetail[]}> = [];
-    for (const restaurant of activeRestaurants) {
+    for (const restaurant of candidates) {
         const check = await checkDietCompatibility(restaurant.id, dietTagIds);
         if (check.compatible) {
             compatible.push({restaurant, matchedDiets: check.matchedDiets});

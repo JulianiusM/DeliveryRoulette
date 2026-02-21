@@ -28,7 +28,8 @@ app.post('/new', asyncHandler(async (req: Request, res: Response) => {
 
 // GET /restaurants/:id - Show detail page
 app.get('/:id', asyncHandler(async (req: Request, res: Response) => {
-    const data = await restaurantController.getRestaurantDetail(req.params.id);
+    const userId = (req.session as any)?.userId ?? undefined;
+    const data = await restaurantController.getRestaurantDetail(req.params.id, userId);
     renderer.renderWithData(res, 'restaurants/detail', data);
 }));
 
@@ -70,6 +71,30 @@ app.post('/:id/diet-overrides', asyncHandler(async (req: Request, res: Response)
 // POST /restaurants/:id/diet-overrides/:overrideId/delete - Remove diet override
 app.post('/:id/diet-overrides/:overrideId/delete', asyncHandler(async (req: Request, res: Response) => {
     await restaurantController.removeDietOverride(req.params.id, req.params.overrideId);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// ── User Restaurant Preference routes ───────────────────────
+
+// POST /restaurants/:id/toggle-favorite - Toggle favorite flag
+app.post('/:id/toggle-favorite', asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+        res.redirect(`/restaurants/${req.params.id}`);
+        return;
+    }
+    await restaurantController.toggleFavorite(req.params.id, userId);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// POST /restaurants/:id/toggle-do-not-suggest - Toggle do-not-suggest flag
+app.post('/:id/toggle-do-not-suggest', asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+        res.redirect(`/restaurants/${req.params.id}`);
+        return;
+    }
+    await restaurantController.toggleDoNotSuggest(req.params.id, userId);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 

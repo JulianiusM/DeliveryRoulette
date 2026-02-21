@@ -2,6 +2,7 @@ import * as suggestionService from "../modules/database/services/SuggestionServi
 import * as suggestionHistoryService from "../modules/database/services/SuggestionHistoryService";
 import * as userDietPrefService from "../modules/database/services/UserDietPreferenceService";
 import * as userPrefService from "../modules/database/services/UserPreferenceService";
+import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {APIError} from "../modules/lib/errors";
 import {SuggestionFilters, SuggestionResult} from "../modules/database/services/SuggestionService";
 
@@ -96,11 +97,17 @@ export async function processSuggestion(body: {
     // Get recently suggested restaurant IDs to exclude
     const excludeRestaurantIds = await suggestionHistoryService.getRecentRestaurantIds(userId);
 
+    // Get do-not-suggest restaurant IDs for this user (hard exclude)
+    const doNotSuggestIds = userId
+        ? await userRestaurantPrefService.getDoNotSuggestRestaurantIds(userId)
+        : [];
+
     const filters: SuggestionFilters = {
         dietTagIds,
         cuisineIncludes: parseCsvList(body.cuisineIncludes),
         cuisineExcludes: parseCsvList(body.cuisineExcludes),
         excludeRestaurantIds,
+        doNotSuggestIds,
     };
 
     const result = await suggestionService.suggest(filters);

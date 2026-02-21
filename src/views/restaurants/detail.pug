@@ -45,6 +45,24 @@ block content
                     p.text-white-50.mb-0
                         small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
 
+            //── User Preference Toggles ──────────────────────────
+            - const isFavorite = data.isFavorite || false
+            - const doNotSuggest = data.doNotSuggest || false
+            .card.text-bg-dark.border-secondary.mt-3
+                .card-header
+                    i.bi.bi-sliders.me-2
+                    | My Preferences
+                .card-body
+                    .d-flex.flex-column.gap-2
+                        form(method="POST" action=`/restaurants/${r.id}/toggle-favorite`)
+                            button.btn.btn-sm.w-100(type="submit" class=isFavorite ? 'btn-warning' : 'btn-outline-warning')
+                                i.bi.me-1(class=isFavorite ? 'bi-star-fill' : 'bi-star')
+                                | #{isFavorite ? 'Unfavorite' : 'Favorite'}
+                        form(method="POST" action=`/restaurants/${r.id}/toggle-do-not-suggest`)
+                            button.btn.btn-sm.w-100(type="submit" class=doNotSuggest ? 'btn-danger' : 'btn-outline-danger')
+                                i.bi.me-1(class=doNotSuggest ? 'bi-x-circle-fill' : 'bi-x-circle')
+                                | #{doNotSuggest ? 'Allow Suggestions' : 'Do Not Suggest'}
+
     //── Diet Suitability Section ─────────────────────────────
     include _diet_suitability
 
