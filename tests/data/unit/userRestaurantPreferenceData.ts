@@ -79,3 +79,19 @@ export const getDoNotSuggestData = [
         expectedIds: [],
     },
 ];
+
+export const getFavoriteData = [
+    {
+        description: 'returns restaurant IDs with favorite flag',
+        prefs: [
+            {restaurantId: 'rest-1'},
+            {restaurantId: 'rest-2'},
+        ],
+        expectedIds: ['rest-1', 'rest-2'],
+    },
+    {
+        description: 'returns empty array when no favorite preferences',
+        prefs: [],
+        expectedIds: [],
+    },
+];

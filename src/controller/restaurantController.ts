@@ -29,13 +29,27 @@ async function requireRestaurant(id: string): Promise<Restaurant> {
 export async function listRestaurants(options: {
     search?: string;
     activeFilter?: string;
-}): Promise<{restaurants: Restaurant[]; search?: string; active?: string}> {
+    favoritesOnly?: boolean;
+    userId?: number;
+}): Promise<{restaurants: Restaurant[]; search?: string; active?: string; favoritesOnly?: boolean; favoriteIds: string[]}> {
     let isActive: boolean | undefined;
     if (options.activeFilter === 'true') isActive = true;
     else if (options.activeFilter === 'false') isActive = false;
 
     const restaurants = await restaurantService.listRestaurants({search: options.search, isActive});
-    return {restaurants, search: options.search, active: options.activeFilter};
+
+    // Get user's favorite restaurant IDs
+    let favoriteIds: string[] = [];
+    if (options.userId) {
+        favoriteIds = await userRestaurantPrefService.getFavoriteRestaurantIds(options.userId);
+    }
+
+    // Filter to favorites only if requested
+    const filtered = options.favoritesOnly && favoriteIds.length > 0
+        ? restaurants.filter(r => favoriteIds.includes(r.id))
+        : restaurants;
+
+    return {restaurants: filtered, search: options.search, active: options.activeFilter, favoritesOnly: options.favoritesOnly, favoriteIds};
 }
 
 export async function getRestaurantDetail(id: string, userId?: number): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]; isFavorite: boolean; doNotSuggest: boolean}> {

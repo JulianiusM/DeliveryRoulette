@@ -11,7 +11,9 @@ const app = express.Router();
 app.get('/', asyncHandler(async (req: Request, res: Response) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const activeFilter = typeof req.query.active === 'string' ? req.query.active : undefined;
-    const data = await restaurantController.listRestaurants({search, activeFilter});
+    const favoritesOnly = req.query.favorites === 'true';
+    const userId = (req.session as any)?.userId ?? undefined;
+    const data = await restaurantController.listRestaurants({search, activeFilter, favoritesOnly, userId});
     renderer.renderWithData(res, 'restaurants/index', data);
 }));
 

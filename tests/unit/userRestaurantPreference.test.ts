@@ -7,6 +7,7 @@ import {
     toggleFavoriteData,
     toggleDoNotSuggestData,
     getDoNotSuggestData,
+    getFavoriteData,
     samplePreference,
 } from '../data/unit/userRestaurantPreferenceData';
 
@@ -91,6 +92,21 @@ describe('UserRestaurantPreferenceService', () => {
             expect(result).toEqual(testCase.expectedIds);
             expect(repo.find).toHaveBeenCalledWith({
                 where: {userId: 1, doNotSuggest: true},
+                select: ['restaurantId'],
+            });
+        });
+    });
+
+    describe('getFavoriteRestaurantIds', () => {
+        test.each(getFavoriteData)('$description', async (testCase) => {
+            const repo = createMockRepo(null, testCase.prefs);
+            mockGetRepository.mockReturnValue(repo);
+
+            const result = await userRestaurantPreferenceService.getFavoriteRestaurantIds(1);
+
+            expect(result).toEqual(testCase.expectedIds);
+            expect(repo.find).toHaveBeenCalledWith({
+                where: {userId: 1, isFavorite: true},
                 select: ['restaurantId'],
             });
         });

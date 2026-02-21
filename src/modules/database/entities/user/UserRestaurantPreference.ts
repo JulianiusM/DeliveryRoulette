@@ -19,7 +19,7 @@ export class UserRestaurantPreference {
     @JoinColumn({name: "restaurant_id"})
     restaurant!: Restaurant;
 
-    @Column("varchar", {name: "restaurant_id", length: 36})
+    @Column({name: "restaurant_id"})
     restaurantId!: string;
 
     @Column("tinyint", {

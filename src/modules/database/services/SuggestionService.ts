@@ -16,6 +16,8 @@ export interface SuggestionFilters {
     excludeRestaurantIds?: string[];
     /** Restaurant IDs marked do-not-suggest by the user (hard exclude, no fallback) */
     doNotSuggestIds?: string[];
+    /** Restaurant IDs marked as favorites (boosted in random selection) */
+    favoriteIds?: string[];
 }
 
 export interface DietMatchDetail {
@@ -109,9 +111,23 @@ export async function checkDietCompatibility(
 
 /**
  * Pick a random element from an array using Fisher-Yates-inspired selection.
+ * When favoriteIds is provided, favorites appear twice in the pool to boost
+ * their selection probability.
  */
-export function pickRandom<T>(items: T[]): T | null {
+export function pickRandom<T>(items: T[], favoriteIds?: Set<string>, getId?: (item: T) => string): T | null {
     if (items.length === 0) return null;
+    if (favoriteIds && favoriteIds.size > 0 && getId) {
+        // Build boosted pool: favorites appear twice
+        const boosted: T[] = [];
+        for (const item of items) {
+            boosted.push(item);
+            if (favoriteIds.has(getId(item))) {
+                boosted.push(item);
+            }
+        }
+        const index = Math.floor(Math.random() * boosted.length);
+        return boosted[index];
+    }
     const index = Math.floor(Math.random() * items.length);
     return items[index];
 }
@@ -136,6 +152,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
 
     const dietTagIds = filters.dietTagIds ?? [];
     const excludeIds = new Set(filters.excludeRestaurantIds ?? []);
+    const favoriteIds = new Set(filters.favoriteIds ?? []);
 
     // If no diet filters, pick randomly from active+cuisine-filtered restaurants
     if (dietTagIds.length === 0) {
@@ -144,7 +161,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
             : candidates;
         // Fallback: if everything excluded, use full list
         const pool = filtered.length > 0 ? filtered : candidates;
-        const picked = pickRandom(pool);
+        const picked = pickRandom(pool, favoriteIds, r => r.id);
         if (!picked) return null;
         return {
             restaurant: picked,
@@ -171,7 +188,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
         : compatible;
     // Fallback: if everything excluded, use full compatible list
     const pool = filtered.length > 0 ? filtered : compatible;
-    const picked = pickRandom(pool);
+    const picked = pickRandom(pool, favoriteIds, c => c.restaurant.id);
     if (!picked) return null;
 
     return {

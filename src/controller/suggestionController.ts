@@ -102,12 +102,18 @@ export async function processSuggestion(body: {
         ? await userRestaurantPrefService.getDoNotSuggestRestaurantIds(userId)
         : [];
 
+    // Get favorite restaurant IDs for this user (boost in selection)
+    const favoriteIds = userId
+        ? await userRestaurantPrefService.getFavoriteRestaurantIds(userId)
+        : [];
+
     const filters: SuggestionFilters = {
         dietTagIds,
         cuisineIncludes: parseCsvList(body.cuisineIncludes),
         cuisineExcludes: parseCsvList(body.cuisineExcludes),
         excludeRestaurantIds,
         doNotSuggestIds,
+        favoriteIds,
     };
 
     const result = await suggestionService.suggest(filters);

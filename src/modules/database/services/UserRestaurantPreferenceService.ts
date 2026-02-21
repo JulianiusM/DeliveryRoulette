@@ -67,3 +67,24 @@ export async function getDoNotSuggestRestaurantIds(userId: number): Promise<stri
     });
     return prefs.map(p => p.restaurantId);
 }
+
+/**
+ * Get all restaurant IDs marked as favorite for a given user.
+ * Used by the suggestion engine to boost favorite restaurants.
+ */
+export async function getFavoriteRestaurantIds(userId: number): Promise<string[]> {
+    const repo = AppDataSource.getRepository(UserRestaurantPreference);
+    const prefs = await repo.find({
+        where: {userId, isFavorite: true},
+        select: ['restaurantId'],
+    });
+    return prefs.map(p => p.restaurantId);
+}
+
+/**
+ * Get all preferences for a user (for restaurant list filtering).
+ */
+export async function getAllByUserId(userId: number): Promise<UserRestaurantPreference[]> {
+    const repo = AppDataSource.getRepository(UserRestaurantPreference);
+    return await repo.find({where: {userId}});
+}

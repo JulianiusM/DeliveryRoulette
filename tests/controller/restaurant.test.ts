@@ -32,6 +32,10 @@ import * as providerRefService from '../../src/modules/database/services/Restaur
 jest.mock('../../src/modules/database/services/DietOverrideService');
 import * as dietOverrideService from '../../src/modules/database/services/DietOverrideService';
 
+// Mock the UserRestaurantPreferenceService
+jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
+import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
+
 const mockCreateRestaurant = restaurantService.createRestaurant as jest.Mock;
 const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
@@ -43,6 +47,8 @@ const mockRemoveProviderRef = providerRefService.removeProviderRef as jest.Mock;
 const mockComputeEffectiveSuitability = dietOverrideService.computeEffectiveSuitability as jest.Mock;
 const mockAddOverride = dietOverrideService.addOverride as jest.Mock;
 const mockRemoveOverride = dietOverrideService.removeOverride as jest.Mock;
+const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
+const mockGetByUserAndRestaurant = userRestaurantPrefService.getByUserAndRestaurant as jest.Mock;
 
 // Import controller after mocking
 import * as restaurantController from '../../src/controller/restaurantController';
@@ -63,6 +69,8 @@ const sampleRestaurant = {
 describe('RestaurantController', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockGetFavoriteRestaurantIds.mockResolvedValue([]);
+        mockGetByUserAndRestaurant.mockResolvedValue(null);
     });
 
     describe('listRestaurants', () => {
@@ -75,6 +83,7 @@ describe('RestaurantController', () => {
             expect(result.restaurants).toEqual([sampleRestaurant]);
             expect(result.search).toBe('Pizza');
             expect(result.active).toBe('true');
+            expect(result.favoriteIds).toEqual([]);
         });
 
         test('passes undefined isActive for empty filter', async () => {
@@ -91,6 +100,29 @@ describe('RestaurantController', () => {
             await restaurantController.listRestaurants({activeFilter: 'false'});
 
             expect(mockListRestaurants).toHaveBeenCalledWith({search: undefined, isActive: false});
+        });
+
+        test('filters to favorites only when requested', async () => {
+            const favRestaurant = {...sampleRestaurant, id: 'fav-id', name: 'Fav Place'};
+            const normalRestaurant = {...sampleRestaurant, id: 'normal-id', name: 'Normal Place'};
+            setupMock(mockListRestaurants, [favRestaurant, normalRestaurant]);
+            mockGetFavoriteRestaurantIds.mockResolvedValue(['fav-id']);
+
+            const result = await restaurantController.listRestaurants({favoritesOnly: true, userId: 1});
+
+            expect(result.restaurants).toHaveLength(1);
+            expect(result.restaurants[0].name).toBe('Fav Place');
+            expect(result.favoriteIds).toEqual(['fav-id']);
+        });
+
+        test('returns all restaurants when favoritesOnly is false', async () => {
+            setupMock(mockListRestaurants, [sampleRestaurant]);
+            mockGetFavoriteRestaurantIds.mockResolvedValue(['test-uuid']);
+
+            const result = await restaurantController.listRestaurants({favoritesOnly: false, userId: 1});
+
+            expect(result.restaurants).toHaveLength(1);
+            expect(result.favoriteIds).toEqual(['test-uuid']);
         });
     });
 
