@@ -45,8 +45,9 @@ export async function listRestaurants(options: {
     }
 
     // Filter to favorites only if requested
+    const favoriteSet = new Set(favoriteIds);
     const filtered = options.favoritesOnly && favoriteIds.length > 0
-        ? restaurants.filter(r => favoriteIds.includes(r.id))
+        ? restaurants.filter(r => favoriteSet.has(r.id))
         : restaurants;
 
     return {restaurants: filtered, search: options.search, active: options.activeFilter, favoritesOnly: options.favoritesOnly, favoriteIds};
