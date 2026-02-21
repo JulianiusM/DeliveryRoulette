@@ -15,8 +15,15 @@ import {ValidationError, ExpectedError} from '../../src/modules/lib/errors';
 jest.mock('../../src/modules/database/services/UserPreferenceService');
 import * as userPreferenceService from '../../src/modules/database/services/UserPreferenceService';
 
+// Mock the UserDietPreferenceService
+jest.mock('../../src/modules/database/services/UserDietPreferenceService');
+import * as userDietPreferenceService from '../../src/modules/database/services/UserDietPreferenceService';
+
 const mockGetByUserId = userPreferenceService.getByUserId as jest.Mock;
 const mockUpsert = userPreferenceService.upsert as jest.Mock;
+const mockGetAllDietTags = userDietPreferenceService.getAllDietTags as jest.Mock;
+const mockGetDietPrefsByUserId = userDietPreferenceService.getByUserId as jest.Mock;
+const mockReplaceForUser = userDietPreferenceService.replaceForUser as jest.Mock;
 
 // Import controller after mocking
 import * as settingsController from '../../src/controller/settingsController';
@@ -29,10 +36,14 @@ describe('SettingsController', () => {
     describe('getSettings', () => {
         test.each(getSettingsData)('$description', async (testCase) => {
             setupMock(mockGetByUserId, testCase.existingPref);
+            setupMock(mockGetAllDietTags, testCase.allDietTags);
+            setupMock(mockGetDietPrefsByUserId, testCase.userDietPrefs);
 
             const result = await settingsController.getSettings(1);
 
             verifyMockCall(mockGetByUserId, 1);
+            verifyMockCall(mockGetAllDietTags);
+            verifyMockCall(mockGetDietPrefsByUserId, 1);
             expect(result).toEqual(testCase.expected);
         });
 
@@ -51,10 +62,14 @@ describe('SettingsController', () => {
                 updatedAt: new Date(),
             };
             setupMock(mockUpsert, savedPref);
+            setupMock(mockReplaceForUser, []);
+            setupMock(mockGetAllDietTags, []);
+            setupMock(mockGetDietPrefsByUserId, []);
 
             const result = await settingsController.saveSettings(1, testCase.input);
 
             expect(mockUpsert).toHaveBeenCalledWith(1, testCase.expectedService);
+            expect(mockReplaceForUser).toHaveBeenCalledWith(1, testCase.expectedDietTagIds);
             expect(result.deliveryArea).toBe(testCase.expectedService.deliveryArea);
         });
 
