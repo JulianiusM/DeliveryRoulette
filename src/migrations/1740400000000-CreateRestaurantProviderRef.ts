@@ -77,7 +77,7 @@ export class CreateRestaurantProviderRef1740400000000 implements MigrationInterf
         await queryRunner.createIndex(
             "restaurant_provider_refs",
             new TableIndex({
-                name: "UQ_provider_key_external_id",
+                name: "UQ_provider_external_id",
                 columnNames: ["provider_key", "external_id"],
                 isUnique: true,
             }),

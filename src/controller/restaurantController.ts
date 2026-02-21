@@ -144,6 +144,6 @@ export async function removeProviderRef(restaurantId: string, refId: string): Pr
 
     const removed = await providerRefService.removeProviderRef(refId, restaurantId);
     if (!removed) {
-        throw new ExpectedError('Provider reference not found', 'error', 404);
+        throw new ExpectedError('Provider reference not found.', 'error', 404);
     }
 }
