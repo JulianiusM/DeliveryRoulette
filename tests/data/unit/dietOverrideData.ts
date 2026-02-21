@@ -2,6 +2,23 @@
  * Test data for DietOverrideService effective suitability computation
  */
 
+/** Sample reasons JSON with matched items for testing */
+export const sampleReasonsJson = JSON.stringify({
+    matchedItems: [
+        {itemId: 'item-1', itemName: 'Vegan Burger', keywords: ['vegan']},
+        {itemId: 'item-2', itemName: 'Tofu Stir Fry', keywords: ['tofu']},
+    ],
+    totalMenuItems: 10,
+    matchRatio: 0.2,
+});
+
+/** Empty reasons JSON (no matched items) */
+export const emptyReasonsJson = JSON.stringify({
+    matchedItems: [],
+    totalMenuItems: 5,
+    matchRatio: 0,
+});
+
 export const sampleDietTags = [
     {id: 'tag-vegan', key: 'VEGAN', label: 'Vegan', createdAt: new Date(), updatedAt: new Date()},
     {id: 'tag-vegetarian', key: 'VEGETARIAN', label: 'Vegetarian', createdAt: new Date(), updatedAt: new Date()},
@@ -30,7 +47,7 @@ export const effectiveSuitabilityTestData = [
                 dietTagId: 'tag-vegan',
                 score: 10,
                 confidence: 'LOW' as const,
-                reasonsJson: '{}',
+                reasonsJson: sampleReasonsJson,
                 engineVersion: '1.0.0',
                 computedAt: new Date(),
             },
@@ -50,7 +67,7 @@ export const effectiveSuitabilityTestData = [
                 dietTagId: 'tag-vegetarian',
                 score: 45,
                 confidence: 'HIGH' as const,
-                reasonsJson: '{}',
+                reasonsJson: sampleReasonsJson,
                 engineVersion: '1.0.0',
                 computedAt: new Date(),
             },
@@ -79,7 +96,7 @@ export const effectiveSuitabilityTestData = [
                 dietTagId: 'tag-gf',
                 score: 0,
                 confidence: 'LOW' as const,
-                reasonsJson: '{}',
+                reasonsJson: emptyReasonsJson,
                 engineVersion: '1.0.0',
                 computedAt: new Date(),
             },
@@ -110,7 +127,7 @@ export const effectiveSuitabilityTestData = [
                 dietTagId: 'tag-vegan',
                 score: 80,
                 confidence: 'HIGH' as const,
-                reasonsJson: '{}',
+                reasonsJson: sampleReasonsJson,
                 engineVersion: '1.0.0',
                 computedAt: new Date(),
             },
