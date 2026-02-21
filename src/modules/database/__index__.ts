@@ -1,4 +1,5 @@
 // ⚠️ AUTO-GENERATED FILE — do not edit manually.
+import { DietTag } from "./entities/diet/DietTag";
 import { MenuCategory } from "./entities/menu/MenuCategory";
 import { MenuItem } from "./entities/menu/MenuItem";
 import { Restaurant } from "./entities/restaurant/Restaurant";
@@ -10,9 +11,10 @@ import { CreateRestaurant1740100000000 } from "../../migrations/1740100000000-Cr
 import { CreateMenuCategoryAndItem1740200000000 } from "../../migrations/1740200000000-CreateMenuCategoryAndItem";
 import { CreateUserPreference1740300000000 } from "../../migrations/1740300000000-CreateUserPreference";
 import { CreateRestaurantProviderRef1740400000000 } from "../../migrations/1740400000000-CreateRestaurantProviderRef";
+import { CreateDietTag1740500000000 } from "../../migrations/1740500000000-CreateDietTag";
 
-export const entities = [MenuCategory, MenuItem, Restaurant, RestaurantProviderRef, Session, User, UserPreference];
+export const entities = [DietTag, MenuCategory, MenuItem, Restaurant, RestaurantProviderRef, Session, User, UserPreference];
 
-export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000];
+export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000, CreateDietTag1740500000000];
 
 export const subscribers = [];

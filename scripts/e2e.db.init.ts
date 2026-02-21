@@ -69,6 +69,11 @@ async function main() {
     }));
     console.log("Users created...")
 
+    // Seed diet tags (idempotent)
+    const {seedDietTags} = await import('./seedDietTags');
+    const dietCount = await seedDietTags(E2EDataSource);
+    console.log(`Diet tags seeded (${dietCount} new)...`);
+
     await E2EDataSource.destroy();
     // eslint-disable-next-line no-console
     console.log('E2E database re-initialized.');

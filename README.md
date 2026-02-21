@@ -23,6 +23,8 @@ A restaurant suggestion application built with Node.js, Express, TypeScript, and
 2. Install dependencies: `npm install`
 3. Configure your database (see `docs/DEVELOPMENT.md`)
 4. Build: `npm run build`
+5. Run migrations: `npm run typeorm:migrate`
+6. Seed diet tags: `npm run seed:diet-tags`
 
 ## Documentation
 

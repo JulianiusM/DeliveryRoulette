@@ -35,6 +35,7 @@
     "test:client:flows": "jest --config jest.client.config.ts tests/client/flows",
     "test:client:watch": "jest --config jest.client.config.ts --watch",
     "test:client:coverage": "jest --config jest.client.config.ts --coverage",
+    "seed:diet-tags": "ts-node --project tsconfig.server.json scripts/seedDietTags.ts",
     "e2e:prepare": "ts-node --transpile-only scripts/e2e.db.init.ts",
     "e2e:server": "cross-env NODE_ENV=e2e node dist/server.js",
     "e2e:init": "npm run build && npm run e2e:prepare && npm run e2e:server",
