@@ -134,7 +134,7 @@ export async function computeEffectiveSuitability(
                 dietTagId: tag.id,
                 dietTagKey: tag.key,
                 dietTagLabel: tag.label,
-                supported: inference.score > 0 ? true : false,
+                supported: inference.score > 0,
                 source: 'inference' as const,
                 inference: {
                     score: inference.score,

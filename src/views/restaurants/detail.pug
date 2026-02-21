@@ -12,6 +12,7 @@ block title
 block content
     - const r = data.restaurant
     - const categories = data.categories || []
+    - const dietSuitability = data.dietSuitability || []
 
     .row.g-4
         .col-md-8
@@ -121,7 +122,6 @@ block content
 
     //── Provider References Section ──────────────────────────
     - const providerRefs = data.providerRefs || []
-    - const dietSuitability = data.dietSuitability || []
     .card.text-bg-dark.border-secondary.mt-4
         .card-header.d-flex.justify-content-between.align-items-center
             span
