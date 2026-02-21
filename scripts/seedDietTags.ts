@@ -22,16 +22,15 @@ export const DEFAULT_DIET_TAGS: { key: string; label: string }[] = [
 export async function seedDietTags(dataSource: DataSource): Promise<number> {
     const repo = dataSource.getRepository(DietTag);
 
-    let inserted = 0;
-    for (const tag of DEFAULT_DIET_TAGS) {
-        const exists = await repo.findOne({where: {key: tag.key}});
-        if (!exists) {
-            await repo.save(repo.create(tag));
-            inserted++;
-        }
+    const existingTags = await repo.find({select: ['key']});
+    const existingKeys = new Set(existingTags.map((t) => t.key));
+
+    const newTags = DEFAULT_DIET_TAGS.filter((t) => !existingKeys.has(t.key));
+    if (newTags.length > 0) {
+        await repo.save(newTags.map((t) => repo.create(t)));
     }
 
-    return inserted;
+    return newTags.length;
 }
 
 /* ---- CLI entry-point ---- */

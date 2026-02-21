@@ -30,13 +30,12 @@ describe('DietTag seed', () => {
         function buildMockDataSource(existingTags: { key: string; label: string }[]) {
             const store = [...existingTags];
             const mockRepo = {
-                findOne: jest.fn(({where}: { where: { key: string } }) =>
-                    Promise.resolve(store.find((t) => t.key === where.key) ?? null)
-                ),
+                find: jest.fn(() => Promise.resolve(store.map((t) => ({key: t.key})))),
                 create: jest.fn((data: { key: string; label: string }) => ({...data})),
-                save: jest.fn((entity: { key: string; label: string }) => {
-                    store.push(entity);
-                    return Promise.resolve(entity);
+                save: jest.fn((entities: { key: string; label: string }[]) => {
+                    const toSave = Array.isArray(entities) ? entities : [entities];
+                    store.push(...toSave);
+                    return Promise.resolve(toSave);
                 }),
             } as unknown as Repository<DietTag>;
 
