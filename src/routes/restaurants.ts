@@ -58,6 +58,21 @@ app.post('/:id/providers/:refId/delete', asyncHandler(async (req: Request, res: 
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
+// ── Diet Override routes ────────────────────────────────────
+
+// POST /restaurants/:id/diet-overrides - Add/update diet override
+app.post('/:id/diet-overrides', asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req.session as any)?.userId ?? 0;
+    await restaurantController.addDietOverride(req.params.id, req.body, userId);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
+// POST /restaurants/:id/diet-overrides/:overrideId/delete - Remove diet override
+app.post('/:id/diet-overrides/:overrideId/delete', asyncHandler(async (req: Request, res: Response) => {
+    await restaurantController.removeDietOverride(req.params.id, req.params.overrideId);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
 // ── Menu Category routes ────────────────────────────────────
 
 // GET /restaurants/:id/menu/categories/new

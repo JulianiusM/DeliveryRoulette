@@ -28,6 +28,10 @@ import * as menuService from '../../src/modules/database/services/MenuService';
 jest.mock('../../src/modules/database/services/RestaurantProviderRefService');
 import * as providerRefService from '../../src/modules/database/services/RestaurantProviderRefService';
 
+// Mock the DietOverrideService (used by getRestaurantDetail)
+jest.mock('../../src/modules/database/services/DietOverrideService');
+import * as dietOverrideService from '../../src/modules/database/services/DietOverrideService';
+
 const mockCreateRestaurant = restaurantService.createRestaurant as jest.Mock;
 const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
@@ -36,6 +40,9 @@ const mockListCategoriesByRestaurant = menuService.listCategoriesByRestaurant as
 const mockListByRestaurant = providerRefService.listByRestaurant as jest.Mock;
 const mockAddProviderRef = providerRefService.addProviderRef as jest.Mock;
 const mockRemoveProviderRef = providerRefService.removeProviderRef as jest.Mock;
+const mockComputeEffectiveSuitability = dietOverrideService.computeEffectiveSuitability as jest.Mock;
+const mockAddOverride = dietOverrideService.addOverride as jest.Mock;
+const mockRemoveOverride = dietOverrideService.removeOverride as jest.Mock;
 
 // Import controller after mocking
 import * as restaurantController from '../../src/controller/restaurantController';
@@ -92,12 +99,14 @@ describe('RestaurantController', () => {
             setupMock(mockGetRestaurantById, sampleRestaurant);
             setupMock(mockListCategoriesByRestaurant, []);
             setupMock(mockListByRestaurant, []);
+            setupMock(mockComputeEffectiveSuitability, []);
 
             const result = await restaurantController.getRestaurantDetail('test-uuid');
 
             expect(result.restaurant).toEqual(sampleRestaurant);
             expect(result.categories).toEqual([]);
             expect(result.providerRefs).toEqual([]);
+            expect(result.dietSuitability).toEqual([]);
         });
 
         test('throws ExpectedError when restaurant not found', async () => {
@@ -248,6 +257,117 @@ describe('RestaurantController', () => {
 
             await expect(
                 restaurantController.removeProviderRef('bad-id', 'ref-uuid')
+            ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('addDietOverride', () => {
+        test('adds diet override with valid data', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockAddOverride, {
+                id: 'override-uuid',
+                restaurantId: 'test-uuid',
+                dietTagId: 'tag-uuid',
+                supported: true,
+                userId: 1,
+                notes: 'Verified by staff',
+            });
+
+            const result = await restaurantController.addDietOverride('test-uuid', {
+                dietTagId: 'tag-uuid',
+                supported: 'true',
+                notes: 'Verified by staff',
+            }, 1);
+
+            expect(mockAddOverride).toHaveBeenCalledWith({
+                restaurantId: 'test-uuid',
+                dietTagId: 'tag-uuid',
+                supported: true,
+                userId: 1,
+                notes: 'Verified by staff',
+            });
+            expect(result).toMatchObject({dietTagId: 'tag-uuid', supported: true});
+        });
+
+        test('adds override with supported=false', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockAddOverride, {
+                id: 'override-uuid',
+                restaurantId: 'test-uuid',
+                dietTagId: 'tag-uuid',
+                supported: false,
+                userId: 1,
+                notes: null,
+            });
+
+            const result = await restaurantController.addDietOverride('test-uuid', {
+                dietTagId: 'tag-uuid',
+                supported: 'false',
+            }, 1);
+
+            expect(mockAddOverride).toHaveBeenCalledWith({
+                restaurantId: 'test-uuid',
+                dietTagId: 'tag-uuid',
+                supported: false,
+                userId: 1,
+                notes: null,
+            });
+            expect(result).toMatchObject({supported: false});
+        });
+
+        test('rejects empty dietTagId', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+
+            await expect(
+                restaurantController.addDietOverride('test-uuid', {dietTagId: '', supported: 'true'}, 1)
+            ).rejects.toThrow(ExpectedError);
+
+            expect(mockAddOverride).not.toHaveBeenCalled();
+        });
+
+        test('rejects missing supported value', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+
+            await expect(
+                restaurantController.addDietOverride('test-uuid', {dietTagId: 'tag-uuid'}, 1)
+            ).rejects.toThrow(ExpectedError);
+
+            expect(mockAddOverride).not.toHaveBeenCalled();
+        });
+
+        test('throws ExpectedError when restaurant not found', async () => {
+            setupMock(mockGetRestaurantById, null);
+
+            await expect(
+                restaurantController.addDietOverride('bad-id', {dietTagId: 'tag-uuid', supported: 'true'}, 1)
+            ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('removeDietOverride', () => {
+        test('removes diet override successfully', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockRemoveOverride, true);
+
+            await restaurantController.removeDietOverride('test-uuid', 'override-uuid');
+
+            verifyMockCall(mockRemoveOverride, 'override-uuid', 'test-uuid');
+        });
+
+        test('throws ExpectedError when override not found', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockRemoveOverride, false);
+
+            await expect(
+                restaurantController.removeDietOverride('test-uuid', 'bad-override-id')
+            ).rejects.toThrow(ExpectedError);
+        });
+
+        test('throws ExpectedError when restaurant not found', async () => {
+            setupMock(mockGetRestaurantById, null);
+
+            await expect(
+                restaurantController.removeDietOverride('bad-id', 'override-uuid')
             ).rejects.toThrow(ExpectedError);
         });
     });
