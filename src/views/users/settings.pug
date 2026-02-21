@@ -1,0 +1,59 @@
+//- views/users/settings.pug – User Preferences
+extends ../layout
+
+block meta
+    title Settings | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-gear-fill.me-2
+        | Settings
+
+block content
+    - const d = data || {}
+
+    form.row.gy-3(action="/users/settings" method="post")
+        //── Delivery Area ────────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="deliveryArea")
+                i.bi.bi-geo-alt.me-1
+                | Default Delivery Area
+            input#deliveryArea.form-control.text-bg-dark(
+                type="text"
+                name="deliveryArea"
+                maxlength="150"
+                value=(d.deliveryArea || '')
+                placeholder="e.g. Downtown, Midtown, 10km radius")
+
+        //── Cuisine Include ──────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="cuisineIncludes")
+                i.bi.bi-hand-thumbs-up.me-1
+                | Cuisine Include Filter
+            input#cuisineIncludes.form-control.text-bg-dark(
+                type="text"
+                name="cuisineIncludes"
+                value=(d.cuisineIncludes || '')
+                placeholder="e.g. Italian, Japanese, Mexican")
+            .form-text.text-white-50 Comma-separated list of cuisines to prefer.
+
+        //── Cuisine Exclude ──────────────────────────
+        .col-md-6
+            label.form-label.mb-1(for="cuisineExcludes")
+                i.bi.bi-hand-thumbs-down.me-1
+                | Cuisine Exclude Filter
+            input#cuisineExcludes.form-control.text-bg-dark(
+                type="text"
+                name="cuisineExcludes"
+                value=(d.cuisineExcludes || '')
+                placeholder="e.g. Fast Food, Sushi")
+            .form-text.text-white-50 Comma-separated list of cuisines to exclude.
+
+        //── Buttons ──────────────────────────────────
+        .col-12.d-flex.gap-2.mt-2
+            button.btn.btn-success(type="submit")
+                i.bi.bi-check-lg.me-1
+                | Save Settings
+            a.btn.btn-outline-light(href="/users/dashboard")
+                i.bi.bi-x-lg.me-1
+                | Cancel
