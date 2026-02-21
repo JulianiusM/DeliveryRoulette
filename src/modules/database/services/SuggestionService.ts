@@ -12,6 +12,8 @@ export interface SuggestionFilters {
     cuisineIncludes?: string[];
     /** Cuisine keywords to match against restaurant name (exclude) */
     cuisineExcludes?: string[];
+    /** Restaurant IDs to exclude (e.g. recently suggested) */
+    excludeRestaurantIds?: string[];
 }
 
 export interface DietMatchDetail {
@@ -114,6 +116,8 @@ export function pickRandom<T>(items: T[]): T | null {
 
 /**
  * Main suggestion function: find a random restaurant matching all filters.
+ * Excludes recently-suggested restaurants when possible (fallback: if all
+ * candidates are recent, ignore the exclusion list).
  */
 export async function suggest(filters: SuggestionFilters): Promise<SuggestionResult | null> {
     const activeRestaurants = await findActiveRestaurants(filters);
@@ -121,16 +125,22 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     if (activeRestaurants.length === 0) return null;
 
     const dietTagIds = filters.dietTagIds ?? [];
+    const excludeIds = new Set(filters.excludeRestaurantIds ?? []);
 
     // If no diet filters, pick randomly from active+cuisine-filtered restaurants
     if (dietTagIds.length === 0) {
-        const picked = pickRandom(activeRestaurants);
+        const filtered = excludeIds.size > 0
+            ? activeRestaurants.filter(r => !excludeIds.has(r.id))
+            : activeRestaurants;
+        // Fallback: if everything excluded, use full list
+        const pool = filtered.length > 0 ? filtered : activeRestaurants;
+        const picked = pickRandom(pool);
         if (!picked) return null;
         return {
             restaurant: picked,
             reason: {
                 matchedDiets: [],
-                totalCandidates: activeRestaurants.length,
+                totalCandidates: pool.length,
             },
         };
     }
@@ -146,14 +156,19 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
 
     if (compatible.length === 0) return null;
 
-    const picked = pickRandom(compatible);
+    const filtered = excludeIds.size > 0
+        ? compatible.filter(c => !excludeIds.has(c.restaurant.id))
+        : compatible;
+    // Fallback: if everything excluded, use full compatible list
+    const pool = filtered.length > 0 ? filtered : compatible;
+    const picked = pickRandom(pool);
     if (!picked) return null;
 
     return {
         restaurant: picked.restaurant,
         reason: {
             matchedDiets: picked.matchedDiets,
-            totalCandidates: compatible.length,
+            totalCandidates: pool.length,
         },
     };
 }

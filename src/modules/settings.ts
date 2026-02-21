@@ -77,6 +77,9 @@ export type Settings = {
     minNormalizedTitleLength: number;
     minSimilarityScore: number;
 
+    // Suggestion history
+    suggestionExcludeRecentCount: number;
+
     initialized: boolean;
 };
 
@@ -150,6 +153,9 @@ const defaults: Settings = {
     // Similar title matching thresholds
     minNormalizedTitleLength: 4,
     minSimilarityScore: 50,
+
+    // Suggestion history
+    suggestionExcludeRecentCount: 3,
 };
 
 // CSV_KEY -> settings key
@@ -199,6 +205,7 @@ const keyMap: Record<string, keyof Settings> = {
     MAX_DESCRIPTION_LENGTH: "maxDescriptionLength",
     MIN_NORMALIZED_TITLE_LENGTH: "minNormalizedTitleLength",
     MIN_SIMILARITY_SCORE: "minSimilarityScore",
+    SUGGESTION_EXCLUDE_RECENT_COUNT: "suggestionExcludeRecentCount",
 };
 
 // per-field coercion
@@ -221,6 +228,7 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     maxDescriptionLength: (v) => Number(v),
     minNormalizedTitleLength: (v) => Number(v),
     minSimilarityScore: (v) => Number(v),
+    suggestionExcludeRecentCount: (v) => Number(v),
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),

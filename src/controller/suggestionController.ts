@@ -1,4 +1,5 @@
 import * as suggestionService from "../modules/database/services/SuggestionService";
+import * as suggestionHistoryService from "../modules/database/services/SuggestionHistoryService";
 import * as userDietPrefService from "../modules/database/services/UserDietPreferenceService";
 import * as userPrefService from "../modules/database/services/UserPreferenceService";
 import {APIError} from "../modules/lib/errors";
@@ -78,12 +79,13 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
 /**
  * Process a suggestion request from form data.
  * Returns the suggestion result or throws if no match found.
+ * Records the suggestion in history for future exclusion.
  */
 export async function processSuggestion(body: {
     dietTagIds?: string | string[];
     cuisineIncludes?: string;
     cuisineExcludes?: string;
-}): Promise<SuggestionResultData> {
+}, userId?: number | null): Promise<SuggestionResultData> {
     // Normalize dietTagIds to array
     let dietTagIds: string[] = [];
     if (body.dietTagIds) {
@@ -91,10 +93,14 @@ export async function processSuggestion(body: {
     }
     dietTagIds = dietTagIds.filter(Boolean);
 
+    // Get recently suggested restaurant IDs to exclude
+    const excludeRestaurantIds = await suggestionHistoryService.getRecentRestaurantIds(userId);
+
     const filters: SuggestionFilters = {
         dietTagIds,
         cuisineIncludes: parseCsvList(body.cuisineIncludes),
         cuisineExcludes: parseCsvList(body.cuisineExcludes),
+        excludeRestaurantIds,
     };
 
     const result = await suggestionService.suggest(filters);
@@ -106,6 +112,9 @@ export async function processSuggestion(body: {
             404,
         );
     }
+
+    // Record suggestion in history
+    await suggestionHistoryService.recordSuggestion(result.restaurant.id, userId);
 
     return formatResult(result);
 }

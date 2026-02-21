@@ -211,5 +211,87 @@ describe('SuggestionService', () => {
             const result = await suggestionService.suggest({dietTagIds: ['tag-vegan']});
             expect(result).toBeNull();
         });
+
+        test('excludes recently suggested restaurants (no diet filters)', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Exclude r1 and r2, only r3 should remain
+            const result = await suggestionService.suggest({excludeRestaurantIds: ['r1', 'r2']});
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r3');
+            expect(result!.reason.totalCandidates).toBe(1);
+        });
+
+        test('excludes recently suggested restaurants (with diet filters)', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // r1 and r2 support vegan, r3 does not
+            mockComputeEffectiveSuitability
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'override'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+                ]);
+
+            // Exclude r1, only r2 should remain from compatible set
+            const result = await suggestionService.suggest({
+                dietTagIds: ['tag-vegan'],
+                excludeRestaurantIds: ['r1'],
+            });
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r2');
+            expect(result!.reason.totalCandidates).toBe(1);
+        });
+
+        test('fallback: returns from full list when all candidates are excluded (no diet)', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Exclude all three
+            const result = await suggestionService.suggest({excludeRestaurantIds: ['r1', 'r2', 'r3']});
+            expect(result).not.toBeNull();
+            expect(sampleRestaurants.map(r => r.id)).toContain(result!.restaurant.id);
+            expect(result!.reason.totalCandidates).toBe(3);
+        });
+
+        test('fallback: returns from compatible list when all compatible are excluded', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // Only r1 supports vegan
+            mockComputeEffectiveSuitability
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'override'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'inference'},
+                ])
+                .mockResolvedValueOnce([
+                    {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+                ]);
+
+            // Exclude r1 (the only compatible one) - should still return r1 as fallback
+            const result = await suggestionService.suggest({
+                dietTagIds: ['tag-vegan'],
+                excludeRestaurantIds: ['r1'],
+            });
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r1');
+            expect(result!.reason.totalCandidates).toBe(1);
+        });
     });
 });
