@@ -83,6 +83,47 @@ export interface EffectiveSuitability {
     inference?: {
         score: number;
         confidence: string;
+        reasons?: {
+            matchedItems: Array<{itemId: string; itemName: string; keywords: string[]}>;
+            totalMenuItems: number;
+            matchRatio: number;
+        };
+    };
+}
+
+interface InferenceReasons {
+    matchedItems: Array<{itemId: string; itemName: string; keywords: string[]}>;
+    totalMenuItems: number;
+    matchRatio: number;
+}
+
+/**
+ * Safely parse reasonsJson from an inference result.
+ * Returns undefined if parsing fails or data is missing.
+ */
+function parseReasons(reasonsJson: string | undefined | null): InferenceReasons | undefined {
+    if (!reasonsJson) return undefined;
+    try {
+        const parsed = JSON.parse(reasonsJson);
+        if (parsed && Array.isArray(parsed.matchedItems)) {
+            return {
+                matchedItems: parsed.matchedItems,
+                totalMenuItems: parsed.totalMenuItems ?? 0,
+                matchRatio: parsed.matchRatio ?? 0,
+            };
+        }
+    } catch { /* ignore malformed JSON */ }
+    return undefined;
+}
+
+/**
+ * Build inference detail object from an inference result entity.
+ */
+function buildInferenceDetail(inference: DietInferenceResult): NonNullable<EffectiveSuitability['inference']> {
+    return {
+        score: inference.score,
+        confidence: inference.confidence,
+        reasons: parseReasons(inference.reasonsJson),
     };
 }
 
@@ -122,10 +163,7 @@ export async function computeEffectiveSuitability(
                     notes: override.notes ?? null,
                     updatedAt: override.updatedAt,
                 },
-                inference: inference ? {
-                    score: inference.score,
-                    confidence: inference.confidence,
-                } : undefined,
+                inference: inference ? buildInferenceDetail(inference) : undefined,
             };
         }
 
@@ -136,10 +174,7 @@ export async function computeEffectiveSuitability(
                 dietTagLabel: tag.label,
                 supported: inference.score > 0,
                 source: 'inference' as const,
-                inference: {
-                    score: inference.score,
-                    confidence: inference.confidence,
-                },
+                inference: buildInferenceDetail(inference),
             };
         }
 
