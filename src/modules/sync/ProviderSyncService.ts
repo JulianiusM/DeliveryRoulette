@@ -1,10 +1,12 @@
 import {AppDataSource} from '../database/dataSource';
 import {SyncJob, SyncJobStatus} from '../database/entities/sync/SyncJob';
 import {RestaurantProviderRef} from '../database/entities/restaurant/RestaurantProviderRef';
+import {DietManualOverride} from '../database/entities/diet/DietManualOverride';
 import * as restaurantService from '../database/services/RestaurantService';
 import * as menuService from '../database/services/MenuService';
 import * as providerRefService from '../database/services/RestaurantProviderRefService';
 import * as dietInferenceService from '../database/services/DietInferenceService';
+import * as syncAlertService from '../database/services/SyncAlertService';
 import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
 import {ProviderKey} from '../../providers/ProviderKey';
 import {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
@@ -114,10 +116,14 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
             // Discover restaurants from the connector (empty query = list all)
             const providerRestaurants = await conn.listRestaurants('');
 
+            // Track which restaurants the connector returned (for stale detection)
+            const seenRestaurantIds = new Set<string>();
+
             for (const incoming of providerRestaurants) {
                 try {
                     // Upsert restaurant via service layer
                     const restaurantId = await restaurantService.upsertFromProvider(incoming);
+                    seenRestaurantIds.add(restaurantId);
 
                     // Ensure provider ref for this connector
                     await providerRefService.ensureProviderRef(
@@ -139,8 +145,17 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
                         }
                     }
 
+                    // Capture pre-sync diet inference scores for override checks
+                    const preSyncInference = await dietInferenceService.getResultsByRestaurant(
+                        restaurantId, dietInferenceService.ENGINE_VERSION,
+                    );
+                    const preScores = new Map(preSyncInference.map((r) => [r.dietTagId, r.score]));
+
                     // Sync menu
                     await syncMenuForRestaurant(conn, incoming.externalId, restaurantId);
+
+                    // Check if diet inference changed and there are manual overrides
+                    await checkDietOverrideAlerts(restaurantId, conn.providerKey, preScores);
 
                     // Update lastSyncAt on the provider ref
                     await updateLastSyncAt(restaurantId, conn.providerKey);
@@ -152,6 +167,9 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
                     allResults.push({name: incoming.name, success: false, error: message});
                 }
             }
+
+            // Detect restaurants that were previously synced but are now gone
+            await detectStaleRestaurants(conn.providerKey, seenRestaurantIds);
         }
 
         job.status = 'completed' as SyncJobStatus;
@@ -248,4 +266,87 @@ function toResult(job: SyncJob): Omit<SyncResult, 'restaurants'> {
         restaurantsSynced: job.restaurantsSynced,
         errorMessage: job.errorMessage,
     };
+}
+
+/**
+ * Detect restaurants that have active provider refs for a connector
+ * but were NOT returned by that connector's `listRestaurants()`.
+ * Marks the ref as `stale` and creates a `restaurant_gone` alert.
+ */
+async function detectStaleRestaurants(
+    providerKey: string,
+    seenRestaurantIds: Set<string>,
+): Promise<void> {
+    const refRepo = AppDataSource.getRepository(RestaurantProviderRef);
+    const activeRefs = await refRepo.find({
+        where: {providerKey, status: 'active'},
+    });
+
+    for (const ref of activeRefs) {
+        if (!seenRestaurantIds.has(ref.restaurantId)) {
+            ref.status = 'stale';
+            ref.updatedAt = new Date();
+            await refRepo.save(ref);
+
+            const alreadyAlerted = await syncAlertService.hasActiveAlert(
+                ref.restaurantId, providerKey, 'restaurant_gone',
+            );
+            if (!alreadyAlerted) {
+                const restaurant = await restaurantService.getRestaurantById(ref.restaurantId);
+                const name = restaurant?.name ?? ref.restaurantId;
+                await syncAlertService.createAlert({
+                    restaurantId: ref.restaurantId,
+                    providerKey,
+                    type: 'restaurant_gone',
+                    message: `"${name}" was not returned by ${providerKey} and may have closed.`,
+                });
+            }
+        }
+    }
+}
+
+/**
+ * After menu sync + diet recompute, check whether any diet inference
+ * scores changed for a restaurant that has manual overrides.
+ * If so, create a `diet_override_stale` alert so the user can review.
+ */
+async function checkDietOverrideAlerts(
+    restaurantId: string,
+    providerKey: string,
+    preScores: Map<string, number>,
+): Promise<void> {
+    const overrideRepo = AppDataSource.getRepository(DietManualOverride);
+    const overrides = await overrideRepo.find({where: {restaurantId}});
+    if (overrides.length === 0) return;
+
+    const postSyncInference = await dietInferenceService.getResultsByRestaurant(
+        restaurantId, dietInferenceService.ENGINE_VERSION,
+    );
+
+    const changedTags: string[] = [];
+    for (const result of postSyncInference) {
+        const oldScore = preScores.get(result.dietTagId);
+        if (oldScore !== undefined && oldScore !== result.score) {
+            const hasOverride = overrides.some((o) => o.dietTagId === result.dietTagId);
+            if (hasOverride) {
+                changedTags.push(result.dietTagId);
+            }
+        }
+    }
+
+    if (changedTags.length > 0) {
+        const alreadyAlerted = await syncAlertService.hasActiveAlert(
+            restaurantId, providerKey, 'diet_override_stale',
+        );
+        if (!alreadyAlerted) {
+            const restaurant = await restaurantService.getRestaurantById(restaurantId);
+            const name = restaurant?.name ?? restaurantId;
+            await syncAlertService.createAlert({
+                restaurantId,
+                providerKey,
+                type: 'diet_override_stale',
+                message: `Menu changes for "${name}" affected diet inference. ${changedTags.length} diet tag(s) with manual overrides may need review.`,
+            });
+        }
+    }
 }

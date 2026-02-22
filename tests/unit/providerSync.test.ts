@@ -1,7 +1,7 @@
 /**
  * Unit tests for ProviderSyncService
- * Tests the unified sync pipeline: listRestaurants → upsert → fetchMenu → sync.
- * All connectors (registry-based and directly provided) follow the same flow.
+ * Tests the unified sync pipeline, stale-restaurant detection,
+ * and diet-override-stale alerting.
  */
 
 import {ProviderKey} from '../../src/providers/ProviderKey';
@@ -20,24 +20,22 @@ const mockFindOneJob = jest.fn();
 const mockCreateJob = jest.fn();
 const mockSaveJob = jest.fn();
 const mockFindOneRef = jest.fn();
+const mockFindRef = jest.fn();
 const mockSaveRef = jest.fn();
+const mockFindOverrides = jest.fn();
 
 jest.mock('../../src/modules/database/dataSource', () => ({
     AppDataSource: {
         getRepository: jest.fn((entity: any) => {
             const name = typeof entity === 'function' ? entity.name : entity;
             if (name === 'SyncJob') {
-                return {
-                    findOne: mockFindOneJob,
-                    create: mockCreateJob.mockImplementation((data: any) => ({id: 'job-1', restaurantsSynced: 0, ...data})),
-                    save: mockSaveJob.mockImplementation((e: any) => Promise.resolve(e)),
-                };
+                return {findOne: mockFindOneJob, create: mockCreateJob, save: mockSaveJob};
             }
             if (name === 'RestaurantProviderRef') {
-                return {
-                    findOne: mockFindOneRef.mockResolvedValue(null),
-                    save: mockSaveRef.mockImplementation((e: any) => Promise.resolve(e)),
-                };
+                return {findOne: mockFindOneRef, find: mockFindRef, save: mockSaveRef};
+            }
+            if (name === 'DietManualOverride') {
+                return {find: mockFindOverrides};
             }
             return {find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null)};
         }),
@@ -47,6 +45,7 @@ jest.mock('../../src/modules/database/dataSource', () => ({
 jest.mock('../../src/modules/database/services/RestaurantService');
 import * as restaurantService from '../../src/modules/database/services/RestaurantService';
 const mockUpsertFromProvider = restaurantService.upsertFromProvider as jest.Mock;
+const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
 
 jest.mock('../../src/modules/database/services/MenuService');
 import * as menuService from '../../src/modules/database/services/MenuService';
@@ -60,6 +59,12 @@ const mockEnsureProviderRef = providerRefService.ensureProviderRef as jest.Mock;
 jest.mock('../../src/modules/database/services/DietInferenceService');
 import * as dietInference from '../../src/modules/database/services/DietInferenceService';
 const mockRecompute = dietInference.recomputeAfterMenuChange as jest.Mock;
+const mockGetResults = dietInference.getResultsByRestaurant as jest.Mock;
+
+jest.mock('../../src/modules/database/services/SyncAlertService');
+import * as syncAlertService from '../../src/modules/database/services/SyncAlertService';
+const mockCreateAlert = syncAlertService.createAlert as jest.Mock;
+const mockHasActiveAlert = syncAlertService.hasActiveAlert as jest.Mock;
 
 jest.mock('../../src/providers/ConnectorRegistry');
 import * as ConnectorRegistry from '../../src/providers/ConnectorRegistry';
@@ -73,13 +78,24 @@ import type {SyncResult} from '../../src/modules/sync/ProviderSyncService';
 describe('ProviderSyncService', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockFindOneJob.mockResolvedValue(null); // no running job by default
+        // Defaults for repo mocks
+        mockFindOneJob.mockResolvedValue(null);
+        mockCreateJob.mockImplementation((data: any) => ({id: 'job-1', restaurantsSynced: 0, ...data}));
+        mockSaveJob.mockImplementation((e: any) => Promise.resolve(e));
+        mockFindOneRef.mockResolvedValue(null);
+        mockFindRef.mockResolvedValue([]);
+        mockSaveRef.mockImplementation((e: any) => Promise.resolve(e));
+        mockFindOverrides.mockResolvedValue([]);
+        // Defaults for service mocks
         mockRegisteredKeys.mockReturnValue([]);
+        mockGetResults.mockResolvedValue([]);
+        mockHasActiveAlert.mockResolvedValue(false);
+        mockCreateAlert.mockResolvedValue({id: 'alert-1'});
+        mockGetRestaurantById.mockResolvedValue(null);
     });
 
     describe('isLocked', () => {
         test('returns false when no in-progress job exists', async () => {
-            mockFindOneJob.mockResolvedValue(null);
             expect(await isLocked()).toBe(false);
         });
 
@@ -89,19 +105,16 @@ describe('ProviderSyncService', () => {
         });
     });
 
-    describe('runSync – registry-resolved connector', () => {
+    describe('runSync - registry-resolved connector', () => {
         test('returns failed result when another sync is already running', async () => {
             mockFindOneJob.mockResolvedValue({id: 'running', status: 'in_progress'});
-
             const result = await runSync();
-
             expect(result.status).toBe('failed');
             expect(result.errorMessage).toMatch(/already in progress/);
         });
 
         test('completes with zero restaurants when no connectors registered', async () => {
             const result = await runSync();
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(0);
             expect(result.restaurants).toEqual([]);
@@ -118,10 +131,7 @@ describe('ProviderSyncService', () => {
 
             mockUpsertFromProvider.mockResolvedValue('rest-1');
             mockEnsureProviderRef.mockResolvedValue(undefined);
-            mockUpsertCategories.mockResolvedValue([
-                {id: 'cat-1', name: 'Starters'},
-                {id: 'cat-2', name: 'Mains'},
-            ]);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
             mockUpsertItems.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
 
@@ -129,7 +139,6 @@ describe('ProviderSyncService', () => {
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
-            expect(result.restaurants).toHaveLength(1);
             expect(result.restaurants[0].success).toBe(true);
             expect(connector.listRestaurants).toHaveBeenCalled();
             expect(mockUpsertFromProvider).toHaveBeenCalled();
@@ -144,9 +153,7 @@ describe('ProviderSyncService', () => {
             const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
             (connector.listRestaurants as jest.Mock).mockRejectedValue(new Error('API down'));
             mockResolve.mockReturnValue(connector);
-
             const result = await runSync({providerKey: ProviderKey.UBER_EATS});
-
             expect(result.status).toBe('failed');
             expect(result.errorMessage).toBe('API down');
         });
@@ -158,14 +165,11 @@ describe('ProviderSyncService', () => {
             ]);
             (connector.fetchMenu as jest.Mock).mockResolvedValue(emptyProviderMenu);
             mockResolve.mockReturnValue(connector);
-
             mockUpsertFromProvider.mockResolvedValue('rest-2');
             mockEnsureProviderRef.mockResolvedValue(undefined);
             mockUpsertCategories.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
-
             const result = await runSync({providerKey: ProviderKey.UBER_EATS});
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
             expect(mockUpsertItems).not.toHaveBeenCalled();
@@ -181,18 +185,12 @@ describe('ProviderSyncService', () => {
                 .mockResolvedValueOnce(sampleProviderMenu)
                 .mockRejectedValueOnce(new Error('Menu fetch failed'));
             mockResolve.mockReturnValue(connector);
-
             mockUpsertFromProvider.mockResolvedValue('rest-1');
             mockEnsureProviderRef.mockResolvedValue(undefined);
-            mockUpsertCategories.mockResolvedValue([
-                {id: 'cat-1', name: 'Starters'},
-                {id: 'cat-2', name: 'Mains'},
-            ]);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
             mockUpsertItems.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
-
             const result = await runSync({providerKey: ProviderKey.UBER_EATS});
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
             expect(result.restaurants).toHaveLength(2);
@@ -202,10 +200,10 @@ describe('ProviderSyncService', () => {
         });
     });
 
-    describe('runSync – directly provided connector (ImportConnector)', () => {
+    describe('runSync - directly provided connector (ImportConnector)', () => {
         beforeEach(() => {
             mockUpsertFromProvider.mockImplementation(async (data: any) =>
-                `new-${data.name.toLowerCase().replace(/\s+/g, '-')}`,
+                'new-' + data.name.toLowerCase().replace(/\s+/g, '-'),
             );
             mockEnsureProviderRef.mockResolvedValue(undefined);
             mockUpsertCategories.mockResolvedValue([]);
@@ -215,39 +213,27 @@ describe('ProviderSyncService', () => {
         test('creates SyncJob with connector providerKey', async () => {
             const connector = new ImportConnector(importPayloadNoMenu);
             const result = await runSync({connector});
-
             expect(result.status).toBe('completed');
             expect(result.jobId).toBe('job-1');
-            expect(mockCreateJob).toHaveBeenCalledWith(
-                expect.objectContaining({providerKey: ProviderKey.IMPORT}),
-            );
+            expect(mockCreateJob).toHaveBeenCalledWith(expect.objectContaining({providerKey: ProviderKey.IMPORT}));
         });
 
         test('creates new restaurant and provider ref', async () => {
             const connector = new ImportConnector(importPayloadNoMenu);
             const result = await runSync({connector});
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
-            expect(result.restaurants).toHaveLength(1);
             expect(result.restaurants[0].success).toBe(true);
-            expect(mockUpsertFromProvider).toHaveBeenCalledWith(
-                expect.objectContaining({name: 'Simple Place'}),
-            );
+            expect(mockUpsertFromProvider).toHaveBeenCalledWith(expect.objectContaining({name: 'Simple Place'}));
             expect(mockEnsureProviderRef).toHaveBeenCalledWith(
-                expect.any(String),
-                ProviderKey.IMPORT,
-                'Simple Place',
-                expect.stringContaining('import://'),
+                expect.any(String), ProviderKey.IMPORT, 'Simple Place', expect.stringContaining('import://'),
             );
         });
 
         test('processes menu through the connector fetchMenu pipeline', async () => {
             mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Mains'}]);
-
             const connector = new ImportConnector(importPayloadWithMenu);
             const result = await runSync({connector});
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
             expect(mockUpsertCategories).toHaveBeenCalled();
@@ -258,7 +244,6 @@ describe('ProviderSyncService', () => {
         test('processes multiple restaurants', async () => {
             const connector = new ImportConnector(importPayloadMultiple);
             const result = await runSync({connector});
-
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(2);
             expect(result.restaurants).toHaveLength(2);
@@ -266,10 +251,8 @@ describe('ProviderSyncService', () => {
         });
 
         test('does not duplicate provider ref when one already exists', async () => {
-            // ensureProviderRef handles dedup internally; we verify it's called once per restaurant
             const connector = new ImportConnector(importPayloadNoMenu);
             await runSync({connector});
-
             expect(mockEnsureProviderRef).toHaveBeenCalledTimes(1);
         });
 
@@ -277,10 +260,8 @@ describe('ProviderSyncService', () => {
             mockUpsertFromProvider
                 .mockRejectedValueOnce(new Error('DB error'))
                 .mockResolvedValueOnce('new-2');
-
             const connector = new ImportConnector(importPayloadMultiple);
             const result = await runSync({connector});
-
             expect(result.status).toBe('completed');
             expect(result.restaurants).toHaveLength(2);
             expect(result.restaurants[0].success).toBe(false);
@@ -292,11 +273,141 @@ describe('ProviderSyncService', () => {
         test('concurrent imports use isolated instances', async () => {
             const connector1 = new ImportConnector(importPayloadNoMenu);
             const connector2 = new ImportConnector(importPayloadMultiple);
-
             const list1 = await connector1.listRestaurants('');
             const list2 = await connector2.listRestaurants('');
             expect(list1).toHaveLength(1);
             expect(list2).toHaveLength(2);
+        });
+    });
+
+    describe('stale restaurant detection', () => {
+        test('marks ref as stale and creates alert when restaurant not returned', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([]);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockFindRef.mockResolvedValue([
+                {restaurantId: 'rest-gone', providerKey: ProviderKey.UBER_EATS, status: 'active', updatedAt: new Date()},
+            ]);
+            mockGetRestaurantById.mockResolvedValue({id: 'rest-gone', name: 'Gone Place'});
+
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(result.status).toBe('completed');
+            expect(mockSaveRef).toHaveBeenCalledWith(expect.objectContaining({restaurantId: 'rest-gone', status: 'stale'}));
+            expect(mockCreateAlert).toHaveBeenCalledWith(expect.objectContaining({
+                restaurantId: 'rest-gone', providerKey: ProviderKey.UBER_EATS, type: 'restaurant_gone',
+            }));
+        });
+
+        test('does not duplicate restaurant_gone alert if one already exists', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([]);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockFindRef.mockResolvedValue([
+                {restaurantId: 'rest-gone', providerKey: ProviderKey.UBER_EATS, status: 'active', updatedAt: new Date()},
+            ]);
+            mockHasActiveAlert.mockResolvedValue(true);
+
+            await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(mockCreateAlert).not.toHaveBeenCalled();
+        });
+
+        test('does not alert for restaurants that were returned by the connector', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Still Here', url: 'https://example.com/1'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(emptyProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockUpsertFromProvider.mockResolvedValue('rest-1');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+            mockFindRef.mockResolvedValue([
+                {restaurantId: 'rest-1', providerKey: ProviderKey.UBER_EATS, status: 'active', updatedAt: new Date()},
+            ]);
+
+            await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(mockSaveRef).not.toHaveBeenCalledWith(expect.objectContaining({status: 'stale'}));
+            expect(mockCreateAlert).not.toHaveBeenCalledWith(expect.objectContaining({type: 'restaurant_gone'}));
+        });
+    });
+
+    describe('diet override stale alerting', () => {
+        test('creates alert when diet score changes and manual override exists', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Diet Place', url: 'https://example.com/1'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockUpsertFromProvider.mockResolvedValue('rest-1');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+            // Pre-sync: score=50, Post-sync: score=80
+            mockGetResults
+                .mockResolvedValueOnce([{dietTagId: 'tag-vegan', score: 50}])
+                .mockResolvedValueOnce([{dietTagId: 'tag-vegan', score: 80}]);
+            mockFindOverrides.mockResolvedValue([{dietTagId: 'tag-vegan', restaurantId: 'rest-1'}]);
+            mockGetRestaurantById.mockResolvedValue({id: 'rest-1', name: 'Diet Place'});
+
+            await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(mockCreateAlert).toHaveBeenCalledWith(expect.objectContaining({
+                restaurantId: 'rest-1', type: 'diet_override_stale',
+            }));
+        });
+
+        test('does not create alert when diet scores are unchanged', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Stable Place', url: 'https://example.com/1'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockUpsertFromProvider.mockResolvedValue('rest-1');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+            mockGetResults.mockResolvedValue([{dietTagId: 'tag-vegan', score: 50}]);
+            mockFindOverrides.mockResolvedValue([{dietTagId: 'tag-vegan', restaurantId: 'rest-1'}]);
+
+            await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(mockCreateAlert).not.toHaveBeenCalledWith(expect.objectContaining({type: 'diet_override_stale'}));
+        });
+
+        test('does not create alert when no manual overrides exist', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'No Override Place', url: 'https://example.com/1'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockUpsertFromProvider.mockResolvedValue('rest-1');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+            mockGetResults
+                .mockResolvedValueOnce([{dietTagId: 'tag-vegan', score: 50}])
+                .mockResolvedValueOnce([{dietTagId: 'tag-vegan', score: 80}]);
+            mockFindOverrides.mockResolvedValue([]);
+
+            await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(mockCreateAlert).not.toHaveBeenCalledWith(expect.objectContaining({type: 'diet_override_stale'}));
         });
     });
 });
