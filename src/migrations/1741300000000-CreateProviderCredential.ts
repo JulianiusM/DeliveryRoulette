@@ -1,4 +1,4 @@
-import {MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex} from "typeorm";
+import {MigrationInterface, QueryRunner, Table, TableForeignKey} from "typeorm";
 
 export class CreateProviderCredential1741300000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
@@ -44,17 +44,15 @@ export class CreateProviderCredential1741300000000 implements MigrationInterface
                         default: "CURRENT_TIMESTAMP",
                     },
                 ],
+                indices: [
+                    {
+                        name: "UQ_provider_credential_key_user",
+                        columnNames: ["provider_key", "credential_key", "user_id"],
+                        isUnique: true,
+                    },
+                ],
             }),
             true,
-        );
-
-        await queryRunner.createIndex(
-            "provider_credentials",
-            new TableIndex({
-                name: "UQ_provider_credential_key_user",
-                columnNames: ["provider_key", "credential_key", "user_id"],
-                isUnique: true,
-            }),
         );
 
         await queryRunner.createForeignKey(

@@ -1,7 +1,6 @@
-import {Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn} from "typeorm";
 import {User} from "../user/User";
 
-@Index("UQ_provider_credential_key_user", ["providerKey", "credentialKey", "userId"], {unique: true})
 @Entity("provider_credentials")
 export class ProviderCredential {
     @PrimaryGeneratedColumn("uuid")
