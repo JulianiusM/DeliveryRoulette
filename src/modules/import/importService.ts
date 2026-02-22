@@ -253,13 +253,13 @@ async function applySingleRestaurant(incoming: ImportRestaurant): Promise<Restau
                 }
             }
 
-            // Upsert provider references
-            if (incoming.providerRefs && incoming.providerRefs.length > 0) {
-                const existingRefs = await providerRefService.listByRestaurant(restaurantId);
-                const existingRefByKey = new Map(
-                    existingRefs.map((r) => [r.providerKey.toLowerCase(), r]),
-                );
+            // Upsert provider references and ensure IMPORT ref exists
+            const existingRefs = await providerRefService.listByRestaurant(restaurantId);
+            const existingRefByKey = new Map(
+                existingRefs.map((r) => [r.providerKey.toLowerCase(), r]),
+            );
 
+            if (incoming.providerRefs && incoming.providerRefs.length > 0) {
                 for (const ref of incoming.providerRefs) {
                     const existingRef = existingRefByKey.get(ref.providerKey.toLowerCase());
                     if (!existingRef) {
@@ -274,10 +274,7 @@ async function applySingleRestaurant(incoming: ImportRestaurant): Promise<Restau
             }
 
             // Ensure an IMPORT provider ref exists for this restaurant
-            const allRefs = await providerRefService.listByRestaurant(restaurantId);
-            const hasImportRef = allRefs.some(
-                (r) => r.providerKey === ProviderKey.IMPORT,
-            );
+            const hasImportRef = existingRefByKey.has(ProviderKey.IMPORT);
             if (!hasImportRef) {
                 await providerRefService.addProviderRef({
                     restaurantId,
