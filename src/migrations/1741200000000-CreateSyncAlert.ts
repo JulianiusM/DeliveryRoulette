@@ -52,6 +52,7 @@ export class CreateSyncAlert1741200000000 implements MigrationInterface {
         await queryRunner.createForeignKey(
             "sync_alerts",
             new TableForeignKey({
+                name: "FK_sync_alert_restaurant",
                 columnNames: ["restaurant_id"],
                 referencedTableName: "restaurants",
                 referencedColumnNames: ["id"],
