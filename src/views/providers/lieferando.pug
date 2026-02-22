@@ -1,0 +1,70 @@
+extends ../layout
+
+block title
+    .card-header
+        h4.mb-0
+            i.bi.bi-shop.me-2
+            | Lieferando Provider Settings
+
+block content
+    //- Listing URL configuration
+    .card.bg-dark.text-white.mb-4
+        .card-header
+            h5.mb-0
+                i.bi.bi-geo-alt.me-2
+                | Discovery – Listing URL
+        .card-body
+            p.text-white-50.
+                Paste a Lieferando delivery area listing URL (e.g. a postal code page) to discover restaurants.
+            form(method="POST" action="/providers/lieferando/sync")
+                .mb-3
+                    label.form-label(for="listingUrl") Listing URL
+                    input.form-control.bg-dark.text-white.border-secondary#listingUrl(
+                        type="url"
+                        name="listingUrl"
+                        placeholder="https://www.lieferando.de/en/delivery/food/..."
+                        value=data.listingUrl
+                        required
+                    )
+                    .form-text.text-white-50 Enter the URL of a Lieferando delivery area page for your postal code region.
+                button.btn.btn-primary(type="submit")
+                    i.bi.bi-arrow-repeat.me-1
+                    | Sync Lieferando
+
+    //- Paste URL import
+    .card.bg-dark.text-white.mb-4
+        .card-header
+            h5.mb-0
+                i.bi.bi-link-45deg.me-2
+                | Import – Paste Restaurant URL
+        .card-body
+            p.text-white-50.
+                Paste a Lieferando restaurant menu URL to import a single restaurant (and optionally its menu).
+            form(method="POST" action="/providers/lieferando/import-url")
+                .mb-3
+                    label.form-label(for="menuUrl") Restaurant Menu URL
+                    input.form-control.bg-dark.text-white.border-secondary#menuUrl(
+                        type="url"
+                        name="menuUrl"
+                        placeholder="https://www.lieferando.de/en/menu/restaurant-name"
+                        required
+                    )
+                    .form-text.text-white-50 The URL must be from lieferando.de and contain /menu/ in the path.
+                button.btn.btn-success(type="submit")
+                    i.bi.bi-download.me-1
+                    | Import Restaurant
+
+    //- Info section
+    .card.bg-dark.text-white
+        .card-header
+            h5.mb-0
+                i.bi.bi-info-circle.me-2
+                | About Lieferando Integration
+        .card-body
+            ul.text-white-50
+                li Listing pages are cached for 6 hours.
+                li Menu pages are cached for 24 hours.
+                li Restaurants are matched by name to avoid duplicates.
+                li If menu parsing fails, the restaurant is still imported with a raw text snapshot.
+                li
+                    a.text-white(href="/restaurants") View all restaurants
