@@ -1,7 +1,6 @@
-import {Column, Entity, Index, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
 
 @Entity("provider_fetch_cache")
-@Index("IDX_provider_fetch_cache_key", ["providerKey", "cacheKey"], {unique: true})
 export class ProviderFetchCache {
     @PrimaryGeneratedColumn("uuid")
     id!: string;

@@ -2,8 +2,7 @@ import http from 'http';
 import settings from './modules/settings';
 import {initDataSource} from "./modules/database/dataSource";
 import {startScheduler} from "./modules/sync/SyncScheduler";
-import * as ConnectorRegistry from './providers/ConnectorRegistry';
-import {LieferandoConnector} from './providers/lieferando/LieferandoConnector';
+import {registerConnectors} from './providers/ConnectorBootstrap';
 
 async function bootstrap() {
     try {
@@ -12,7 +11,7 @@ async function bootstrap() {
         await initDataSource();
 
         // Register delivery provider connectors
-        ConnectorRegistry.register(new LieferandoConnector());
+        registerConnectors();
 
         const {default: app} = await import('./app');
         const server = http.createServer(app);
