@@ -115,7 +115,8 @@ export async function parseCsvBuffer(buffer: Buffer): Promise<CsvParseResult> {
         const rowNum = i + 2; // +2 because row 1 is header, array is 0-indexed
         const row = dataRows[i];
 
-        // Skip fully empty rows
+        // Skip rows where all cells are empty (e.g. ",,,") – note that
+        // skipEmptyLines only filters lines with no characters at all.
         if (row.every((cell) => String(cell).trim() === '')) continue;
 
         const result = mapRow(row, headerMapping.mapping, rowNum);
