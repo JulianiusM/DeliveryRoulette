@@ -70,6 +70,7 @@ const mockResolve = ConnectorRegistry.resolve as jest.Mock;
 
 import {runSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
 import {ImportConnector} from '../../src/providers/ImportConnector';
+import type {PushSyncResult} from '../../src/modules/sync/ProviderSyncService';
 
 describe('ProviderSyncService', () => {
     beforeEach(() => {
@@ -248,11 +249,11 @@ describe('ProviderSyncService', () => {
 
         test('processes multiple restaurants', async () => {
             const connector = new ImportConnector(importPayloadMultiple);
-            const result = await runSync({pushConnector: connector});
+            const result = await runSync({pushConnector: connector}) as PushSyncResult;
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(2);
-            expect('restaurants' in result && result.restaurants).toHaveLength(2);
+            expect(result.restaurants).toHaveLength(2);
             expect(mockCreateRestaurant).toHaveBeenCalledTimes(2);
         });
 
@@ -276,14 +277,13 @@ describe('ProviderSyncService', () => {
                 .mockImplementationOnce(async (data: any) => ({id: 'new-2', ...data}));
 
             const connector = new ImportConnector(importPayloadMultiple);
-            const result = await runSync({pushConnector: connector});
+            const result = await runSync({pushConnector: connector}) as PushSyncResult;
 
             expect(result.status).toBe('completed');
-            const pushResult = result as any;
-            expect(pushResult.restaurants).toHaveLength(2);
-            expect(pushResult.restaurants[0].success).toBe(false);
-            expect(pushResult.restaurants[0].error).toBe('DB error');
-            expect(pushResult.restaurants[1].success).toBe(true);
+            expect(result.restaurants).toHaveLength(2);
+            expect(result.restaurants[0].success).toBe(false);
+            expect(result.restaurants[0].error).toBe('DB error');
+            expect(result.restaurants[1].success).toBe(true);
             expect(result.restaurantsSynced).toBe(1);
         });
 
