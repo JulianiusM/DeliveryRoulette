@@ -45,6 +45,16 @@ export const normalizeTextData = [
         input: 'hello\t\nworld',
         expected: 'hello world',
     },
+    {
+        description: 'normalizes German text with umlauts',
+        input: '  Käsespätzle  Vegetarisch  ',
+        expected: 'käsespätzle vegetarisch',
+    },
+    {
+        description: 'normalizes mixed German/English text',
+        input: 'Vegan  Pflanzlich  Bowl',
+        expected: 'vegan pflanzlich bowl',
+    },
 ];
 
 // ── computeScoreAndConfidence test data ────────────────────
@@ -200,4 +210,163 @@ export const inferForTagData = [
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-2'],
     },
+    // ── German keyword test cases ──────────────────────────────
+    {
+        description: 'detects German vegan keywords (pflanzlich)',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Pflanzlich Bowl', description: 'Mit Tofu'},
+            {id: 'item-2', name: 'Schnitzel', description: 'Paniert mit Semmelbröseln'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'detects German vegetarian keywords (vegetarisch, fleischlos)',
+        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        items: [
+            {id: 'item-1', name: 'Vegetarische Gemüsepfanne', description: null},
+            {id: 'item-2', name: 'Fleischlos Glücklich Teller', description: null},
+            {id: 'item-3', name: 'Bratwurst', description: 'Vom Grill'},
+        ],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
+    },
+    {
+        description: 'detects German gluten-free keywords (glutenfrei)',
+        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        items: [
+            {id: 'item-1', name: 'Reispfanne', description: 'Glutenfrei zubereitet'},
+            {id: 'item-2', name: 'Nudeln', description: 'Weizen-basiert'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'detects German lactose-free keywords (laktosefrei, milchfrei)',
+        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        items: [
+            {id: 'item-1', name: 'Hafermilch Latte', description: 'Laktosefrei'},
+            {id: 'item-2', name: 'Sorbet', description: 'Milchfrei und erfrischend'},
+            {id: 'item-3', name: 'Käsekuchen', description: 'Mit Frischkäse'},
+        ],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
+    },
+    {
+        description: 'detects German "ohne fleisch" keyword for vegetarian',
+        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        items: [
+            {id: 'item-1', name: 'Gemüsecurry', description: 'Ohne Fleisch, mit Reis'},
+            {id: 'item-2', name: 'Rindergulasch', description: null},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'detects mixed German/English keywords in same menu',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Vegan Bowl', description: null},
+            {id: 'item-2', name: 'Pflanzlich Wrap', description: null},
+            {id: 'item-3', name: 'Seitan Steak', description: 'Pflanzenbasiert'},
+            {id: 'item-4', name: 'Currywurst', description: null},
+        ],
+        expectedMatchCount: 3,
+        expectedMatchedItemIds: ['item-1', 'item-2', 'item-3'],
+    },
+    // ── Negative-hit test cases ────────────────────────────────
+    {
+        description: 'negative hit: "Hamburg" does not match halal',
+        tag: {id: 'tag-halal', key: 'HALAL'},
+        items: [
+            {id: 'item-1', name: 'Hamburger', description: 'Classic burger'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'negative hit: "Steak" does not match vegan',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Steak', description: 'Ribeye steak with butter'},
+            {id: 'item-2', name: 'Chicken Wings', description: 'Spicy buffalo'},
+            {id: 'item-3', name: 'Pork Belly', description: 'Slow-roasted'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'negative hit: "Fleischkäse" does not match vegetarian despite containing "fleisch"',
+        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        items: [
+            {id: 'item-1', name: 'Fleischkäse', description: 'Bayerischer Leberkäs'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'negative hit: "Milchreis" does not match lactose-free',
+        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        items: [
+            {id: 'item-1', name: 'Milchreis', description: 'Klassisch mit Zimt'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    // ── Sample menu fixtures ───────────────────────────────────
+    {
+        description: 'fully vegan menu: all items match VEGAN tag',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Vegan Pad Thai', description: 'Tofu and vegetables'},
+            {id: 'item-2', name: 'Tempeh Salad', description: 'Fresh greens'},
+            {id: 'item-3', name: 'Seitan Wrap', description: 'Plant-based protein'},
+            {id: 'item-4', name: 'Pflanzlich Burger', description: 'Dairy-free bun'},
+        ],
+        expectedMatchCount: 4,
+        expectedMatchedItemIds: ['item-1', 'item-2', 'item-3', 'item-4'],
+    },
+    {
+        description: 'mixed menu: some items match VEGETARIAN tag',
+        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        items: [
+            {id: 'item-1', name: 'Veggie Burger', description: 'Meat-free patty'},
+            {id: 'item-2', name: 'Grilled Salmon', description: 'Wild-caught'},
+            {id: 'item-3', name: 'Vegetarische Lasagne', description: 'Mit Gemüse'},
+            {id: 'item-4', name: 'Ribeye Steak', description: '300g dry-aged'},
+            {id: 'item-5', name: 'Caesar Salad', description: 'Romaine lettuce'},
+            {id: 'item-6', name: 'Meatless Monday Bowl', description: 'Seasonal vegetables'},
+        ],
+        expectedMatchCount: 3,
+        expectedMatchedItemIds: ['item-1', 'item-3', 'item-6'],
+    },
+    {
+        description: 'ambiguous menu: items with partial keyword overlap for GLUTEN_FREE',
+        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        items: [
+            {id: 'item-1', name: 'Rice Noodle Soup', description: 'Naturally gluten free'},
+            {id: 'item-2', name: 'Bread Basket', description: 'Assorted wheat breads'},
+            {id: 'item-3', name: 'Fries', description: 'May contain traces of gluten'},
+            {id: 'item-4', name: 'Glutenfrei Pizza', description: 'Mit Reismehl'},
+        ],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-4'],
+    },
 ];
+
+// ── German keyword rules expected data ─────────────────────
+
+export const germanKeywordExpectations = [
+    {key: 'VEGAN', expectedKeywords: ['pflanzlich', 'pflanzenbasiert']},
+    {key: 'VEGETARIAN', expectedKeywords: ['vegetarisch', 'fleischlos', 'ohne fleisch']},
+    {key: 'GLUTEN_FREE', expectedKeywords: ['glutenfrei', 'ohne gluten']},
+    {key: 'LACTOSE_FREE', expectedKeywords: ['laktosefrei', 'ohne laktose', 'milchfrei']},
+];
+
+// ── Engine versioning test data ────────────────────────────
+
+export const engineVersionData = {
+    validFormat: /^\d+\.\d+\.\d+$/,
+    expectedCurrent: '1.0.0',
+};

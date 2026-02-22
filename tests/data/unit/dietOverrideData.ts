@@ -137,4 +137,83 @@ export const effectiveSuitabilityTestData = [
             source: 'override',
         },
     },
+    {
+        description: 'multiple overrides and inferences coexist per restaurant',
+        overrides: [
+            {
+                id: 'ov-1',
+                restaurantId: 'r-1',
+                dietTagId: 'tag-vegan',
+                supported: true,
+                userId: 1,
+                notes: 'Confirmed',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+            {
+                id: 'ov-2',
+                restaurantId: 'r-1',
+                dietTagId: 'tag-vegetarian',
+                supported: false,
+                userId: 2,
+                notes: 'Not vegetarian',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        ],
+        inferences: [
+            {
+                id: 'inf-1',
+                restaurantId: 'r-1',
+                dietTagId: 'tag-vegan',
+                score: 10,
+                confidence: 'LOW' as const,
+                reasonsJson: sampleReasonsJson,
+                engineVersion: '1.0.0',
+                computedAt: new Date(),
+            },
+            {
+                id: 'inf-2',
+                restaurantId: 'r-1',
+                dietTagId: 'tag-gf',
+                score: 50,
+                confidence: 'HIGH' as const,
+                reasonsJson: sampleReasonsJson,
+                engineVersion: '1.0.0',
+                computedAt: new Date(),
+            },
+        ],
+        expectedVegan: {
+            supported: true,
+            source: 'override',
+        },
+        expectedVegetarian: {
+            supported: false,
+            source: 'override',
+        },
+        expectedGf: {
+            supported: true,
+            source: 'inference',
+        },
+    },
+    {
+        description: 'inference with null reasonsJson still produces result',
+        overrides: [],
+        inferences: [
+            {
+                id: 'inf-1',
+                restaurantId: 'r-1',
+                dietTagId: 'tag-vegan',
+                score: 30,
+                confidence: 'MEDIUM' as const,
+                reasonsJson: null,
+                engineVersion: '1.0.0',
+                computedAt: new Date(),
+            },
+        ],
+        expectedVegan: {
+            supported: true,
+            source: 'inference',
+        },
+    },
 ];
