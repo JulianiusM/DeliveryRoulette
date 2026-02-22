@@ -83,6 +83,9 @@ export type Settings = {
     // Import configuration
     importMaxFileSizeBytes: number;
 
+    // Provider sync configuration (0 = disabled)
+    syncIntervalMs: number;
+
     initialized: boolean;
 };
 
@@ -162,6 +165,9 @@ const defaults: Settings = {
 
     // Import configuration
     importMaxFileSizeBytes: 25 * 1024 * 1024, // 25 MB
+
+    // Provider sync (0 = disabled, otherwise interval in ms)
+    syncIntervalMs: 0,
 };
 
 // CSV_KEY -> settings key
@@ -213,6 +219,7 @@ const keyMap: Record<string, keyof Settings> = {
     MIN_SIMILARITY_SCORE: "minSimilarityScore",
     SUGGESTION_EXCLUDE_RECENT_COUNT: "suggestionExcludeRecentCount",
     IMPORT_MAX_FILE_SIZE_BYTES: "importMaxFileSizeBytes",
+    SYNC_INTERVAL_MS: "syncIntervalMs",
 };
 
 // per-field coercion
@@ -237,6 +244,7 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     minSimilarityScore: (v) => Number(v),
     suggestionExcludeRecentCount: (v) => Number(v),
     importMaxFileSizeBytes: (v) => Number(v),
+    syncIntervalMs: (v) => Number(v),
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),
