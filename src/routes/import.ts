@@ -17,9 +17,9 @@ app.get('/', (_req: Request, res: Response) => {
     renderer.renderWithData(res, 'import/upload', data);
 });
 
-// POST /import/upload – Process uploaded JSON file
+// POST /import/upload – Process uploaded JSON or CSV file
 app.post('/upload', upload.single('file'), asyncHandler(async (req: Request, res: Response) => {
-    const data = await importController.handleUpload(req.file?.buffer);
+    const data = await importController.handleUpload(req.file?.buffer, req.file?.originalname);
     renderer.renderWithData(res, 'import/preview', data);
 }));
 
