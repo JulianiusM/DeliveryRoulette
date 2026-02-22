@@ -111,6 +111,7 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
 
         // ── Single unified pipeline per connector ───────────
         for (const conn of connectors) {
+            // Discover restaurants from the connector (empty query = list all)
             const providerRestaurants = await conn.listRestaurants('');
 
             for (const incoming of providerRestaurants) {

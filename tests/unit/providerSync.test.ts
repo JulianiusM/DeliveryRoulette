@@ -170,6 +170,36 @@ describe('ProviderSyncService', () => {
             expect(result.restaurantsSynced).toBe(1);
             expect(mockUpsertItems).not.toHaveBeenCalled();
         });
+
+        test('isolates per-restaurant failure when fetchMenu throws', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Good Place', url: 'https://example.com/1'},
+                {externalId: 'ext-2', name: 'Bad Place', url: 'https://example.com/2'},
+            ]);
+            (connector.fetchMenu as jest.Mock)
+                .mockResolvedValueOnce(sampleProviderMenu)
+                .mockRejectedValueOnce(new Error('Menu fetch failed'));
+            mockResolve.mockReturnValue(connector);
+
+            mockUpsertFromProvider.mockResolvedValue('rest-1');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([
+                {id: 'cat-1', name: 'Starters'},
+                {id: 'cat-2', name: 'Mains'},
+            ]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            expect(result.restaurants).toHaveLength(2);
+            expect(result.restaurants[0].success).toBe(true);
+            expect(result.restaurants[1].success).toBe(false);
+            expect(result.restaurants[1].error).toBe('Menu fetch failed');
+        });
     });
 
     describe('runSync – directly provided connector (ImportConnector)', () => {
