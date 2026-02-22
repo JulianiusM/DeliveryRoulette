@@ -11,14 +11,14 @@ This document describes the overall architecture, design patterns, and technical
 - [Frontend Architecture](#frontend-architecture)
 - [Authentication & Authorization](#authentication--authorization)
 - [Testing Architecture](#testing-architecture)
-- [Games Module](#games-module)
+- [Provider Integration](#provider-integration)
 - [Design Patterns](#design-patterns)
 
 ---
 
 ## System Overview
 
-DeliveryRoulette is a **monolithic web application** for item cataloging and tracking with the following characteristics:
+DeliveryRoulette is a **monolithic web application** for restaurant management, dietary preference tracking, and delivery suggestions with the following characteristics:
 
 - **Backend**: Node.js + Express.js + TypeScript
 - **Database**: MariaDB with TypeORM
@@ -49,7 +49,7 @@ DeliveryRoulette is a **monolithic web application** for item cataloging and tra
 ┌────────────────────┴────────────────────────────────┐
 │              MariaDB Database (TypeORM)              │
 │  ┌───────────────────────────────────────────────┐ │
-│  │  Entities: Users, Surveys, Events, Activities │ │
+│  │  Entities: Users, Restaurants, Menus, DietTags  │ │
 │  └───────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
@@ -64,7 +64,7 @@ DeliveryRoulette is a **monolithic web application** for item cataloging and tra
 |------------|---------|---------|
 | Node.js | ≥ 24.x | Runtime environment |
 | TypeScript | Latest | Type-safe JavaScript |
-| Express.js | 4.x | Web framework |
+| Express.js | 5.x | Web framework |
 | TypeORM | Latest | ORM for database access |
 | Pug | 3.x | Template engine |
 | bcryptjs | Latest | Password hashing |
@@ -106,9 +106,9 @@ DeliveryRoulette is a **monolithic web application** for item cataloging and tra
 **Responsibility**: Define HTTP endpoints and route requests to controllers.
 
 ```typescript
-// src/routes/survey.ts
-router.get('/create', requireLogin, surveyController.renderCreate);
-router.post('/create', requireLogin, asyncHandler(surveyController.create));
+// src/routes/restaurants.ts
+router.get('/', requireLogin, asyncHandler(restaurantController.list));
+router.post('/create', requireLogin, asyncHandler(restaurantController.create));
 ```
 
 **Patterns:**
@@ -124,11 +124,11 @@ router.post('/create', requireLogin, asyncHandler(surveyController.create));
 
 **Key Middleware:**
 - `requireLogin` - Ensures user is authenticated
-- `requireOwner` - Ensures user owns resource
-- `requirePerm` - Checks entity permissions
-- `assignFlowFactory` - Permission checking for assignments
-- `asyncHandler` - Error handling for async routes
 - `genericErrorHandler` - Centralized error handling
+- `validationErrorHandler` - Express-validator error handling
+- `asyncHandler` - Error handling wrapper for async routes
+- `requestIdMiddleware` - Request tracking with unique IDs
+- `pushConnectorAuthMiddleware` - Provider API token authentication
 
 ### 3. Controller Layer
 
@@ -161,12 +161,10 @@ export default {
 
 ```typescript
 // Service pattern
-export class ItemService {
-    private itemRepo: Repository<Item>;
-    
-    async createItem(data: CreateItemDto): Promise<Item> {
-        // Database operations
-        return await this.itemRepo.save(item);
+export class RestaurantService {
+    async createRestaurant(data: CreateRestaurantDto): Promise<Restaurant> {
+        const restaurant = restaurantRepo.create(data);
+        return await restaurantRepo.save(restaurant);
     }
 }
 ```
@@ -185,15 +183,15 @@ export class ItemService {
 
 ```typescript
 @Entity()
-export class Item {
+export class Restaurant {
     @PrimaryGeneratedColumn('uuid')
     id: string;
     
     @Column()
     name: string;
     
-    @ManyToOne(() => User)
-    owner: User;
+    @Column({ nullable: true })
+    city: string;
 }
 ```
 
@@ -210,72 +208,53 @@ export class Item {
 ### Entity Relationship Overview
 
 ```
-User ───┬─── Survey
-        ├─── Event ───── EventRegistration
-        ├─── PackingList ───── PackingItem
-        ├─── ActivityPlan ───── ActivitySlot ───── SlotAssignment
-        └─── DriversList ───── DriversItem
+User ───┬─── UserPreference
+        ├─── UserDietPreference ─── DietTag
+        ├─── UserRestaurantPreference ─── Restaurant
+        └─── SuggestionHistory ─── Restaurant
 
-EntityPermissions ─── EntityAdminAssignment
+Restaurant ───┬─── MenuCategory ─── MenuItem
+              ├─── RestaurantProviderRef
+              ├─── DietInferenceResult ─── DietTag
+              └─── DietManualOverride ─── DietTag
+
+ProviderCredential
+ProviderSourceConfig
+ProviderFetchCache
+SyncJob ─── SyncAlert
 ```
 
 ### Key Entities
 
 #### Users
-- Authentication via OIDC
-- Local accounts for guests
+- Authentication via OIDC or local accounts
 - Email verification system
 - Password reset functionality
 
-#### Surveys
-- Multi-combination surveys
-- Guest and user responses
-- Ranked choice voting support
+#### Restaurants
+- Name, address, city, postal code, country
+- Active/inactive status
+- Provider references for external delivery platforms
 
-#### Events
-- Event creation and management
-- Registration system
-- Invoice pool management
-- Participant tracking
+#### Menus
+- Menu categories per restaurant
+- Menu items with name, description, price, currency
 
-#### Packing Lists
-- Shared packing coordination
-- Item assignments
-- Category organization
+#### Diet System
+- Diet tags (vegetarian, vegan, gluten-free, etc.)
+- Diet inference results (auto-detected from menu items)
+- Manual overrides for incorrect detections
+- User diet preferences for suggestion filtering
 
-#### Activity Plans
-- Time-boxed scheduling
-- Role-based assignments
-- Participant requirements
-- Auto-assignment recommendations
+#### Suggestions
+- Random restaurant suggestion engine
+- Suggestion history tracking
 
-#### Drivers Lists
-- Driver coordination
-- Seat management
-- Participant assignments
-
-### Permission System
-
-**Table**: `entity_permissions`
-
-Flexible permission system for all entity types:
-
-```typescript
-interface EntityPermissions {
-    entityType: string;    // 'survey', 'event', 'packing', etc.
-    entityId: string;      // UUID of the entity
-    ownerId: number;       // User ID of owner
-    defaultPermissions: {  // Default perms for all users
-        view: boolean;
-        edit: boolean;
-        manage_assignments: boolean;
-    };
-    permMeta: Array<{      // Individual user permissions
-        userId: number;
-        permissions: string[];
-    }>;
-}
-```
+#### Provider Integration
+- Provider credentials (encrypted)
+- Source configurations
+- Fetch cache with TTL
+- Sync jobs and alerts
 
 ### Migrations
 
@@ -303,24 +282,20 @@ js/
 │   ├── navigation.ts       # Navigation helpers
 │   ├── form-utils.ts       # Form utilities
 │   ├── formatting.ts       # Data formatting
-│   └── permissions.ts      # Permission loader
+│   ├── dom.ts              # DOM manipulation
+│   ├── clipboard.ts        # Copy-to-clipboard
+│   └── password-validation.ts # Password validation
 ├── shared/         # Shared UI behaviors
 │   ├── alerts.ts           # Alert messages
 │   ├── drag-drop.ts        # Drag & drop
-│   ├── entity-assign.ts    # Assignment helpers
 │   ├── inline-edit.ts      # Inline editing
-│   ├── list-actions.ts     # List operations
-│   └── ui-helpers.ts       # UI utilities
+│   ├── ui-helpers.ts       # UI utilities
+│   └── date-range-modal.ts # Date range picker
 ├── modules/        # Feature-specific widgets
-│   ├── entity-select.ts    # Entity selector
-│   ├── timezone-select.ts  # Timezone picker
-│   ├── activity-*.ts       # Activity modules
-│   └── ...
+│   ├── suggest.ts          # Suggestion engine
+│   └── timezone-select.ts  # Timezone picker
 └── *.ts           # Page-level scripts
-    ├── activity.ts
-    ├── packing.ts
-    ├── events.ts
-    └── ...
+    └── stub.ts            # Main entry point
 ```
 
 ### Module Pattern
@@ -360,52 +335,22 @@ window.DeliveryRouletteApp.init = init;
 
 ```typescript
 // OIDC Provider: src/modules/oidc.ts
-export const provider = new Provider(issuer, configuration);
-
-// Strategy: Local accounts + OIDC
-passport.use(new LocalStrategy(...));
-passport.use('oidc', new Strategy(...));
+// Supports OpenID Connect authentication with auto-provisioning
 ```
 
 **Flow:**
 1. User attempts login
 2. If OIDC configured, redirect to provider
 3. Provider authenticates and returns
-4. Application creates/updates local user
+4. Application creates/updates local user (JIT provisioning)
 5. Session established
 
-### Authorization (Permissions)
+### Authorization
 
-**Permission Engine**: `src/modules/permissionEngine.ts`
-
-```typescript
-interface PermissionEngine {
-    has(user: User, entity: Entity, permission: string): boolean;
-    grant(user: User, entity: Entity, permission: string): void;
-    revoke(user: User, entity: Entity, permission: string): void;
-}
-```
-
-**Permission Levels:**
-- `VIEW` - Can view entity
-- `EDIT` - Can edit entity
-- `MANAGE_ASSIGNMENTS` - Can manage participants/assignments
-- `ADMIN` - Full control (owner)
-
-**Checking Permissions:**
-
-Backend (middleware):
-```typescript
-router.get('/:id', requirePerm('VIEW'), controller.view);
-```
-
-Frontend (client-side):
-```typescript
-const perms = await loadPerms('activity', activityId);
-if (perms.has('EDIT')) {
-    // Show edit button
-}
-```
+Authorization is handled through session-based authentication:
+- `requireLogin` middleware checks for authenticated session
+- User roles and permissions stored in session
+- Route-level middleware enforces access control
 
 ---
 
@@ -435,17 +380,17 @@ if (perms.has('EDIT')) {
 #### Data-Driven Testing
 
 ```typescript
-// tests/data/controller/surveyData.ts
-export const createSurveyData = [
+// tests/data/controller/restaurantData.ts
+export const createRestaurantData = [
     {
-        description: 'creates survey with valid data',
-        input: { title: 'Test' },
-        expected: { id: '123', title: 'Test' },
+        description: 'creates restaurant with valid data',
+        input: { name: 'Pizza Place', city: 'Berlin' },
+        expected: { id: '123', name: 'Pizza Place' },
     },
 ];
 
-// tests/controller/survey.test.ts
-test.each(createSurveyData)('$description', async (testCase) => {
+// tests/controller/restaurant.test.ts
+test.each(createRestaurantData)('$description', async (testCase) => {
     // Test implementation
 });
 ```
@@ -480,72 +425,52 @@ See [TESTING_GUIDE.md](TESTING_GUIDE.md) for comprehensive testing documentation
 
 ---
 
-## Games Module
+## Provider Integration
 
-The Games module is a comprehensive system for managing video games, board games, and other game types with external provider integration.
+DeliveryRoulette integrates with external delivery platforms (currently Lieferando) to sync restaurant and menu data.
 
-### Core Entities
-
-| Entity | Purpose |
-|--------|---------|
-| GameTitle | Core game info (name, description, player counts) |
-| GameRelease | Platform-specific release (PC, PS5, edition, region) |
-| Item (type=GAME_DIGITAL/GAME) | Game copies (digital or physical) |
-| ExternalAccount | Linked external accounts (Steam, Playnite) |
-| ConnectorDevice | Devices for push-style sync |
-| SyncJob | Sync job tracking and history |
-| Platform | Game platforms with normalization aliases |
-
-### Controller Architecture
-
-The games controller is modular for maintainability:
+### Provider Connector Architecture
 
 ```
-src/controller/games/
-├── gameTitleController.ts     # Title CRUD and metadata operations
-├── gameReleaseController.ts   # Release management
-├── gameCopyController.ts      # Copy/item operations and lending
-├── gameAccountController.ts   # External accounts and sync triggers
-├── gameMappingController.ts   # Mapping queue for unmatched games
-├── gamePlatformController.ts  # Platform CRUD and merging
-├── gameJobsController.ts      # Sync job listing
-├── helpers.ts                 # Shared utilities (auth, ownership checks)
-└── index.ts                   # Re-exports all functions
+src/providers/
+├── ProviderKey.ts             # Provider identifier enum
+├── DeliveryProviderConnector.ts  # Base connector class
+├── ImportConnector.ts         # Import-capable connector base
+├── ConnectorRegistry.ts       # Service locator for connectors
+├── ConnectorBootstrap.ts      # Connector initialization
+├── ProviderTypes.ts           # Type definitions
+└── lieferando/                # Lieferando implementation
+    ├── LieferandoConnector.ts # Fetch restaurants, menus, validate URLs
+    ├── lieferandoParsing.ts   # HTML parsing (JSON-LD, preloaded state, heuristics)
+    └── lieferandoTypes.ts     # Lieferando-specific types
 ```
 
-### Sync Architecture
-
-The sync pipeline is unified for all connector types:
+### Sync Pipeline
 
 ```
-Connector (fetch/push) → processGameBatch() → safeCreateGameFromData()
-                                                      │
-                              ├── extractEdition()     ← Extract edition from name
-                              ├── getOrCreateTitle()   ← Merge by normalized name
-                              └── getOrCreateRelease() ← By platform+edition
+ProviderSyncService → ConnectorRegistry.get(providerKey)
+    → connector.listRestaurants(query)     # Discover restaurants
+    → restaurantService.upsert()           # Persist restaurant data
+    → connector.fetchMenu(externalId)      # Fetch menu HTML
+    → menuService.upsert()                 # Persist menu categories/items
+    → dietInferenceService.compute()       # Auto-detect diet suitability
+    → syncAlertService.check()             # Generate alerts for stale data
 ```
 
-**Key Files:**
-- `sync/GameProcessor.ts` - Unified game processing
-- `sync/MetadataFetcher.ts` - Centralized metadata fetching with rate limiting
-- `GameSyncService.ts` - Orchestration and scheduling
-- `GameNameUtils.ts` - Edition extraction and title normalization
+### HTML Parsing Strategy
 
-### Connector Types
+Lieferando parsing uses a three-tier resilient approach:
+1. **JSON-LD** — Structured data from `<script type="application/ld+json">`
+2. **Preloaded state** — `__NEXT_DATA__`, `__NUXT__`, `__PRELOADED_STATE__`
+3. **HTML heuristics** — DOM-based extraction with multiple fallback strategies
 
-| Type | Description | Example |
-|------|-------------|---------|
-| Fetch-style | Connector pulls from external API | Steam |
-| Push-style | External agent pushes via API | Playnite |
+### Plugin Isolation
 
-### Metadata Providers
-
-Providers are selected by capability, not hardcoded references:
-
-- `hasAccuratePlayerCounts` - For accurate multiplayer info
-- `supportsSearch` - For game name lookup
-
-Providers: Steam, IGDB, RAWG, Wikidata (board games)
+Connectors are treated as external plugins:
+- Connectors must NOT import app internals
+- App code must NOT reference specific connectors by name
+- Use `ConnectorRegistry` for all connector lookups
+- Each connector folder could be extracted to a separate package
 
 ---
 
@@ -556,15 +481,9 @@ Providers: Steam, IGDB, RAWG, Wikidata (board games)
 Service layer uses repository pattern:
 
 ```typescript
-class SurveyService {
-    private repository: Repository<Survey>;
-    
-    constructor() {
-        this.repository = AppDataSource.getRepository(Survey);
-    }
-    
-    async findById(id: string): Promise<Survey | null> {
-        return await this.repository.findOne({ where: { id } });
+class RestaurantService {
+    async findById(id: string): Promise<Restaurant | null> {
+        return await restaurantRepo.findOne({ where: { id } });
     }
 }
 ```
@@ -574,10 +493,10 @@ class SurveyService {
 Data Transfer Objects for API boundaries:
 
 ```typescript
-interface CreateSurveyDto {
-    title: string;
-    description: string;
-    combinations: CombinationDto[];
+interface CreateRestaurantDto {
+    name: string;
+    addressLine1: string;
+    city: string;
 }
 
 // Validated in controller
@@ -648,8 +567,8 @@ eventEmitter.on('user.login', (user) => {
 
 ### Caching
 
-- **Session Store**: Redis (configurable)
-- **Query Cache**: TypeORM query caching
+- **Session Store**: TypeORM-backed session store
+- **Provider Cache**: `ProviderFetchCache` table with configurable TTL
 - **Static Assets**: Nginx caching (production)
 
 ### Frontend
@@ -665,25 +584,25 @@ eventEmitter.on('user.login', (user) => {
 
 ### Security Layers
 
-1. **Input Validation**: express-validator on all inputs
+1. **Input Validation**: express-validator available (chains to be added per route)
 2. **Output Escaping**: Pug auto-escapes by default
 3. **Authentication**: OIDC + bcrypt password hashing
-4. **Authorization**: Permission system on all entities
-5. **Session Security**: Secure cookies, HTTPS-only in production
-6. **CSRF Protection**: CSRF tokens on forms
-7. **SQL Injection**: Parameterized queries via TypeORM
-8. **XSS Protection**: Content Security Policy headers
+4. **Authorization**: Session-based with requireLogin middleware
+5. **Session Security**: Secure cookies, HTTPS-only in production, SameSite=lax
+6. **SQL Injection**: Parameterized queries via TypeORM
+7. **Credential Encryption**: AES-256-GCM for provider credentials
+8. **Logging Safety**: Pino logger with automatic secret redaction
 
 ### Security Best Practices
 
-- ✅ Passwords hashed with bcrypt (10 rounds)
-- ✅ Sessions use secure, httpOnly cookies
-- ✅ Input validated on backend and frontend
-- ✅ Output escaped in templates
+- ✅ Passwords hashed with bcrypt
+- ✅ Sessions use secure cookies in production
+- ✅ Output escaped in Pug templates
 - ✅ HTTPS enforced in production
 - ✅ Database credentials in environment variables
-- ✅ Rate limiting on authentication endpoints
-- ✅ Regular dependency updates
+- ✅ Provider credentials encrypted at rest (AES-256-GCM)
+- ✅ URL validation with domain whitelist for provider connectors
+- ✅ Structured logging with secret redaction
 
 ---
 
@@ -703,7 +622,7 @@ esbuild (watch) ─────────────────────�
 [Nginx] ──→ [Node.js App] ──→ [MariaDB]
    ↓              ↓
 [Static         [Sessions]
- Assets]        (Redis)
+ Assets]        (TypeORM Store)
 ```
 
 **Production Checklist:**
@@ -742,9 +661,10 @@ If needed, consider:
 
 ### Logging
 
-- **Winston**: Structured logging
+- **Pino**: Structured JSON logging
 - **Levels**: Error, Warn, Info, Debug
-- **Destinations**: Console, Files, External service
+- **Redaction**: Automatic redaction of passwords, secrets, tokens, cookies
+- **Request IDs**: Unique request tracking via requestIdMiddleware
 
 ### Metrics
 
@@ -798,6 +718,6 @@ If requirements grow:
 
 ---
 
-**Last Updated:** December 10, 2025  
-**Architecture Version:** 1.0  
+**Last Updated:** February 2026  
+**Architecture Version:** 2.0  
 **Next Review:** Quarterly or with major changes
