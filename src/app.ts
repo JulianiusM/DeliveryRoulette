@@ -15,6 +15,7 @@ import suggestRouter from './routes/suggest';
 import importRouter from './routes/import';
 import syncRouter from './routes/sync';
 import syncAlertsRouter from './routes/syncAlerts';
+import providersRouter from './routes/providers';
 import settings from './modules/settings';
 import {handleGenericError} from './middleware/genericErrorHandler';
 
@@ -86,6 +87,7 @@ app.use('/suggest', suggestRouter);
 app.use('/import', importRouter);
 app.use('/api/sync', syncRouter);
 app.use('/sync/alerts', syncAlertsRouter);
+app.use('/providers', providersRouter);
 
 app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 

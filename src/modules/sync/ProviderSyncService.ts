@@ -69,6 +69,13 @@ export interface RunSyncOptions {
      * connector is synced and the registry is not consulted.
      */
     connector?: DeliveryProviderConnector;
+
+    /**
+     * Query string to pass to `listRestaurants()`.
+     * For URL-based connectors, this is the listing URL.
+     * Defaults to empty string.
+     */
+    query?: string;
 }
 
 /**
@@ -78,7 +85,7 @@ export interface RunSyncOptions {
  *   `listRestaurants()` → upsert restaurant & refs → `fetchMenu()` → upsert menu
  */
 export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult> {
-    const {providerKey, connector: directConnector} = options;
+    const {providerKey, connector: directConnector, query: syncQuery} = options;
     const jobProviderKey = directConnector?.providerKey ?? providerKey ?? null;
 
     const jobRepo = AppDataSource.getRepository(SyncJob);
@@ -113,8 +120,8 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
 
         // ── Single unified pipeline per connector ───────────
         for (const conn of connectors) {
-            // Discover restaurants from the connector (empty query = list all)
-            const providerRestaurants = await conn.listRestaurants('');
+            // Discover restaurants from the connector
+            const providerRestaurants = await conn.listRestaurants(syncQuery ?? '');
 
             // Track which restaurants the connector returned (for stale detection)
             const seenRestaurantIds = new Set<string>();

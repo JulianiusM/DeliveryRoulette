@@ -2,12 +2,16 @@ import http from 'http';
 import settings from './modules/settings';
 import {initDataSource} from "./modules/database/dataSource";
 import {startScheduler} from "./modules/sync/SyncScheduler";
+import {registerConnectors} from './providers/ConnectorBootstrap';
 
 async function bootstrap() {
     try {
         console.log('🔧 Initializing database connection...');
         await settings.read();
         await initDataSource();
+
+        // Register delivery provider connectors
+        registerConnectors();
 
         const {default: app} = await import('./app');
         const server = http.createServer(app);

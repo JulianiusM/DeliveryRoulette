@@ -1,4 +1,4 @@
-import {DeliveryProviderConnector} from "./DeliveryProviderConnector";
+import {ConnectorCapabilities, DeliveryProviderConnector} from "./DeliveryProviderConnector";
 import {ProviderKey} from "./ProviderKey";
 import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes";
 import {ImportPayload, ImportRestaurant} from "../modules/import/importSchema";
@@ -68,5 +68,12 @@ export class ImportConnector implements DeliveryProviderConnector {
 
     rateLimitPolicy(): RateLimitPolicy {
         return {maxRequests: Infinity, windowMs: 60_000};
+    }
+
+    capabilities(): ConnectorCapabilities {
+        return {
+            canDiscoverFromListingUrl: false,
+            canImportFromUrl: false,
+        };
     }
 }

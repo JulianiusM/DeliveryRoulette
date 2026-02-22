@@ -89,6 +89,14 @@ export type Settings = {
     // Provider credential encryption key (required for encrypted storage)
     credentialEncryptionKey: string;
 
+    // Provider HTTP client configuration
+    providerHttpTimeoutMs: number;
+    providerHttpMaxConcurrent: number;
+
+    // Provider fetch cache TTL (seconds)
+    providerCacheListingTtlSeconds: number;
+    providerCacheMenuTtlSeconds: number;
+
     initialized: boolean;
 };
 
@@ -174,6 +182,14 @@ const defaults: Settings = {
 
     // Provider credential encryption key (set via env: CREDENTIAL_ENCRYPTION_KEY)
     credentialEncryptionKey: "",
+
+    // Provider HTTP client configuration
+    providerHttpTimeoutMs: 10_000,        // 10 seconds
+    providerHttpMaxConcurrent: 2,
+
+    // Provider fetch cache TTL (seconds)
+    providerCacheListingTtlSeconds: 6 * 60 * 60,    // 6 hours
+    providerCacheMenuTtlSeconds: 24 * 60 * 60,      // 24 hours
 };
 
 // CSV_KEY -> settings key
@@ -227,6 +243,10 @@ const keyMap: Record<string, keyof Settings> = {
     IMPORT_MAX_FILE_SIZE_BYTES: "importMaxFileSizeBytes",
     SYNC_INTERVAL_MS: "syncIntervalMs",
     CREDENTIAL_ENCRYPTION_KEY: "credentialEncryptionKey",
+    PROVIDER_HTTP_TIMEOUT_MS: "providerHttpTimeoutMs",
+    PROVIDER_HTTP_MAX_CONCURRENT: "providerHttpMaxConcurrent",
+    PROVIDER_CACHE_LISTING_TTL_SECONDS: "providerCacheListingTtlSeconds",
+    PROVIDER_CACHE_MENU_TTL_SECONDS: "providerCacheMenuTtlSeconds",
 };
 
 // per-field coercion
@@ -252,6 +272,10 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     suggestionExcludeRecentCount: (v) => Number(v),
     importMaxFileSizeBytes: (v) => Number(v),
     syncIntervalMs: (v) => Number(v),
+    providerHttpTimeoutMs: (v) => Number(v),
+    providerHttpMaxConcurrent: (v) => Number(v),
+    providerCacheListingTtlSeconds: (v) => Number(v),
+    providerCacheMenuTtlSeconds: (v) => Number(v),
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),
