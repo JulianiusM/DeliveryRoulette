@@ -41,21 +41,22 @@ export function parseListingHtml(html: string, pageUrl?: string): DiscoveredRest
         const absoluteUrl = resolveUrl(href, pageUrl);
         if (seen.has(absoluteUrl)) return;
 
-        // Determine restaurant name
-        let name = $(el).text().trim();
-        if (!name) {
-            // Try data-qa attribute on parent/sibling
-            const card = $(el).closest('[data-qa="restaurant-card"]');
-            name = card.find('[data-qa="restaurant-name"]').text().trim();
-        }
+        const card = $(el).closest('[data-qa="restaurant-card"]');
+
+        // Determine restaurant name (real Lieferando uses restaurant-info-name; spec uses restaurant-name)
+        let name = card.find('[data-qa="restaurant-info-name"]').text().trim()
+            || card.find('[data-qa="restaurant-name"]').text().trim()
+            || $(el).text().trim();
+
         if (!name) {
             // Fallback: extract from URL slug
             name = slugToName(href);
         }
 
-        // Optional: extract cuisines from nearby element
-        const card = $(el).closest('[data-qa="restaurant-card"]');
-        const cuisines = card.find('[data-qa="cuisines"]').text().trim() || null;
+        // Optional: extract cuisines (real Lieferando uses restaurant-cuisine; spec uses cuisines)
+        const cuisines = card.find('[data-qa="restaurant-cuisine"]').text().trim()
+            || card.find('[data-qa="cuisines"]').text().trim()
+            || null;
 
         seen.set(absoluteUrl, {
             name,
@@ -261,16 +262,85 @@ function isMenuItemLike(obj: unknown): obj is Record<string, unknown> {
 // ── Tier 2: HTML heuristics ───────────────────────────────────
 
 function parseMenuFromHtml($: cheerio.CheerioAPI, warnings: string[]): ParsedMenuCategory[] {
-    const categories: ParsedMenuCategory[] = [];
+    // Strategy 1: Real Lieferando structure — data-qa="item-category" sections with data-qa="item" blocks
+    const categorySections = $('[data-qa="item-category"]');
+    if (categorySections.length > 0) {
+        return parseRealLieferandoMenu($, categorySections, warnings);
+    }
 
-    // Strategy: find data-qa="menu-item" blocks grouped under headings
+    // Strategy 2: Spec fixture structure — data-qa="menu-item" blocks grouped under headings
     const menuItems = $('[data-qa="menu-item"]');
     if (menuItems.length > 0) {
         return parseDataQaMenu($, menuItems, warnings);
     }
 
-    // Fallback: find repeated heading + item patterns
+    // Strategy 3: Generic heading + item patterns
     return parseHeadingBasedMenu($, warnings);
+}
+
+/**
+ * Parse the real Lieferando menu structure.
+ *
+ * Structure: `[data-qa="item-category"]` sections, each containing:
+ *   - `h2[data-qa="heading"]` for category name
+ *   - `[data-qa="item"]` blocks with:
+ *     - `h3[data-qa="heading"]` for item name
+ *     - `[data-qa="item-price"]` for price (contains `formatted-currency-style` spans)
+ *     - `.list-item-content-style_item-description` or nested `[data-qa="text"]` for description
+ */
+function parseRealLieferandoMenu(
+    $: cheerio.CheerioAPI,
+    categorySections: cheerio.Cheerio<AnyNode>,
+    warnings: string[],
+): ParsedMenuCategory[] {
+    const categories: ParsedMenuCategory[] = [];
+
+    categorySections.each((_i, sectionEl) => {
+        const $section = $(sectionEl);
+
+        // Category name from the direct h2 child heading (not item h3 headings)
+        const categoryHeading = $section.find('> h2[data-qa="heading"]').first();
+        const categoryName = categoryHeading.text().trim()
+            || $section.find('> h2').first().text().trim()
+            || 'Menu';
+
+        const items: ParsedMenuItem[] = [];
+        $section.find('[data-qa="item"]').each((_j, itemEl) => {
+            const $item = $(itemEl);
+
+            // Item name is in h3[data-qa="heading"] inside the item
+            const itemName = $item.find('h3[data-qa="heading"]').text().trim()
+                || $item.find('[data-qa="heading"]').first().text().trim();
+            if (!itemName || itemName === categoryName) return;
+
+            // Price from data-qa="item-price" — may contain "from" prefix and &nbsp;
+            const priceText = $item.find('[data-qa="item-price"]').text().trim();
+            const {price, currency} = parsePrice(priceText);
+
+            // Description from item-description class or second data-qa="text" element
+            let description: string | null = null;
+            const descEl = $item.find('[class*="item-description"]');
+            if (descEl.length > 0) {
+                description = descEl.text().trim() || null;
+            }
+            if (!description) {
+                // Fallback: look for data-qa="item-desc"
+                description = $item.find('[data-qa="item-desc"]').text().trim() || null;
+            }
+
+            items.push({name: itemName, description, price, currency});
+        });
+
+        if (items.length > 0) {
+            categories.push({name: categoryName, items});
+        }
+    });
+
+    if (categories.length === 0) {
+        warnings.push(`Found ${categorySections.length} item-category sections but could not extract items`);
+    }
+
+    return categories;
 }
 
 function parseDataQaMenu(
@@ -386,23 +456,23 @@ function parseHeadingBasedMenu($: cheerio.CheerioAPI, warnings: string[]): Parse
 // ── Utility functions ─────────────────────────────────────────
 
 function extractRestaurantName($: cheerio.CheerioAPI): string | null {
-    // Try <title> tag
-    const title = $('title').text().trim();
-    if (title) {
-        // Strip common suffixes like "| Lieferando.de", "- Order online"
-        const cleaned = title
-            .replace(/\s*[\|–\-]\s*(Lieferando|Order online|Delivery).*$/i, '')
-            .trim();
-        if (cleaned) return cleaned;
-    }
+    // Try h1 first (real Lieferando pages have a clean restaurant name in h1)
+    const h1 = $('h1').first().text().trim();
+    if (h1) return h1;
 
     // Try og:title meta
     const ogTitle = $('meta[property="og:title"]').attr('content')?.trim();
     if (ogTitle) return ogTitle;
 
-    // Try h1
-    const h1 = $('h1').first().text().trim();
-    if (h1) return h1;
+    // Try <title> tag (strip common suffixes)
+    const title = $('title').text().trim();
+    if (title) {
+        const cleaned = title
+            .replace(/\s*[\|–\-]\s*(Lieferando|Order online|Delivery).*$/i, '')
+            .replace(/\s+Delivery\s*$/i, '')
+            .trim();
+        if (cleaned) return cleaned;
+    }
 
     return null;
 }
@@ -410,8 +480,11 @@ function extractRestaurantName($: cheerio.CheerioAPI): string | null {
 function parsePrice(text: string): {price: number | null; currency: string | null} {
     if (!text) return {price: null, currency: null};
 
+    // Normalize whitespace (including &nbsp; / \u00a0) and strip "from" prefix
+    const normalized = text.replace(/\s+/g, ' ').replace(/^from\s+/i, '').trim();
+
     // Match European price format: "9,90 €" or "12,50€"
-    const euroMatch = text.match(/(\d+)[,.](\d{2})\s*€/);
+    const euroMatch = normalized.match(/(\d+)[,.](\d{2})\s*€/);
     if (euroMatch) {
         return {
             price: parseFloat(`${euroMatch[1]}.${euroMatch[2]}`),
@@ -420,7 +493,7 @@ function parsePrice(text: string): {price: number | null; currency: string | nul
     }
 
     // Match "€9.90" format
-    const euroPrefix = text.match(/€\s*(\d+)[,.](\d{2})/);
+    const euroPrefix = normalized.match(/€\s*(\d+)[,.](\d{2})/);
     if (euroPrefix) {
         return {
             price: parseFloat(`${euroPrefix[1]}.${euroPrefix[2]}`),
