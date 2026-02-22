@@ -36,7 +36,11 @@ For comprehensive documentation:
 5. **Configuration**: Use the centralized settings module (`src/modules/settings.ts`) for all configuration constants. Never hardcode values like timeouts, limits, or thresholds.
 6. **Following Directions**: Always follow user directions. If you are not sure, make reasonable assumptions. Interpret requirements conservatively.
 7. **Generic approach**: If the user asks you to fix all tests, fix all tests including database and e2e tests. Fix all issues including those that are not influenced or caused by your changes.
-8. **Pre-commit requirement**: **ALWAYS run all tests (including database and E2E) before committing. All tests must pass. Fix all test failures, including unrelated ones.**
+8. **Pre-commit requirement**: **ALWAYS run all tests before committing. All tests must pass. Fix all test failures, including unrelated ones.** Run the following commands in order:
+   - `npm run build` — TypeScript compilation + asset copy
+   - `npm test -- --passWithNoTests` — Jest tests (unit, controller, middleware, database)
+   - `npm run test:client` — Frontend tests (Jest + MSW)
+   - `npx playwright test` — E2E tests (requires build + e2e:prepare)
 9. **Dark theme**: All UI pages use Bootstrap dark theme (`text-bg-dark`, `table-dark`, `text-white`, `text-white-50` for muted)
 
 ## Configuration Management

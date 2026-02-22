@@ -5,6 +5,8 @@ import * as importController from '../controller/importController';
 import renderer from '../modules/renderer';
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import settings from '../modules/settings';
+import {handleValidationError} from '../middleware/validationErrorHandler';
+import {validateImportApply} from '../middleware/validationChains';
 
 const app = express.Router();
 
@@ -24,7 +26,7 @@ app.post('/upload', upload.single('file'), asyncHandler(async (req: Request, res
 }));
 
 // POST /import/apply – Apply the import
-app.post('/apply', asyncHandler(async (req: Request, res: Response) => {
+app.post('/apply', validateImportApply, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const data = await importController.handleApply(req.body.payloadJson);
     renderer.renderWithData(res, 'import/result', data);
 }));

@@ -672,7 +672,7 @@ Consider adding:
 - Response times
 - Error rates
 - Database query times
-- User activity
+- Sync job statistics
 
 ### Health Checks
 

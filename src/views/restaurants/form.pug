@@ -21,6 +21,7 @@ block content
     - const formAction = editing ? `/restaurants/${d.id}/edit` : '/restaurants/new'
 
     form.row.gy-3(action=formAction method="post")
+        +csrf
         //── Name ────────────────────────────────────────
         .col-md-6
             label.form-label.mb-1(for="name")

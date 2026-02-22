@@ -6,8 +6,10 @@
  * - Honest User-Agent header
  * - Gzip/deflate support
  * - Global concurrency limiting (from settings)
+ * - Per-provider token-bucket rate limiting
  */
 import settings from '../settings';
+import {RateLimitPolicy} from '../../providers/ProviderTypes';
 
 const USER_AGENT = 'DeliveryRoulette/1.0 (provider-sync)';
 
@@ -34,6 +36,52 @@ function releaseSlot(): void {
     }
 }
 
+// ── Per-provider token-bucket rate limiter ───────────────────
+
+interface TokenBucket {
+    tokens: number;
+    maxTokens: number;
+    refillMs: number;
+    lastRefill: number;
+}
+
+const buckets = new Map<string, TokenBucket>();
+
+function acquireRateToken(providerKey: string, policy: RateLimitPolicy): Promise<void> {
+    let bucket = buckets.get(providerKey);
+    if (!bucket) {
+        bucket = {
+            tokens: policy.maxRequests,
+            maxTokens: policy.maxRequests,
+            refillMs: policy.windowMs,
+            lastRefill: Date.now(),
+        };
+        buckets.set(providerKey, bucket);
+    }
+
+    // Refill tokens based on elapsed time
+    const now = Date.now();
+    const elapsed = now - bucket.lastRefill;
+    if (elapsed >= bucket.refillMs) {
+        const periods = Math.floor(elapsed / bucket.refillMs);
+        bucket.tokens = Math.min(bucket.maxTokens, bucket.tokens + periods * bucket.maxTokens);
+        bucket.lastRefill += periods * bucket.refillMs;
+    }
+
+    if (bucket.tokens > 0) {
+        bucket.tokens--;
+        return Promise.resolve();
+    }
+
+    // Wait until next refill
+    const waitMs = bucket.refillMs - (now - bucket.lastRefill);
+    return new Promise((resolve) => setTimeout(() => {
+        bucket!.tokens = bucket!.maxTokens - 1;
+        bucket!.lastRefill = Date.now();
+        resolve();
+    }, waitMs));
+}
+
 export interface HttpResponse {
     status: number;
     body: string;
@@ -44,11 +92,20 @@ export interface HttpResponse {
  * Fetch a URL with provider-appropriate defaults.
  *
  * @param url  The URL to fetch
- * @param timeoutMs  Request timeout in milliseconds (default: from settings)
+ * @param options  Optional: timeoutMs and rateLimit policy
  * @returns Resolved response with status, body text, and ok flag
  */
-export async function fetchUrl(url: string, timeoutMs?: number): Promise<HttpResponse> {
-    const timeout = timeoutMs ?? settings.value.providerHttpTimeoutMs;
+export async function fetchUrl(
+    url: string,
+    options?: {timeoutMs?: number; providerKey?: string; rateLimit?: RateLimitPolicy},
+): Promise<HttpResponse> {
+    const timeout = options?.timeoutMs ?? settings.value.providerHttpTimeoutMs;
+
+    // Enforce per-provider rate limiting if provided
+    if (options?.providerKey && options?.rateLimit) {
+        await acquireRateToken(options.providerKey, options.rateLimit);
+    }
+
     await acquireSlot();
     try {
         const controller = new AbortController();

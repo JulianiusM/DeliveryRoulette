@@ -58,8 +58,7 @@ async function testButtonFeedback(page: Page, button: any, buttonText: string): 
     // Check for custom click handlers by looking for specific classes or data attributes
     const classes = await button.getAttribute('class') || '';
     const hasCustomHandler = 
-        classes.includes('barcode-delete') ||
-        classes.includes('loan-return') ||
+        classes.includes('btn-delete') ||
         button.id && (await button.getAttribute('id') || '').includes('delete');
     
     if (hasCustomHandler) {
@@ -181,12 +180,12 @@ test.describe('Button Functionality Tests', () => {
         });
     }
     
-    test('Barcode delete button works', async ({ page }) => {
-        // This test requires a restaurant with items
+    test('Restaurant detail page navigation works', async ({ page }) => {
+        // This test requires a restaurant
         // Navigate to restaurants list to check
         await page.goto('/restaurants');
         
-        // Try to find an existing restaurant or note test needs setup
+        // Try to find an existing restaurant or skip
         const restaurantLinks = await page.locator('a[href^="/restaurants/"]').all();
         if (restaurantLinks.length === 0) {
             test.skip();

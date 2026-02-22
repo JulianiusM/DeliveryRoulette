@@ -10,12 +10,10 @@ block title
         | Welcome, #{user.name || user.username}!
 
 block content
-    - const itemCount = (data && data.itemCount) || 0
-    - const locationCount = (data && data.locationCount) || 0
-    - const activeLoanCount = (data && data.activeLoanCount) || 0
-    - const overdueLoanCount = (data && data.overdueLoanCount) || 0
-    - const recentItems = (data && data.recentItems) || []
-    - const activeLoans = (data && data.activeLoans) || []
+    - const restaurantCount = (data && data.restaurantCount) || 0
+    - const suggestionCount = (data && data.suggestionCount) || 0
+    - const syncAlertCount = (data && data.syncAlertCount) || 0
+    - const dietTagCount = (data && data.dietTagCount) || 0
     - const preferences = (data && data.preferences) || {}
 
     //- Stats cards
@@ -23,46 +21,46 @@ block content
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body.text-center
-                    h2.display-4.mb-1 #{itemCount}
+                    h2.display-4.mb-1 #{restaurantCount}
                     p.text-white-50.mb-0
-                        i.bi.bi-box-seam.me-1
-                        | Items
+                        i.bi.bi-shop.me-1
+                        | Restaurants
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body.text-center
-                    h2.display-4.mb-1 #{locationCount}
+                    h2.display-4.mb-1 #{suggestionCount}
                     p.text-white-50.mb-0
-                        i.bi.bi-geo-alt.me-1
-                        | Locations
+                        i.bi.bi-shuffle.me-1
+                        | Suggestions
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body.text-center
-                    h2.display-4.mb-1 #{activeLoanCount}
+                    h2.display-4.mb-1 #{dietTagCount}
                     p.text-white-50.mb-0
-                        i.bi.bi-arrow-left-right.me-1
-                        | Active Loans
+                        i.bi.bi-heart-pulse.me-1
+                        | Diet Tags
         .col
-            .card.h-100.text-bg-dark.border-secondary(class=overdueLoanCount > 0 ? 'border-danger' : '')
+            .card.h-100.text-bg-dark.border-secondary(class=syncAlertCount > 0 ? 'border-warning' : '')
                 .card-body.text-center
-                    h2.display-4.mb-1(class=overdueLoanCount > 0 ? 'text-danger' : '') #{overdueLoanCount}
-                    p.mb-0(class=overdueLoanCount > 0 ? 'text-danger' : 'text-white-50')
-                        i.bi.bi-exclamation-triangle.me-1
-                        | Overdue
+                    h2.display-4.mb-1(class=syncAlertCount > 0 ? 'text-warning' : '') #{syncAlertCount}
+                    p.mb-0(class=syncAlertCount > 0 ? 'text-warning' : 'text-white-50')
+                        i.bi.bi-bell.me-1
+                        | Sync Alerts
 
     //- Quick actions
     .d-flex.flex-wrap.justify-content-center.gap-2.mb-4
-        a.btn.btn-primary.d-inline-flex.align-items-center.gap-2(href="/items")
-            i.bi.bi-box-seam
-            | Manage Items
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/scan")
-            i.bi.bi-upc-scan
-            | Scan Barcode
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/locations")
-            i.bi.bi-geo-alt
-            | Locations
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/loans")
-            i.bi.bi-arrow-left-right
-            | Lending
+        a.btn.btn-primary.d-inline-flex.align-items-center.gap-2(href="/restaurants")
+            i.bi.bi-shop
+            | Restaurants
+        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/suggest")
+            i.bi.bi-shuffle
+            | Get Suggestion
+        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/import")
+            i.bi.bi-upload
+            | Import
+        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/providers")
+            i.bi.bi-plug
+            | Providers
 
     //- User preferences summary
     if preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
@@ -94,59 +92,6 @@ block content
                                 i.bi.bi-hand-thumbs-down.me-1
                                 | Excluded Cuisines
                             p.mb-0 #{preferences.cuisineExcludes}
-
-    .row.g-4
-        //- Recent items
-        .col-lg-6
-            .card.text-bg-dark.border-secondary.h-100
-                .card-header
-                    i.bi.bi-clock-history.me-2
-                    | Recent Items
-                .card-body
-                    if recentItems.length === 0
-                        p.text-white-50.mb-0 No items yet.
-                            a.text-white.text-decoration-none.ms-1(href="/items") Add your first item →
-                    else
-                        ul.list-group.list-group-flush
-                            each item in recentItems
-                                li.list-group-item.d-flex.justify-content-between.align-items-center.bg-transparent.text-white.border-secondary
-                                    div
-                                        a.text-white.text-decoration-none(href=`/items/${item.id}`) #{item.name}
-                                        span.badge.text-bg-secondary.ms-2 #{item.type}
-                                    .text-white-50.small
-                                        if item.location
-                                            | #{item.location.name}
-                                        else
-                                            | Unassigned
-                        .mt-2
-                            a.text-white.text-decoration-none(href="/items") View all items →
-
-        //- Active loans
-        .col-lg-6
-            .card.text-bg-dark.border-secondary.h-100
-                .card-header
-                    i.bi.bi-arrow-left-right.me-2
-                    | Active Loans
-                .card-body
-                    if activeLoans.length === 0
-                        p.text-white-50.mb-0 No active loans.
-                            a.text-white.text-decoration-none.ms-1(href="/loans") Create a loan →
-                    else
-                        ul.list-group.list-group-flush
-                            each loan in activeLoans
-                                li.list-group-item.d-flex.justify-content-between.align-items-center.bg-transparent.text-white.border-secondary
-                                    div
-                                        a.text-white.text-decoration-none(href=`/items/${loan.item.id}`) #{loan.item.name}
-                                        if loan.direction === 'lend'
-                                            span.badge.text-bg-primary.ms-2 Lending
-                                        else
-                                            span.badge.text-bg-secondary.ms-2 Borrowing
-                                    div.text-end
-                                        .small.text-white-50 #{loan.party.name}
-                                        if loan.dueAt
-                                            .small.text-warning Due: #{new Date(loan.dueAt).toLocaleDateString()}
-                        .mt-2
-                            a.text-white.text-decoration-none(href="/loans") View all loans →
 
 block scripts
     //- No custom JS needed for dashboard

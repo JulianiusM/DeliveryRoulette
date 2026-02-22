@@ -39,6 +39,18 @@ jest.mock('../../src/modules/database/dataSource', () => ({
             }
             return {find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null)};
         }),
+        transaction: jest.fn(async (cb: any) => {
+            const fakeManager = {
+                getRepository: (entity: any) => {
+                    const name = typeof entity === 'function' ? entity.name : entity;
+                    if (name === 'SyncJob') {
+                        return {findOne: mockFindOneJob, create: mockCreateJob, save: mockSaveJob};
+                    }
+                    return {find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), create: jest.fn(), save: jest.fn()};
+                },
+            };
+            return cb(fakeManager);
+        }),
     },
 }));
 

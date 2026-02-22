@@ -43,16 +43,6 @@ export type Settings = {
     imprintUrl: string;
     privacyPolicyUrl: string;
 
-    // Metadata provider API keys
-    steamWebApiKey: string;
-    rawgApiKey: string;
-    twitchClientId: string;
-    twitchClientSecret: string;
-    boardGameAtlasClientId: string;
-    
-    // Metadata sync configuration
-    metadataEnrichmentQueryTimeoutMs: number;
-
     // Token expiration (in milliseconds)
     tokenExpirationMs: number;
 
@@ -62,10 +52,7 @@ export type Settings = {
     rateLimitMaxDeviceRegistration: number;
 
     // Pagination defaults
-    paginationDefaultItems: number;
-    paginationDefaultLocations: number;
-    paginationDefaultGames: number;
-    paginationDefaultLoans: number;
+    paginationDefaultRestaurants: number;
     paginationMaxPerPage: number;
     paginationMaxTimezoneItems: number;
 
@@ -137,16 +124,6 @@ const defaults: Settings = {
     imprintUrl: "http://example.com/imprint",
     privacyPolicyUrl: "http://example.com/privacy",
 
-    // Metadata provider API keys (optional)
-    steamWebApiKey: "",
-    rawgApiKey: "",
-    twitchClientId: "",
-    twitchClientSecret: "",
-    boardGameAtlasClientId: "",
-    
-    // Metadata sync configuration
-    metadataEnrichmentQueryTimeoutMs: 3000000, // 5 minutes default for thorough metadata enrichment
-
     // Token expiration (1 hour in milliseconds)
     tokenExpirationMs: 3600_000,
 
@@ -156,10 +133,7 @@ const defaults: Settings = {
     rateLimitMaxDeviceRegistration: 5,
 
     // Pagination defaults
-    paginationDefaultItems: 30,
-    paginationDefaultLocations: 50,
-    paginationDefaultGames: 24,
-    paginationDefaultLoans: 30,
+    paginationDefaultRestaurants: 30,
     paginationMaxPerPage: 100,
     paginationMaxTimezoneItems: 200,
 
@@ -219,20 +193,11 @@ const keyMap: Record<string, keyof Settings> = {
     APP_PORT: "appPort",
     IMPRINT_URL: "imprintUrl",
     PRIVACY_POLICY_URL: "privacyPolicyUrl",
-    STEAM_WEB_API_KEY: "steamWebApiKey",
-    RAWG_API_KEY: "rawgApiKey",
-    TWITCH_CLIENT_ID: "twitchClientId",
-    TWITCH_CLIENT_SECRET: "twitchClientSecret",
-    BOARD_GAME_ATLAS_CLIENT_ID: "boardGameAtlasClientId",
-    METADATA_ENRICHMENT_QUERY_TIMEOUT_MS: "metadataEnrichmentQueryTimeoutMs",
     TOKEN_EXPIRATION_MS: "tokenExpirationMs",
     RATE_LIMIT_WINDOW_MS: "rateLimitWindowMs",
     RATE_LIMIT_MAX_PUSH_CONNECTOR: "rateLimitMaxPushConnector",
     RATE_LIMIT_MAX_DEVICE_REGISTRATION: "rateLimitMaxDeviceRegistration",
-    PAGINATION_DEFAULT_ITEMS: "paginationDefaultItems",
-    PAGINATION_DEFAULT_LOCATIONS: "paginationDefaultLocations",
-    PAGINATION_DEFAULT_GAMES: "paginationDefaultGames",
-    PAGINATION_DEFAULT_LOANS: "paginationDefaultLoans",
+    PAGINATION_DEFAULT_RESTAURANTS: "paginationDefaultRestaurants",
     PAGINATION_MAX_PER_PAGE: "paginationMaxPerPage",
     PAGINATION_MAX_TIMEZONE_ITEMS: "paginationMaxTimezoneItems",
     MIN_VALID_DESCRIPTION_LENGTH: "minValidDescriptionLength",
@@ -254,15 +219,11 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     dbPort: (v) => Number(v),
     smtpPort: (v) => Number(v),
     appPort: (v) => Number(v),
-    metadataEnrichmentQueryTimeoutMs: (v) => Number(v),
     tokenExpirationMs: (v) => Number(v),
     rateLimitWindowMs: (v) => Number(v),
     rateLimitMaxPushConnector: (v) => Number(v),
     rateLimitMaxDeviceRegistration: (v) => Number(v),
-    paginationDefaultItems: (v) => Number(v),
-    paginationDefaultLocations: (v) => Number(v),
-    paginationDefaultGames: (v) => Number(v),
-    paginationDefaultLoans: (v) => Number(v),
+    paginationDefaultRestaurants: (v) => Number(v),
     paginationMaxPerPage: (v) => Number(v),
     paginationMaxTimezoneItems: (v) => Number(v),
     minValidDescriptionLength: (v) => Number(v),

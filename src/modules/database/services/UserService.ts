@@ -154,73 +154,74 @@ export async function findOrCreateUserFromOidc(
     claims: OidcClaims,
     opts: { linkByEmail?: boolean } = {linkByEmail: true}
 ) {
-    const repo = AppDataSource.getRepository(User);
-    const {sub, email, preferred_username, name} = claims;
+    return AppDataSource.transaction(async (manager) => {
+        const repo = manager.getRepository(User);
+        const {sub, email, preferred_username, name} = claims;
 
-    // 1) Try exact OIDC match first
-    let user = await repo.findOne({
-        where: {oidcIssuer, oidcSub: sub},
-    });
-
-    // 2) If not found: try link-by-email (optional)
-    if (!user && opts.linkByEmail && email) {
-        user = await repo.findOne({where: {email}});
-        if (user) {
-            user.oidcIssuer = oidcIssuer;
-            user.oidcSub = sub;
-            if (user.isActive !== true) user.isActive = true;
-            await repo.save(user);
-        }
-    }
-
-    // 3) If still not found: create a new local user (JIT provisioning)
-    // inside findOrCreateUserFromOidc, in the "3) If still not found: create a new local user" block
-    if (!user) {
-        const baseUsername =
-            preferred_username ||
-            (email ? email.split('@')[0] : `oidc_${sub.slice(0, 8)}`);
-        const uniqueUsername = await toUniqueUsername(baseUsername);
-
-        // Ensure we don't violate unique(email)
-        let emailToUse = email || `${sub}@no-email.local`;
-
-        // If linkByEmail is disabled OR the email is already taken, use a synthetic email
-        if (email) {
-            const emailTaken = await repo.exist({where: {email}});
-            if (!opts.linkByEmail || emailTaken) {
-                emailToUse = `${sub}@no-email.local`;
-            }
-        }
-
-        user = repo.create({
-            username: uniqueUsername,
-            name: name || baseUsername,
-            email: emailToUse,
-            password: null,
-            isActive: true,
-            oidcIssuer,
-            oidcSub: sub,
+        // 1) Try exact OIDC match first
+        let user = await repo.findOne({
+            where: {oidcIssuer, oidcSub: sub},
         });
 
-        try {
-            user = await repo.save(user);
-        } catch (err: any) {
-            // Last-chance fallback for race conditions (MySQL/PG/SQLite)
-            const message = String(err?.message || '');
-            if (
-                err?.code === 'ER_DUP_ENTRY' || // MySQL/MariaDB
-                err?.code === '23505' ||        // Postgres
-                message.includes('UNIQUE')      // SQLite/others
-            ) {
-                user.email = `${sub}@no-email.local`;
-                user = await repo.save(user);
-            } else {
-                throw err;
+        // 2) If not found: try link-by-email (optional)
+        if (!user && opts.linkByEmail && email) {
+            user = await repo.findOne({where: {email}});
+            if (user) {
+                user.oidcIssuer = oidcIssuer;
+                user.oidcSub = sub;
+                if (user.isActive !== true) user.isActive = true;
+                await repo.save(user);
             }
         }
-    }
 
-    return user;
+        // 3) If still not found: create a new local user (JIT provisioning)
+        if (!user) {
+            const baseUsername =
+                preferred_username ||
+                (email ? email.split('@')[0] : `oidc_${sub.slice(0, 8)}`);
+            const uniqueUsername = await toUniqueUsername(baseUsername);
+
+            // Ensure we don't violate unique(email)
+            let emailToUse = email || `${sub}@no-email.local`;
+
+            // If linkByEmail is disabled OR the email is already taken, use a synthetic email
+            if (email) {
+                const emailTaken = await repo.exist({where: {email}});
+                if (!opts.linkByEmail || emailTaken) {
+                    emailToUse = `${sub}@no-email.local`;
+                }
+            }
+
+            user = repo.create({
+                username: uniqueUsername,
+                name: name || baseUsername,
+                email: emailToUse,
+                password: null,
+                isActive: true,
+                oidcIssuer,
+                oidcSub: sub,
+            });
+
+            try {
+                user = await repo.save(user);
+            } catch (err: any) {
+                // Last-chance fallback for race conditions (MySQL/PG/SQLite)
+                const message = String(err?.message || '');
+                if (
+                    err?.code === 'ER_DUP_ENTRY' || // MySQL/MariaDB
+                    err?.code === '23505' ||        // Postgres
+                    message.includes('UNIQUE')      // SQLite/others
+                ) {
+                    user.email = `${sub}@no-email.local`;
+                    user = await repo.save(user);
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        return user;
+    });
 }
 
 /**

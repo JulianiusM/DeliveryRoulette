@@ -1,4 +1,5 @@
 import express, {Request, Response} from 'express';
+import rateLimit from 'express-rate-limit';
 
 import * as userController from "../controller/userController";
 import * as settingsController from "../controller/settingsController";
@@ -6,15 +7,31 @@ import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import settings from "../modules/settings";
 import {ExpectedError} from "../modules/lib/errors";
+import {handleValidationError} from '../middleware/validationErrorHandler';
+import {
+    validateRegister, validateLogin, validateForgotPassword,
+    validateResetPassword, validateSettings,
+} from '../middleware/validationChains';
 
 const app = express.Router();
+
+// Rate limiting for authentication endpoints
+// In E2E/test environments, use a higher limit to support parallel test sessions
+const isTestEnv = ['test', 'e2e'].includes(process.env.NODE_ENV ?? '');
+const authLimiter = rateLimit({
+    windowMs: settings.value.rateLimitWindowMs,
+    max: isTestEnv ? 100 : 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests, please try again later.',
+});
 
 /* GET users listing. */
 app.get('/', asyncHandler((req: Request, res: Response) => {
     res.redirect('/users/dashboard');
 }));
 
-// User dashboard - overview of user's inventory
+// User dashboard - overview of user's delivery preferences
 app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
@@ -23,12 +40,10 @@ app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
     const preferences = await settingsController.getSettings(req.session.user.id);
 
     renderer.renderWithData(res, 'users/dashboard', {
-        itemCount: 0,
-        locationCount: 0,
-        activeLoanCount: 0,
-        overdueLoanCount: 0,
-        recentItems: [],
-        activeLoans: [],
+        restaurantCount: 0,
+        suggestionCount: 0,
+        syncAlertCount: 0,
+        dietTagCount: 0,
         preferences,
     });
 }));
@@ -48,7 +63,7 @@ app.get('/register', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/register');  // Zeige das Registrierungsformular an
 }));
 
-app.post('/register', asyncHandler(async (req: Request, res: Response) => {
+app.post('/register', authLimiter, validateRegister, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.registerUser(req.body);
     renderer.renderInfo(res, 'Account successfully registered. Please activate it using the link sent to your email.');
@@ -60,7 +75,7 @@ app.get('/login', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/login');  // Zeige das Login-Formular an
 }));
 
-app.post('/login', asyncHandler(async (req: Request, res: Response) => {
+app.post('/login', authLimiter, validateLogin, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.loginUser(req.body, req.session);
     req.flash('success', 'Login successful');
@@ -79,7 +94,7 @@ app.get('/forgot-password', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/forgot-password.pug');  // Zeige das Formular zum Zurücksetzen des Passworts
 }));
 
-app.post('/forgot-password', asyncHandler(async (req: Request, res: Response) => {
+app.post('/forgot-password', authLimiter, validateForgotPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.sendPasswordForgotMail(req.body.username);
     renderer.renderSuccess(res, 'A link has been sent to the email corresponding to this account (if present).')
@@ -94,7 +109,7 @@ app.get('/reset-password/:token', asyncHandler(async (req: Request, res: Respons
 }));
 
 // Passwort zurücksetzen: Neues Passwort speichern
-app.post('/reset-password/:token', asyncHandler(async (req: Request, res: Response) => {
+app.post('/reset-password/:token', authLimiter, validateResetPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.resetPassword(req.params.token as string, req.body);
     renderer.renderSuccess(res, 'Your password has been successfully reset')
@@ -116,7 +131,7 @@ app.get('/settings', asyncHandler(async (req: Request, res: Response) => {
     renderer.renderWithData(res, 'users/settings', data);
 }));
 
-app.post('/settings', asyncHandler(async (req: Request, res: Response) => {
+app.post('/settings', validateSettings, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
     }

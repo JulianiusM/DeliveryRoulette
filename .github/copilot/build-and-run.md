@@ -19,10 +19,22 @@ npm run build:client    # Build client only
 ## Testing
 
 ```bash
-npm test                # Run all tests
-npm run test:watch      # Run tests in watch mode
-npm run e2e             # Run E2E tests
-npm run e2e:headed      # Run E2E tests with browser
+npm test                  # Run Jest tests (unit, controller, middleware, database)
+npm run test:client       # Run frontend tests (Jest + MSW)
+npm run e2e               # Run Playwright E2E tests
+npm run e2e:headed        # Run E2E tests with visible browser
+npm run test:all          # One-click: setup + build + run all tests
+```
+
+### Pre-commit Test Sequence (mandatory)
+
+Always run **all three** test suites before committing:
+
+```bash
+npm run build                         # 1. Build application
+npm test -- --passWithNoTests         # 2. Jest tests (backend + DB)
+npm run test:client                   # 3. Frontend tests
+npx playwright test                   # 4. E2E tests (requires build)
 ```
 
 ## CI Pipeline

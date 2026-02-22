@@ -50,6 +50,7 @@ block content
     //── Bulk Actions ────────────────────────────────────
     if alerts.length > 0 && filterStatus !== 'dismissed'
         form.d-flex.justify-content-end.mb-3(method="POST" action="/sync/alerts/dismiss-all")
+            +csrf
             input(type="hidden" name="type" value=filterType)
             input(type="hidden" name="provider" value=filterProvider)
             button.btn.btn-outline-warning(type="submit" onclick="return confirm('Dismiss all matching alerts?')")
@@ -110,6 +111,7 @@ block content
                             td
                                 if !a.dismissed
                                     form.d-inline(method="POST" action=`/sync/alerts/${a.id}/dismiss`)
+                                        +csrf
                                         button.btn.btn-sm.btn-outline-warning(type="submit" title="Dismiss")
                                             i.bi.bi-check-lg
                                 a.btn.btn-sm.btn-outline-light.ms-1(href=`/restaurants/${a.restaurantId}` title="View Restaurant")
