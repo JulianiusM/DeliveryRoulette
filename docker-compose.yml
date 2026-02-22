@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: deliveryroulette-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MARIADB_DATABASE: ${DB_NAME:-deliveryroulette}
+      MARIADB_USER: ${DB_USER:-deliveryroulette}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-deliveryroulette}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: deliveryroulette-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      # ── Application ────────────────────────────────────────────────────────
+      NODE_ENV: production
+      APP_PORT: 3000
+      ROOT_URL: ${ROOT_URL:-http://localhost:3000}
+
+      # ── Session ────────────────────────────────────────────────────────────
+      # REQUIRED: override this with a long random string (e.g. openssl rand -hex 32)
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set in your .env file}
+
+      # ── Database ───────────────────────────────────────────────────────────
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-deliveryroulette}
+      DB_USER: ${DB_USER:-deliveryroulette}
+      DB_PASSWORD: ${DB_PASSWORD:-deliveryroulette}
+
+      # ── Authentication ─────────────────────────────────────────────────────
+      LOCAL_LOGIN_ENABLED: ${LOCAL_LOGIN_ENABLED:-1}
+      OIDC_ENABLED: ${OIDC_ENABLED:-0}
+      # OIDC_NAME: ${OIDC_NAME}
+      # OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # OIDC_ISSUER_BASE_URL: ${OIDC_ISSUER_BASE_URL}
+      # OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL}
+
+      # ── Email (optional) ───────────────────────────────────────────────────
+      # SMTP_HOST: ${SMTP_HOST}
+      # SMTP_PORT: ${SMTP_PORT:-465}
+      # SMTP_SECURE: ${SMTP_SECURE:-true}
+      # SMTP_EMAIL: ${SMTP_EMAIL}
+      # SMTP_USER: ${SMTP_USER}
+      # SMTP_PASSWORD: ${SMTP_PASSWORD}
+
+volumes:
+  db_data:

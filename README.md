@@ -12,6 +12,47 @@ A restaurant suggestion application built with Node.js, Express, TypeScript, and
 
 ## Getting Started
 
+### Docker (recommended for production-like runs)
+
+The fastest way to run a full stack locally is with Docker Compose:
+
+```bash
+# 1. Create an env file with your secrets (copy the example, then edit)
+cp .env.e2e.example .env
+#    At minimum set SESSION_SECRET, DB_PASSWORD, and DB_ROOT_PASSWORD
+
+# 2. Build the image and start app + MariaDB
+docker compose up --build
+
+# 3. Run database migrations (first time only, from your dev machine)
+#    Point the migration tool at the running database:
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=deliveryroulette \
+  DB_PASSWORD=deliveryroulette DB_NAME=deliveryroulette \
+  npm run typeorm:migrate
+```
+
+The app will be available at `http://localhost:3000` (or the `APP_PORT` you configured).
+
+**Key environment variables** (see `docker-compose.yml` for the full list):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SESSION_SECRET` | *(required)* | **Required** – long random string (`openssl rand -hex 32`) |
+| `DB_PASSWORD` | `deliveryroulette` | MariaDB user password |
+| `DB_ROOT_PASSWORD` | `rootpassword` | MariaDB root password |
+| `DB_NAME` | `deliveryroulette` | Database name |
+| `DB_USER` | `deliveryroulette` | Database user |
+| `APP_PORT` | `3000` | Host port exposed by the app |
+| `ROOT_URL` | `http://localhost:3000` | Public base URL |
+| `LOCAL_LOGIN_ENABLED` | `1` | Enable local username/password login |
+| `OIDC_ENABLED` | `0` | Enable OIDC authentication |
+
+> **Tip:** Create a `.env` file next to `docker-compose.yml` – Docker Compose will pick it up automatically.
+
+---
+
+### Manual setup (development)
+
 ### Prerequisites
 
 - Node.js >= 24
