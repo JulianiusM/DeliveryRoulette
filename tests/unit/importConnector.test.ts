@@ -30,11 +30,6 @@ describe('ImportConnector', () => {
         expect(connector.displayName).toBe(expectedDisplayName);
     });
 
-    test('has syncStyle set to push', () => {
-        const connector = new ImportConnector(samplePayload);
-        expect(connector.syncStyle).toBe('push');
-    });
-
     test('rateLimitPolicy returns no practical limit', () => {
         const connector = new ImportConnector(samplePayload);
         const policy = connector.rateLimitPolicy();

@@ -1,5 +1,6 @@
 import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
+import {ProviderRestaurant} from '../../../providers/ProviderTypes';
 
 export interface ListRestaurantsOptions {
     search?: string;
@@ -66,4 +67,36 @@ export async function listRestaurants(options: ListRestaurantsOptions = {}): Pro
     qb.orderBy('r.name', 'ASC');
 
     return await qb.getMany();
+}
+
+/**
+ * Create or update a restaurant from normalised provider data.
+ * Returns the restaurant ID.
+ */
+export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<string> {
+    const existing = (await listRestaurants({})).find(
+        (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
+    );
+
+    if (existing) {
+        await updateRestaurant(existing.id, {
+            addressLine1: incoming.address ?? '',
+            addressLine2: incoming.addressLine2 ?? null,
+            city: incoming.city ?? '',
+            postalCode: incoming.postalCode ?? '',
+            country: incoming.country ?? '',
+            isActive: true,
+        });
+        return existing.id;
+    }
+
+    const created = await createRestaurant({
+        name: incoming.name,
+        addressLine1: incoming.address ?? '',
+        addressLine2: incoming.addressLine2 ?? null,
+        city: incoming.city ?? '',
+        postalCode: incoming.postalCode ?? '',
+        country: incoming.country ?? '',
+    });
+    return created.id;
 }

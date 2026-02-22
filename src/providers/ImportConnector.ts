@@ -1,4 +1,4 @@
-import {DeliveryProviderConnector, SyncStyle} from "./DeliveryProviderConnector";
+import {DeliveryProviderConnector} from "./DeliveryProviderConnector";
 import {ProviderKey} from "./ProviderKey";
 import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes";
 import {ImportPayload, ImportRestaurant} from "../modules/import/importSchema";
@@ -18,7 +18,6 @@ import {ImportPayload, ImportRestaurant} from "../modules/import/importSchema";
 export class ImportConnector implements DeliveryProviderConnector {
     readonly providerKey = ProviderKey.IMPORT;
     readonly displayName = "Import";
-    readonly syncStyle: SyncStyle = 'push';
 
     /** Restaurants keyed by lowercased name. */
     private readonly restaurants: Map<string, ImportRestaurant>;
