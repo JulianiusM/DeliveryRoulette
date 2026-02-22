@@ -1,4 +1,5 @@
 import express, {Request, Response} from 'express';
+import rateLimit from 'express-rate-limit';
 
 import * as userController from "../controller/userController";
 import * as settingsController from "../controller/settingsController";
@@ -13,6 +14,15 @@ import {
 } from '../middleware/validationChains';
 
 const app = express.Router();
+
+// Rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+    windowMs: settings.value.rateLimitWindowMs,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests, please try again later.',
+});
 
 /* GET users listing. */
 app.get('/', asyncHandler((req: Request, res: Response) => {
@@ -51,7 +61,7 @@ app.get('/register', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/register');  // Zeige das Registrierungsformular an
 }));
 
-app.post('/register', validateRegister, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/register', authLimiter, validateRegister, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.registerUser(req.body);
     renderer.renderInfo(res, 'Account successfully registered. Please activate it using the link sent to your email.');
@@ -63,7 +73,7 @@ app.get('/login', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/login');  // Zeige das Login-Formular an
 }));
 
-app.post('/login', validateLogin, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/login', authLimiter, validateLogin, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.loginUser(req.body, req.session);
     req.flash('success', 'Login successful');
@@ -82,7 +92,7 @@ app.get('/forgot-password', asyncHandler((req: Request, res: Response) => {
     renderer.render(res, 'users/forgot-password.pug');  // Zeige das Formular zum Zurücksetzen des Passworts
 }));
 
-app.post('/forgot-password', validateForgotPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/forgot-password', authLimiter, validateForgotPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.sendPasswordForgotMail(req.body.username);
     renderer.renderSuccess(res, 'A link has been sent to the email corresponding to this account (if present).')
@@ -97,7 +107,7 @@ app.get('/reset-password/:token', asyncHandler(async (req: Request, res: Respons
 }));
 
 // Passwort zurücksetzen: Neues Passwort speichern
-app.post('/reset-password/:token', validateResetPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/reset-password/:token', authLimiter, validateResetPassword, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
     await userController.resetPassword(req.params.token as string, req.body);
     renderer.renderSuccess(res, 'Your password has been successfully reset')
