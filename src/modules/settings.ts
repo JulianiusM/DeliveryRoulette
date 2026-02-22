@@ -86,6 +86,9 @@ export type Settings = {
     // Provider sync configuration (0 = disabled)
     syncIntervalMs: number;
 
+    // Provider credential encryption key (required for encrypted storage)
+    credentialEncryptionKey: string;
+
     initialized: boolean;
 };
 
@@ -168,6 +171,9 @@ const defaults: Settings = {
 
     // Provider sync (0 = disabled, otherwise interval in ms)
     syncIntervalMs: 0,
+
+    // Provider credential encryption key (set via env: CREDENTIAL_ENCRYPTION_KEY)
+    credentialEncryptionKey: "",
 };
 
 // CSV_KEY -> settings key
@@ -220,6 +226,7 @@ const keyMap: Record<string, keyof Settings> = {
     SUGGESTION_EXCLUDE_RECENT_COUNT: "suggestionExcludeRecentCount",
     IMPORT_MAX_FILE_SIZE_BYTES: "importMaxFileSizeBytes",
     SYNC_INTERVAL_MS: "syncIntervalMs",
+    CREDENTIAL_ENCRYPTION_KEY: "credentialEncryptionKey",
 };
 
 // per-field coercion
