@@ -433,3 +433,63 @@ Issue 18 (Dead settings) — independent
 Issue 19 (Dashboard fix) — extends Issue 3
 Issue 20 (OIDC/email tests) — independent
 ```
+
+---
+
+## Second Review — Additional Items (February 2026)
+
+### Issue 21: Remove dead gaming API settings from `settings.ts`
+
+**Labels:** `type:cleanup`, `area:config`, `prio:P0`
+
+**Description:**
+Settings module contains Steam, RAWG, Twitch, BoardGameAtlas API keys and metadataEnrichmentQueryTimeoutMs from the previous application. These are completely unused.
+
+**Status:** ✅ Resolved — Removed in second review pass.
+
+---
+
+### Issue 22: Fix `package.json` project name
+
+**Labels:** `type:cleanup`, `area:config`, `prio:P1`
+
+**Description:**
+Package name is `inventory-management` instead of `delivery-roulette`.
+
+**Status:** ✅ Resolved — Renamed in second review pass.
+
+---
+
+### Issue 23: Fix CSRF implementation gaps
+
+**Labels:** `type:bug`, `area:security`, `prio:P0`
+
+**Description:**
+Three CSRF implementation gaps were discovered during E2E testing:
+1. `getSessionIdentifier` uses `req.session.id` which changes between GET/POST with `saveUninitialized:false`
+2. Client-side AJAX requests (`http.ts`) don't include CSRF tokens
+3. Multipart file upload bypasses CSRF because multer runs after CSRF middleware
+
+**Status:** ✅ Resolved — Fixed session identifier, added meta tag + AJAX header, import upload exemption.
+
+---
+
+### Issue 24: Clean barcode/loan references from E2E tests
+
+**Labels:** `type:cleanup`, `area:tests`, `prio:P2`
+
+**Description:**
+`button-functionality.spec.ts` references `barcode-delete` and `loan-return` CSS classes from the previous application.
+
+**Status:** ✅ Resolved — Replaced with generic `btn-delete`.
+
+---
+
+### Issue 25: Update CONFIGURATION.md
+
+**Labels:** `type:docs`, `area:config`, `prio:P2`
+
+**Description:**
+CONFIGURATION.md documents dead pagination settings (`paginationDefaultItems/Games/Locations/Loans`) and an entire "Game Metadata Configuration" section that no longer exists.
+
+**Status:** ✅ Resolved — Replaced with current provider sync configuration.

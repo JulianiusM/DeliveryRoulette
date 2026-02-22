@@ -315,3 +315,27 @@ Three instruction sources exist with significant overlap and outdated content:
 | E6 | Tests | 🟢 Low | Builder reference in docs doesn't exist |
 | A1 | Architecture | 🟢 Low | Not all routes use asyncHandler consistently |
 | A2 | Architecture | 🟢 Low | Limited request-level context propagation |
+
+---
+
+## Second Review — Additional Findings (February 2026)
+
+The following issues were discovered during a second review pass after initial implementation:
+
+### J. Dead Code from Previous Application
+
+| ID | Finding | Severity | Status |
+|----|---------|----------|--------|
+| J1 | `package.json` name is `inventory-management` instead of `delivery-roulette` | 🔴 High | ✅ Fixed |
+| J2 | `settings.ts` contains gaming API keys (Steam, RAWG, Twitch, BoardGameAtlas, metadataEnrichment) | 🔴 High | ✅ Fixed |
+| J3 | `CONFIGURATION.md` documents dead pagination settings and gaming metadata scoring | 🟡 Medium | ✅ Fixed |
+| J4 | `button-functionality.spec.ts` references barcode-delete and loan-return CSS classes | 🟡 Medium | ✅ Fixed |
+
+### K. CSRF Implementation Gaps
+
+| ID | Finding | Severity | Status |
+|----|---------|----------|--------|
+| K1 | CSRF `getSessionIdentifier` uses `req.session.id` which changes between GET/POST with `saveUninitialized:false` | 🔴 High | ✅ Fixed |
+| K2 | Client-side AJAX requests (`http.ts`) don't include CSRF tokens | 🔴 High | ✅ Fixed |
+| K3 | Multipart file upload bypasses CSRF because multer runs after CSRF middleware | 🔴 High | ✅ Fixed |
+| K4 | Rate limiter `max:10` too low for parallel E2E test execution | 🟡 Medium | ✅ Fixed |
