@@ -1,6 +1,7 @@
 /**
  * Unit tests for ProviderSyncService
  * Tests the sync pipeline: fetch → upsert → infer, plus locking.
+ * Tests the import sync pipeline: runImportSync.
  */
 
 import {ProviderKey} from '../../src/providers/ProviderKey';
@@ -8,6 +9,9 @@ import {
     sampleProviderMenu,
     emptyProviderMenu,
     providerRefFixtures,
+    importPayloadWithMenu,
+    importPayloadNoMenu,
+    importPayloadMultiple,
 } from '../data/unit/providerSyncData';
 import {stubConnector} from '../data/unit/connectorRegistryData';
 
@@ -41,10 +45,21 @@ jest.mock('../../src/modules/database/dataSource', () => ({
     },
 }));
 
+jest.mock('../../src/modules/database/services/RestaurantService');
+import * as restaurantService from '../../src/modules/database/services/RestaurantService';
+const mockListRestaurants = restaurantService.listRestaurants as jest.Mock;
+const mockCreateRestaurant = restaurantService.createRestaurant as jest.Mock;
+const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
+
 jest.mock('../../src/modules/database/services/MenuService');
 import * as menuService from '../../src/modules/database/services/MenuService';
 const mockUpsertCategories = menuService.upsertCategories as jest.Mock;
 const mockUpsertItems = menuService.upsertItems as jest.Mock;
+
+jest.mock('../../src/modules/database/services/RestaurantProviderRefService');
+import * as providerRefService from '../../src/modules/database/services/RestaurantProviderRefService';
+const mockListByRestaurant = providerRefService.listByRestaurant as jest.Mock;
+const mockAddProviderRef = providerRefService.addProviderRef as jest.Mock;
 
 jest.mock('../../src/modules/database/services/DietInferenceService');
 import * as dietInference from '../../src/modules/database/services/DietInferenceService';
@@ -54,7 +69,7 @@ jest.mock('../../src/providers/ConnectorRegistry');
 import * as ConnectorRegistry from '../../src/providers/ConnectorRegistry';
 const mockResolve = ConnectorRegistry.resolve as jest.Mock;
 
-import {runSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
+import {runSync, runImportSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
 
 describe('ProviderSyncService', () => {
     beforeEach(() => {
@@ -163,6 +178,121 @@ describe('ProviderSyncService', () => {
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
             expect(mockUpsertItems).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('runImportSync', () => {
+        beforeEach(() => {
+            mockListRestaurants.mockResolvedValue([]);
+            mockCreateRestaurant.mockImplementation(async (data: any) => ({
+                id: `new-${data.name.toLowerCase().replace(/\s+/g, '-')}`,
+                ...data,
+            }));
+            mockListByRestaurant.mockResolvedValue([]);
+            mockAddProviderRef.mockResolvedValue({});
+            mockUpsertCategories.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+        });
+
+        test('creates SyncJob with IMPORT provider key', async () => {
+            const result = await runImportSync(importPayloadNoMenu);
+
+            expect(result.status).toBe('completed');
+            expect(result.jobId).toBe('job-1');
+            // Verify the job was created with IMPORT key
+            expect(mockCreateJob).toHaveBeenCalledWith(
+                expect.objectContaining({providerKey: ProviderKey.IMPORT}),
+            );
+        });
+
+        test('creates new restaurant and IMPORT provider ref', async () => {
+            const result = await runImportSync(importPayloadNoMenu);
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            expect(result.restaurants).toHaveLength(1);
+            expect(result.restaurants[0].success).toBe(true);
+            expect(mockCreateRestaurant).toHaveBeenCalledWith(
+                expect.objectContaining({name: 'Simple Place'}),
+            );
+            expect(mockAddProviderRef).toHaveBeenCalledWith(
+                expect.objectContaining({providerKey: ProviderKey.IMPORT}),
+            );
+        });
+
+        test('updates existing restaurant instead of creating', async () => {
+            mockListRestaurants.mockResolvedValue([
+                {id: 'existing-id', name: 'Simple Place', addressLine1: '1 Old St', city: 'Berlin', postalCode: '10115'},
+            ]);
+
+            const result = await runImportSync(importPayloadNoMenu);
+
+            expect(result.status).toBe('completed');
+            expect(mockCreateRestaurant).not.toHaveBeenCalled();
+            expect(mockUpdateRestaurant).toHaveBeenCalledWith('existing-id', expect.any(Object));
+        });
+
+        test('processes menu through the connector fetchMenu pipeline', async () => {
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Mains'}]);
+
+            const result = await runImportSync(importPayloadWithMenu);
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            // Menu was upserted via the unified pipeline (connector.fetchMenu → upsertCategories → upsertItems)
+            expect(mockUpsertCategories).toHaveBeenCalled();
+            expect(mockUpsertItems).toHaveBeenCalled();
+            expect(mockRecompute).toHaveBeenCalled();
+        });
+
+        test('processes multiple restaurants', async () => {
+            const result = await runImportSync(importPayloadMultiple);
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(2);
+            expect(result.restaurants).toHaveLength(2);
+            expect(result.restaurants.every((r) => r.success)).toBe(true);
+            expect(mockCreateRestaurant).toHaveBeenCalledTimes(2);
+        });
+
+        test('does not skip when existing IMPORT ref already exists', async () => {
+            mockListByRestaurant.mockResolvedValue([
+                {providerKey: ProviderKey.IMPORT, externalId: 'Simple Place'},
+            ]);
+
+            const result = await runImportSync(importPayloadNoMenu);
+
+            expect(result.status).toBe('completed');
+            // Should not add a duplicate IMPORT ref
+            expect(mockAddProviderRef).not.toHaveBeenCalledWith(
+                expect.objectContaining({providerKey: ProviderKey.IMPORT}),
+            );
+        });
+
+        test('per-restaurant failures do not block others', async () => {
+            mockCreateRestaurant
+                .mockRejectedValueOnce(new Error('DB error'))
+                .mockImplementationOnce(async (data: any) => ({id: 'new-2', ...data}));
+
+            const result = await runImportSync(importPayloadMultiple);
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurants).toHaveLength(2);
+            expect(result.restaurants[0].success).toBe(false);
+            expect(result.restaurants[0].error).toBe('DB error');
+            expect(result.restaurants[1].success).toBe(true);
+            expect(result.restaurantsSynced).toBe(1);
+        });
+
+        test('clears ImportConnector payload after completion', async () => {
+            // We can verify indirectly: after runImportSync, the connector
+            // should return empty when queried
+            const {ImportConnector} = await import('../../src/providers/ImportConnector');
+
+            await runImportSync(importPayloadNoMenu);
+
+            const restaurants = await ImportConnector.listRestaurants('');
+            expect(restaurants).toEqual([]);
         });
     });
 });

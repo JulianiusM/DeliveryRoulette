@@ -2,20 +2,67 @@
  * Test data for ImportConnector unit tests.
  */
 
+import {ImportPayload} from '../../../src/modules/import/importSchema';
+
 /** Expected display name for the import connector. */
 export const expectedDisplayName = "Import";
 
 /** Expected provider key value. */
 export const expectedProviderKey = "import";
 
-/** Queries to pass to listRestaurants (always returns empty). */
-export const listRestaurantsQueries = [
-    {description: 'returns empty for normal query', query: 'pizza'},
-    {description: 'returns empty for empty query', query: ''},
+/** Sample import payload for testing loadPayload / listRestaurants / fetchMenu. */
+export const samplePayload: ImportPayload = {
+    version: 1,
+    restaurants: [
+        {
+            name: 'Pizza Palace',
+            addressLine1: '1 Main St',
+            city: 'Berlin',
+            postalCode: '10115',
+            country: 'Germany',
+            menuCategories: [
+                {
+                    name: 'Mains',
+                    items: [
+                        {name: 'Margherita', description: 'Classic pizza', price: 9.99, currency: 'EUR'},
+                        {name: 'Pepperoni', price: 11.99, currency: 'EUR'},
+                    ],
+                },
+            ],
+        },
+        {
+            name: 'Burger Barn',
+            addressLine1: '2 Side St',
+            city: 'Munich',
+            postalCode: '80331',
+        },
+    ],
+};
+
+/** Data for listRestaurants tests after payload is loaded. */
+export const listRestaurantsExpected = [
+    {description: 'returns Pizza Palace', name: 'Pizza Palace', address: '1 Main St', city: 'Berlin'},
+    {description: 'returns Burger Barn', name: 'Burger Barn', address: '2 Side St', city: 'Munich'},
 ];
 
-/** External IDs to pass to fetchMenu (always returns empty menu). */
-export const fetchMenuIds = [
-    {description: 'returns empty menu for arbitrary ID', externalId: 'ext-123'},
-    {description: 'returns empty menu for UUID', externalId: '550e8400-e29b-41d4-a716-446655440000'},
+/** Data for fetchMenu tests. */
+export const fetchMenuCases = [
+    {
+        description: 'returns menu for restaurant with categories',
+        externalId: 'Pizza Palace',
+        expectedCategoryCount: 1,
+        expectedItemCount: 2,
+    },
+    {
+        description: 'returns empty menu for restaurant without categories',
+        externalId: 'Burger Barn',
+        expectedCategoryCount: 0,
+        expectedItemCount: 0,
+    },
+    {
+        description: 'returns empty menu for unknown restaurant',
+        externalId: 'Unknown Place',
+        expectedCategoryCount: 0,
+        expectedItemCount: 0,
+    },
 ];

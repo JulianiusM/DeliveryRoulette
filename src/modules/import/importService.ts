@@ -1,18 +1,13 @@
 import {
     ImportPayload,
     ImportRestaurant,
-    ImportMenuCategory,
-    ImportProviderRef,
     validateImportPayload,
     ImportValidationResult,
 } from './importSchema';
 import * as restaurantService from '../database/services/RestaurantService';
 import * as menuService from '../database/services/MenuService';
 import * as providerRefService from '../database/services/RestaurantProviderRefService';
-import * as dietInferenceService from '../database/services/DietInferenceService';
-import {AppDataSource} from '../database/dataSource';
 import {Restaurant} from '../database/entities/restaurant/Restaurant';
-import {ProviderKey} from '../../providers/ProviderKey';
 
 // ── Diff types ──────────────────────────────────────────────
 
@@ -65,6 +60,7 @@ export interface ImportApplyResult {
     restaurants: RestaurantApplyResult[];
     successCount: number;
     errorCount: number;
+    jobId?: string;
 }
 
 // ── Parse ───────────────────────────────────────────────────
@@ -194,122 +190,27 @@ export async function computeDiff(payload: ImportPayload): Promise<ImportDiff> {
 // ── Apply ───────────────────────────────────────────────────
 
 /**
- * Apply a single restaurant from the import data, creating or updating
- * the restaurant, its menu categories/items, and provider refs.
- * Runs inside a transaction for atomicity.
- */
-async function applySingleRestaurant(incoming: ImportRestaurant): Promise<RestaurantApplyResult> {
-    const name = incoming.name;
-
-    try {
-        await AppDataSource.transaction(async (manager) => {
-            // Find existing restaurant by name
-            const existingRestaurants = await restaurantService.listRestaurants({});
-            const existing = existingRestaurants.find(
-                (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
-            );
-
-            let restaurantId: string;
-
-            if (existing) {
-                // Update restaurant fields
-                await restaurantService.updateRestaurant(existing.id, {
-                    addressLine1: incoming.addressLine1,
-                    addressLine2: incoming.addressLine2 ?? null,
-                    city: incoming.city,
-                    postalCode: incoming.postalCode,
-                    country: incoming.country ?? '',
-                    isActive: true,
-                });
-                restaurantId = existing.id;
-            } else {
-                // Create new restaurant
-                const created = await restaurantService.createRestaurant({
-                    name: incoming.name,
-                    addressLine1: incoming.addressLine1,
-                    addressLine2: incoming.addressLine2 ?? null,
-                    city: incoming.city,
-                    postalCode: incoming.postalCode,
-                    country: incoming.country ?? '',
-                });
-                restaurantId = created.id;
-            }
-
-            // Upsert menu categories and items
-            if (incoming.menuCategories && incoming.menuCategories.length > 0) {
-                const categories = await menuService.upsertCategories(
-                    restaurantId,
-                    incoming.menuCategories.map((c) => ({name: c.name, sortOrder: c.sortOrder})),
-                );
-
-                // Upsert items within each category
-                for (const importCat of incoming.menuCategories) {
-                    const savedCat = categories.find(
-                        (c) => c.name.toLowerCase() === importCat.name.toLowerCase(),
-                    );
-                    if (savedCat && importCat.items && importCat.items.length > 0) {
-                        await menuService.upsertItems(savedCat.id, importCat.items);
-                    }
-                }
-            }
-
-            // Upsert provider references and ensure IMPORT ref exists
-            const existingRefs = await providerRefService.listByRestaurant(restaurantId);
-            const existingRefByKey = new Map(
-                existingRefs.map((r) => [r.providerKey.toLowerCase(), r]),
-            );
-
-            if (incoming.providerRefs && incoming.providerRefs.length > 0) {
-                for (const ref of incoming.providerRefs) {
-                    const existingRef = existingRefByKey.get(ref.providerKey.toLowerCase());
-                    if (!existingRef) {
-                        await providerRefService.addProviderRef({
-                            restaurantId,
-                            providerKey: ref.providerKey,
-                            externalId: ref.externalId ?? null,
-                            url: ref.url,
-                        });
-                    }
-                }
-            }
-
-            // Ensure an IMPORT provider ref exists for this restaurant
-            const hasImportRef = existingRefByKey.has(ProviderKey.IMPORT);
-            if (!hasImportRef) {
-                await providerRefService.addProviderRef({
-                    restaurantId,
-                    providerKey: ProviderKey.IMPORT,
-                    externalId: null,
-                    url: `import://${restaurantId}`,
-                });
-            }
-
-            // Trigger diet inference recompute after menu changes
-            await dietInferenceService.recomputeAfterMenuChange(restaurantId);
-        });
-
-        return {name, action: 'new', success: true};
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        return {name, action: 'new', success: false, error: message};
-    }
-}
-
-/**
- * Apply the entire import payload. Each restaurant is applied
- * transactionally — individual restaurant failures don't block others.
+ * Apply the entire import payload via the unified sync pipeline.
+ *
+ * Delegates to {@link runImportSync} which creates a SyncJob, processes
+ * each restaurant through the ImportConnector, and upserts menus via
+ * the same pipeline used by external-provider sync.
  */
 export async function applyImport(payload: ImportPayload): Promise<ImportApplyResult> {
-    const results: RestaurantApplyResult[] = [];
-    let successCount = 0;
-    let errorCount = 0;
+    const {runImportSync} = await import('../sync/ProviderSyncService');
+    const syncResult = await runImportSync(payload);
 
-    for (const restaurant of payload.restaurants) {
-        const result = await applySingleRestaurant(restaurant);
-        results.push(result);
-        if (result.success) successCount++;
-        else errorCount++;
-    }
+    const restaurants: RestaurantApplyResult[] = syncResult.restaurants.map((r) => ({
+        name: r.name,
+        action: 'new' as ChangeAction,
+        success: r.success,
+        error: r.error,
+    }));
 
-    return {restaurants: results, successCount, errorCount};
+    return {
+        restaurants,
+        successCount: restaurants.filter((r) => r.success).length,
+        errorCount: restaurants.filter((r) => !r.success).length,
+        jobId: syncResult.jobId,
+    };
 }

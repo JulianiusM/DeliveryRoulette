@@ -24,15 +24,6 @@ import * as menuService from '../../src/modules/database/services/MenuService';
 jest.mock('../../src/modules/database/services/RestaurantProviderRefService');
 import * as providerRefService from '../../src/modules/database/services/RestaurantProviderRefService';
 
-jest.mock('../../src/modules/database/services/DietInferenceService');
-
-// Mock AppDataSource for transaction
-jest.mock('../../src/modules/database/dataSource', () => ({
-    AppDataSource: {
-        transaction: jest.fn(async (cb: any) => cb({})),
-    },
-}));
-
 const mockListRestaurants = restaurantService.listRestaurants as jest.Mock;
 const mockListCategoriesByRestaurant = menuService.listCategoriesByRestaurant as jest.Mock;
 const mockListByRestaurant = providerRefService.listByRestaurant as jest.Mock;
