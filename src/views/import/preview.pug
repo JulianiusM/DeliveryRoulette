@@ -1,0 +1,103 @@
+//- views/import/preview.pug – Import Preview / Diff Page
+extends ../layout
+
+block meta
+    title Import Preview | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-eye.me-2
+        | Import Preview
+
+block content
+    - const diff = (data && data.diff) || { restaurants: [], totalNew: 0, totalUpdated: 0, totalUnchanged: 0 }
+    - const payloadJson = (data && data.payloadJson) || ''
+
+    //── Summary badges ──────────────────────────────────
+    .d-flex.gap-3.mb-4.flex-wrap
+        span.badge.text-bg-success.fs-6
+            i.bi.bi-plus-circle.me-1
+            | #{diff.totalNew} New
+        span.badge.text-bg-warning.text-dark.fs-6
+            i.bi.bi-pencil.me-1
+            | #{diff.totalUpdated} Updated
+        span.badge.text-bg-secondary.fs-6
+            i.bi.bi-check-circle.me-1
+            | #{diff.totalUnchanged} Unchanged
+
+    //── Restaurant details ──────────────────────────────
+    if diff.restaurants.length === 0
+        .text-center.text-white-50.py-4
+            p No restaurants in the import file.
+    else
+        each r in diff.restaurants
+            .card.bg-dark.border.mb-3(class=(r.action === 'new' ? 'border-success' : r.action === 'updated' ? 'border-warning' : 'border-secondary'))
+                .card-header.d-flex.justify-content-between.align-items-center
+                    span
+                        strong #{r.name}
+                    if r.action === 'new'
+                        span.badge.text-bg-success New
+                    else if r.action === 'updated'
+                        span.badge.text-bg-warning.text-dark Updated
+                    else
+                        span.badge.text-bg-secondary Unchanged
+
+                .card-body
+                    //── Field changes ─────────────────────
+                    if r.fieldChanges && r.fieldChanges.length > 0
+                        h6.text-white-50 Field Changes
+                        .table-responsive.mb-3
+                            table.table.table-dark.table-sm
+                                thead
+                                    tr
+                                        th Field
+                                        th Old Value
+                                        th New Value
+                                tbody
+                                    each change in r.fieldChanges
+                                        tr
+                                            td #{change.field}
+                                            td.text-danger #{change.oldValue || '(empty)'}
+                                            td.text-success #{change.newValue || '(empty)'}
+
+                    //── Menu categories ───────────────────
+                    if r.categories && r.categories.length > 0
+                        h6.text-white-50 Menu Categories
+                        ul.list-group.list-group-flush.mb-3
+                            each cat in r.categories
+                                li.list-group-item.bg-dark.text-white.d-flex.justify-content-between
+                                    span #{cat.name} (#{cat.itemCount} items)
+                                    if cat.action === 'new'
+                                        span.badge.text-bg-success New
+                                    else
+                                        span.badge.text-bg-warning.text-dark Update
+
+                    //── Provider refs ────────────────────
+                    if r.providerRefs && r.providerRefs.length > 0
+                        h6.text-white-50 Provider References
+                        ul.list-group.list-group-flush.mb-3
+                            each ref in r.providerRefs
+                                li.list-group-item.bg-dark.text-white.d-flex.justify-content-between
+                                    span #{ref.providerKey}: #{ref.url}
+                                    if ref.action === 'new'
+                                        span.badge.text-bg-success New
+                                    else
+                                        span.badge.text-bg-warning.text-dark Update
+
+                    //── Diet tags ────────────────────────
+                    if r.dietTags && r.dietTags.length > 0
+                        h6.text-white-50 Diet Tags
+                        .mb-3
+                            each tag in r.dietTags
+                                span.badge.text-bg-info.me-1 #{tag}
+
+    //── Actions ─────────────────────────────────────────
+    .d-flex.justify-content-between.mt-4
+        a.btn.btn-secondary(href="/import")
+            i.bi.bi-arrow-left.me-1
+            | Back
+        form(method="POST" action="/import/apply")
+            input(type="hidden" name="payloadJson" value=payloadJson)
+            button.btn.btn-success(type="submit")
+                i.bi.bi-check-lg.me-1
+                | Apply Import
