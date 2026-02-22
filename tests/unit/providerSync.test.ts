@@ -203,7 +203,7 @@ describe('ProviderSyncService', () => {
     describe('runSync - directly provided connector (ImportConnector)', () => {
         beforeEach(() => {
             mockUpsertFromProvider.mockImplementation(async (data: any) =>
-                'new-' + data.name.toLowerCase().replace(/\s+/g, '-'),
+                `new-${data.name.toLowerCase().replace(/\s+/g, '-')}`,
             );
             mockEnsureProviderRef.mockResolvedValue(undefined);
             mockUpsertCategories.mockResolvedValue([]);
