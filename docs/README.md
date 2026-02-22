@@ -12,10 +12,9 @@ Welcome to the DeliveryRoulette documentation. This directory contains comprehen
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
 
 #### Development Guides
-- **[CODING_STANDARDS.md](CODING_STANDARDS.md)** - TypeScript, code style, and best practices
 - **[DATABASE.md](DATABASE.md)** - Database entities, migrations, and patterns
 - **[CONFIGURATION.md](CONFIGURATION.md)** - Configuration management and settings
-- **[FRONTEND.md](FRONTEND.md)** - Frontend architecture and modular structure
+- **[import-schema.md](import-schema.md)** - JSON / CSV bulk-import format
 - **[UI_REDESIGN_SUMMARY.md](UI_REDESIGN_SUMMARY.md)** - UI redesign documentation and patterns
 - **[UX_IMPROVEMENTS_2026_01.md](UX_IMPROVEMENTS_2026_01.md)** - UX improvements and bug fixes (January 2026)
 
@@ -25,10 +24,8 @@ Welcome to the DeliveryRoulette documentation. This directory contains comprehen
 - **[TEST_RECOMMENDATIONS.md](TEST_RECOMMENDATIONS.md)** - Test improvement recommendations
 - **[FRONTEND_TESTING.md](FRONTEND_TESTING.md)** - Frontend testing with MSW and Testing Library
 
-#### Maintenance
-- **[CI_CD.md](CI_CD.md)** - CI/CD pipeline and GitHub Actions
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment procedures and configuration
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+#### Operations
+- **[OPERATIONS.md](OPERATIONS.md)** - Health checks, logging, sync, and backups
 
 ### 🤖 For AI Agents
 
@@ -40,18 +37,6 @@ Welcome to the DeliveryRoulette documentation. This directory contains comprehen
 
 - **[user-guide/README.md](user-guide/README.md)** - Complete user guide for the DeliveryRoulette app
 
-### 📋 Reference
-
-- **[API.md](API.md)** - API endpoints and usage
-- **[PERMISSIONS.md](PERMISSIONS.md)** - Permission system documentation
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
-
-### 📦 Archive
-
-Historical and deprecated documentation:
-- **[archive/REFACTORING_SUMMARY.md](archive/REFACTORING_SUMMARY.md)** - Test refactoring history
-- **[archive/TESTING_INFRASTRUCTURE.md](archive/TESTING_INFRASTRUCTURE.md)** - Original testing infrastructure docs
-
 ## Quick Links
 
 ### I want to...
@@ -61,7 +46,8 @@ Historical and deprecated documentation:
 - **Understand the codebase** → [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Create a database migration** → [DATABASE.md](DATABASE.md)
 - **Add a new feature** → [DEVELOPMENT.md](DEVELOPMENT.md)
-- **Deploy the application** → [DEPLOYMENT.md](DEPLOYMENT.md)
+- **Import restaurants** → [import-schema.md](import-schema.md)
+- **Run in production** → [OPERATIONS.md](OPERATIONS.md)
 - **Use as AI agent** → [../AGENTS.md](../AGENTS.md)
 - **Learn to use the app** → [user-guide/README.md](user-guide/README.md)
 
@@ -85,21 +71,11 @@ When adding or updating documentation:
 - Add navigation links at top and bottom of long docs
 - Keep line length reasonable for readability
 
-### Document Ownership
-
-| Document | Owner | Update Frequency |
-|----------|-------|------------------|
-| TESTING_GUIDE.md | Test team | With test changes |
-| ARCHITECTURE.md | Tech lead | With major changes |
-| User guides | Product team | With feature releases |
-| API.md | Backend team | With API changes |
-| CI_CD.md | DevOps team | With pipeline changes |
-
 ## Getting Help
 
-- **Questions about code?** Check [ARCHITECTURE.md](ARCHITECTURE.md) or [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Questions about code?** Check [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Questions about tests?** Check [TESTING_GUIDE.md](TESTING_GUIDE.md)
-- **Questions about deployment?** Check [DEPLOYMENT.md](DEPLOYMENT.md)
+- **Questions about operations?** Check [OPERATIONS.md](OPERATIONS.md)
 - **Questions about features?** Check [user-guide/](user-guide/)
 
 ## Contributing to Documentation
@@ -108,5 +84,5 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for guidelines on contributing documentatio
 
 ---
 
-**Last Updated:** December 10, 2025  
-**Version:** 1.0
+**Last Updated:** February 2026  
+**Version:** 1.1
