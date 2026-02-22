@@ -16,9 +16,14 @@ import {ExpectedError} from '../../src/modules/lib/errors';
 jest.mock('../../src/modules/import/importService');
 import * as importService from '../../src/modules/import/importService';
 
+// Mock the CSV parser
+jest.mock('../../src/modules/import/csvParser');
+import {parseCsvBuffer} from '../../src/modules/import/csvParser';
+
 const mockParseAndValidate = importService.parseAndValidate as jest.Mock;
 const mockComputeDiff = importService.computeDiff as jest.Mock;
 const mockApplyImport = importService.applyImport as jest.Mock;
+const mockParseCsvBuffer = parseCsvBuffer as jest.Mock;
 
 // Import controller after mocking
 import * as importController from '../../src/controller/importController';
@@ -81,7 +86,7 @@ describe('ImportController', () => {
             await expect(
                 importController.handleUpload(undefined),
             ).rejects.toMatchObject({
-                message: expect.stringContaining('select a JSON file'),
+                message: expect.stringContaining('select a file'),
             });
         });
 
@@ -140,6 +145,84 @@ describe('ImportController', () => {
             ).rejects.toMatchObject({
                 message: expect.stringContaining(testCase.expectedError),
             });
+        });
+    });
+
+    describe('handleUpload – CSV files', () => {
+        const csvPayload = {
+            version: 1,
+            restaurants: [{name: 'CSV Place', addressLine1: '1 St', city: 'Berlin', postalCode: '10115'}],
+        };
+
+        test('handles valid CSV file upload', async () => {
+            mockParseCsvBuffer.mockResolvedValue({valid: true, data: csvPayload});
+            mockParseAndValidate.mockReturnValue({valid: true, data: csvPayload});
+            mockComputeDiff.mockResolvedValue(sampleDiff);
+
+            const fileBuffer = Buffer.from('name,addressLine1,city,postalCode\nCSV Place,1 St,Berlin,10115', 'utf-8');
+            const result = await importController.handleUpload(fileBuffer, 'restaurants.csv');
+
+            expect(result.pageTitle).toBe('Import Preview');
+            expect(result.diff).toEqual(sampleDiff);
+            expect(mockParseCsvBuffer).toHaveBeenCalledWith(fileBuffer);
+            expect(mockParseAndValidate).toHaveBeenCalledWith(csvPayload);
+        });
+
+        test('rejects invalid CSV file', async () => {
+            mockParseCsvBuffer.mockResolvedValue({valid: false, errors: ['CSV column missing']});
+
+            const fileBuffer = Buffer.from('bad,data\n1,2', 'utf-8');
+
+            await expect(
+                importController.handleUpload(fileBuffer, 'bad.csv'),
+            ).rejects.toThrow(ExpectedError);
+
+            await expect(
+                importController.handleUpload(fileBuffer, 'bad.csv'),
+            ).rejects.toMatchObject({
+                message: expect.stringContaining('CSV parsing failed'),
+            });
+        });
+
+        test('rejects CSV that passes parsing but fails schema validation', async () => {
+            mockParseCsvBuffer.mockResolvedValue({valid: true, data: csvPayload});
+            mockParseAndValidate.mockReturnValue({valid: false, errors: ['name too long']});
+
+            const fileBuffer = Buffer.from('name,addressLine1,city,postalCode\nX,1 St,Berlin,10115', 'utf-8');
+
+            await expect(
+                importController.handleUpload(fileBuffer, 'test.csv'),
+            ).rejects.toThrow(ExpectedError);
+
+            await expect(
+                importController.handleUpload(fileBuffer, 'test.csv'),
+            ).rejects.toMatchObject({
+                message: expect.stringContaining('Validation failed'),
+            });
+        });
+
+        test('uses JSON parser when filename is .json', async () => {
+            const parsed = JSON.parse(validPayloadJson);
+            mockParseAndValidate.mockReturnValue({valid: true, data: parsed});
+            mockComputeDiff.mockResolvedValue(sampleDiff);
+
+            const fileBuffer = Buffer.from(validPayloadJson, 'utf-8');
+            await importController.handleUpload(fileBuffer, 'import.json');
+
+            expect(mockParseCsvBuffer).not.toHaveBeenCalled();
+            expect(mockParseAndValidate).toHaveBeenCalled();
+        });
+
+        test('uses JSON parser when no filename is provided', async () => {
+            const parsed = JSON.parse(validPayloadJson);
+            mockParseAndValidate.mockReturnValue({valid: true, data: parsed});
+            mockComputeDiff.mockResolvedValue(sampleDiff);
+
+            const fileBuffer = Buffer.from(validPayloadJson, 'utf-8');
+            await importController.handleUpload(fileBuffer);
+
+            expect(mockParseCsvBuffer).not.toHaveBeenCalled();
+            expect(mockParseAndValidate).toHaveBeenCalled();
         });
     });
 });

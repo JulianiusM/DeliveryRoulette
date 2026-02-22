@@ -200,3 +200,58 @@ if (!result.valid) {
 * Empty strings are rejected for required fields.
 * The `url` field in provider references must be a valid URI.
 * The `currency` field must be exactly 3 characters (ISO 4217).
+
+## CSV Import (Restaurant List)
+
+In addition to the full JSON import, a simpler **CSV format** is supported
+for importing a flat list of restaurants (without menus or provider
+references).
+
+### Format
+
+The CSV file must contain a **header row** as its first row. Column
+names are matched case-insensitively to restaurant fields using the
+alias table below. Columns that do not match any alias are silently
+ignored.
+
+### Column mapping
+
+| Restaurant field | Accepted CSV column names                                          |
+| ---------------- | ------------------------------------------------------------------ |
+| `name`           | `name`, `restaurant`, `restaurant_name`, `restaurantName`          |
+| `addressLine1`   | `addressLine1`, `address_line_1`, `address_line1`, `address1`, `address` |
+| `addressLine2`   | `addressLine2`, `address_line_2`, `address_line2`, `address2`      |
+| `city`           | `city`, `town`                                                     |
+| `postalCode`     | `postalCode`, `postal_code`, `zip`, `zipCode`, `zip_code`, `postcode` |
+| `country`        | `country`                                                          |
+| `dietTags`       | `dietTags`, `diet_tags`, `tags`, `diet`                            |
+
+**Required columns:** `name`, `addressLine1`, `city`, `postalCode`.
+
+### Diet tags
+
+Multiple diet tags in a single cell are separated by **semicolons** (`;`).
+For example: `vegan;gluten_free;organic`.
+
+### Example
+
+```csv
+name,addressLine1,addressLine2,city,postalCode,country,dietTags
+Pizza Palace,123 Main St,Apt 4B,Berlin,10115,Germany,vegetarian
+Burger Joint,456 Oak Ave,,Munich,80331,Germany,halal
+Sushi Spot,789 Elm St,,Hamburg,20095,,vegan;gluten_free
+```
+
+### Processing
+
+1. The CSV is parsed and converted into an `ImportPayload` (with
+   `version` set automatically to the current schema version).
+2. The resulting payload is validated through the same Joi schema as
+   JSON imports.
+3. The preview diff and apply steps are identical to JSON imports.
+
+### Limitations
+
+* **Restaurant data only** — menus, menu items, and provider references
+  are not supported in CSV format. Use JSON for full imports.
+* Empty rows (all cells blank) are silently skipped.

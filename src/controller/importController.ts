@@ -1,6 +1,7 @@
 import * as importService from '../modules/import/importService';
 import {ImportPayload} from '../modules/import/importSchema';
 import {ImportDiff, ImportApplyResult} from '../modules/import/importService';
+import {parseCsvBuffer} from '../modules/import/csvParser';
 import {ExpectedError} from '../modules/lib/errors';
 
 // ── Upload & Validate ───────────────────────────────────────
@@ -13,20 +14,16 @@ export function getUploadPageData(): {pageTitle: string} {
 }
 
 /**
- * Parse, validate, and compute diff for an uploaded file buffer.
- * Handles file-missing check, buffer-to-string conversion, JSON
- * parsing, schema validation, and diff computation.
- * Returns the complete preview template data.
+ * Detect whether a file buffer is CSV based on the original filename.
  */
-export async function handleUpload(fileBuffer: Buffer | undefined): Promise<{
-    pageTitle: string;
-    diff: ImportDiff;
-    payloadJson: string;
-}> {
-    if (!fileBuffer) {
-        throw new ExpectedError('Please select a JSON file to upload.', 'error', 400);
-    }
+function isCsvFile(originalName?: string): boolean {
+    return !!originalName && originalName.toLowerCase().endsWith('.csv');
+}
 
+/**
+ * Parse a JSON file buffer into a validated ImportPayload.
+ */
+function parseJsonBuffer(fileBuffer: Buffer): ImportPayload {
     const fileContent = fileBuffer.toString('utf-8');
 
     let parsed: unknown;
@@ -42,7 +39,48 @@ export async function handleUpload(fileBuffer: Buffer | undefined): Promise<{
         throw new ExpectedError(`Validation failed: ${errorList}`, 'error', 400);
     }
 
-    const payload = validation.data;
+    return validation.data;
+}
+
+/**
+ * Parse a CSV file buffer into a validated ImportPayload.
+ */
+async function parseCsvFile(fileBuffer: Buffer): Promise<ImportPayload> {
+    const csvResult = await parseCsvBuffer(fileBuffer);
+    if (!csvResult.valid || !csvResult.data) {
+        const errorList = csvResult.errors?.join('; ') ?? 'Unknown CSV parsing error';
+        throw new ExpectedError(`CSV parsing failed: ${errorList}`, 'error', 400);
+    }
+
+    // Run the payload through the standard schema validation
+    const validation = importService.parseAndValidate(csvResult.data);
+    if (!validation.valid || !validation.data) {
+        const errorList = validation.errors?.join('; ') ?? 'Unknown validation error';
+        throw new ExpectedError(`Validation failed: ${errorList}`, 'error', 400);
+    }
+
+    return validation.data;
+}
+
+/**
+ * Parse, validate, and compute diff for an uploaded file buffer.
+ * Supports both JSON and CSV files. The file format is detected
+ * from the original filename extension.
+ * Returns the complete preview template data.
+ */
+export async function handleUpload(fileBuffer: Buffer | undefined, originalName?: string): Promise<{
+    pageTitle: string;
+    diff: ImportDiff;
+    payloadJson: string;
+}> {
+    if (!fileBuffer) {
+        throw new ExpectedError('Please select a file to upload.', 'error', 400);
+    }
+
+    const payload = isCsvFile(originalName)
+        ? await parseCsvFile(fileBuffer)
+        : parseJsonBuffer(fileBuffer);
+
     const diff = await importService.computeDiff(payload);
 
     return {
