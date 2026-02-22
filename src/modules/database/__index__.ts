@@ -8,6 +8,7 @@ import { Restaurant } from "./entities/restaurant/Restaurant";
 import { RestaurantProviderRef } from "./entities/restaurant/RestaurantProviderRef";
 import { Session } from "./entities/session/Session";
 import { SuggestionHistory } from "./entities/suggestion/SuggestionHistory";
+import { SyncJob } from "./entities/sync/SyncJob";
 import { User } from "./entities/user/User";
 import { UserDietPreference } from "./entities/user/UserDietPreference";
 import { UserPreference } from "./entities/user/UserPreference";
@@ -22,9 +23,10 @@ import { CreateDietManualOverride1740700000000 } from "../../migrations/17407000
 import { CreateUserDietPreference1740800000000 } from "../../migrations/1740800000000-CreateUserDietPreference";
 import { CreateSuggestionHistory1740900000000 } from "../../migrations/1740900000000-CreateSuggestionHistory";
 import { CreateUserRestaurantPreference1741000000000 } from "../../migrations/1741000000000-CreateUserRestaurantPreference";
+import { CreateSyncJob1741100000000 } from "../../migrations/1741100000000-CreateSyncJob";
 
-export const entities = [DietInferenceResult, DietManualOverride, DietTag, MenuCategory, MenuItem, Restaurant, RestaurantProviderRef, Session, SuggestionHistory, User, UserDietPreference, UserPreference, UserRestaurantPreference];
+export const entities = [DietInferenceResult, DietManualOverride, DietTag, MenuCategory, MenuItem, Restaurant, RestaurantProviderRef, Session, SuggestionHistory, SyncJob, User, UserDietPreference, UserPreference, UserRestaurantPreference];
 
-export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000, CreateDietTag1740500000000, CreateDietInferenceResult1740600000000, CreateDietManualOverride1740700000000, CreateUserDietPreference1740800000000, CreateSuggestionHistory1740900000000, CreateUserRestaurantPreference1741000000000];
+export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000, CreateDietTag1740500000000, CreateDietInferenceResult1740600000000, CreateDietManualOverride1740700000000, CreateUserDietPreference1740800000000, CreateSuggestionHistory1740900000000, CreateUserRestaurantPreference1741000000000, CreateSyncJob1741100000000];
 
 export const subscribers = [];
