@@ -103,10 +103,11 @@ E2E tests follow the same data-driven and keyword-driven patterns. Key points:
 - **Test data**: All constants (URLs, selectors, messages) in `tests/data/e2e/*.ts`
 - **Keywords**: Reusable actions in `tests/keywords/e2e/*.ts`
   - `authKeywords.ts` - Authentication (login, register, verify)
-  - `entityKeywords.ts` - Entity management (create, navigate, verify)
-  - `navigationKeywords.ts` - Navigation (links, pages, titles)
-  - `validationKeywords.ts` - Validation (errors, fields, alerts)
-  - `dbKeywords.ts` - Database helpers (tokens, queries)
+  - `restaurantKeywords.ts` - Restaurant operations (create, navigate)
+  - `menuKeywords.ts` - Menu management
+  - `importKeywords.ts` - Import operations (upload, apply)
+  - `suggestKeywords.ts` - Suggestion requests
+  - `dietKeywords.ts` - Diet preference workflows
 - **For-loop pattern**: Use `for (const data of testData)` to iterate test cases
 - **Zero hardcoded strings**: All constants externalized to data files
 
