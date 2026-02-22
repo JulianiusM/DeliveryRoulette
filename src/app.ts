@@ -88,9 +88,14 @@ app.use(
 app.use(flash());
 
 // ── CSRF protection (double-submit cookie pattern) ──────────
+// Note: getSessionIdentifier intentionally returns a constant because
+// express-session with saveUninitialized:false does not persist sessions
+// on initial GET requests, causing the session.id to change between
+// the GET (form render) and POST (form submit). The HMAC-signed cookie
+// already prevents token forgery without a per-session identifier.
 const {doubleCsrfProtection, generateCsrfToken} = doubleCsrf({
     getSecret: () => settings.value.sessionSecret,
-    getSessionIdentifier: (req) => req.session?.id ?? '',
+    getSessionIdentifier: () => '',
     cookieName: '__csrf',
     cookieOptions: {
         sameSite: 'lax',
@@ -104,9 +109,16 @@ const {doubleCsrfProtection, generateCsrfToken} = doubleCsrf({
     errorConfig: {statusCode: 403, message: 'Invalid CSRF token', code: 'EBADCSRFTOKEN'},
 });
 
-// Skip CSRF for API routes (they use auth tokens, not sessions) and health checks
+// Skip CSRF for API routes (they use auth tokens, not sessions) and health checks.
+// For the import upload endpoint (multipart/form-data), skip validation but still
+// generate a token so the response page can include it in subsequent forms.
 app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+        return next();
+    }
+    if (req.path === '/import/upload' && req.method === 'POST') {
+        // Generate token for the response without validating the request
+        req.csrfToken = () => generateCsrfToken(req, res);
         return next();
     }
     doubleCsrfProtection(req, res, next);

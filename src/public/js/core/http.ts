@@ -3,6 +3,12 @@
  * Provides a consistent API for making HTTP requests across the application
  */
 
+/** Read the CSRF token from the layout meta tag. */
+function getCsrfToken(): string {
+    const el = document.querySelector('meta[name="csrf-token"]');
+    return el?.getAttribute('content') ?? '';
+}
+
 /**
  * Make an HTTP request
  * @param method HTTP method (GET, POST, DELETE, etc.)
@@ -12,12 +18,18 @@
  */
 export async function http(method: string, url: string, body?: any): Promise<any> {
     const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+    const headers: Record<string, string> = isFormData
+        ? {'X-Requested-With': 'XMLHttpRequest'}
+        : {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'};
+
+    // Attach CSRF token on mutating requests
+    if (method !== 'GET' && method !== 'HEAD') {
+        headers['x-csrf-token'] = getCsrfToken();
+    }
+
     const res = await fetch(url, {
         method,
-        headers: isFormData ? {'X-Requested-With': 'XMLHttpRequest'} : {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
+        headers,
         credentials: 'same-origin',
         body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
     });

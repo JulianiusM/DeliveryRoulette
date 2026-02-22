@@ -16,9 +16,11 @@ import {
 const app = express.Router();
 
 // Rate limiting for authentication endpoints
+// In E2E/test environments, use a higher limit to support parallel test sessions
+const isTestEnv = ['test', 'e2e'].includes(process.env.NODE_ENV ?? '');
 const authLimiter = rateLimit({
     windowMs: settings.value.rateLimitWindowMs,
-    max: 10,
+    max: isTestEnv ? 100 : 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: 'Too many requests, please try again later.',
