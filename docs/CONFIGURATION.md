@@ -61,10 +61,7 @@ Settings are loaded with the following priority (highest to lowest):
 - `rateLimitMaxDeviceRegistration` - Max device registrations per window (default: 5)
 
 ### Pagination Configuration
-- `paginationDefaultItems` - Default items per page (default: 30)
-- `paginationDefaultLocations` - Default locations per page (default: 50)
-- `paginationDefaultGames` - Default games per page (default: 24)
-- `paginationDefaultLoans` - Default loans per page (default: 30)
+- `paginationDefaultRestaurants` - Default restaurants per page (default: 30)
 - `paginationMaxPerPage` - Maximum items per page (default: 100)
 - `paginationMaxTimezoneItems` - Maximum timezone items to display (default: 200)
 
@@ -72,32 +69,23 @@ Settings are loaded with the following priority (highest to lowest):
 - `minValidDescriptionLength` - Minimum description length to be considered valid (default: 50)
 - `maxDescriptionLength` - Maximum description length for storage (default: 250)
 
-### Game Metadata Configuration
+### Restaurant Matching Configuration
 
 #### Similar Title Matching
 - `minNormalizedTitleLength` - Minimum title length for similarity matching (default: 4)
 - `minSimilarityScore` - Minimum similarity score to create a pair (default: 50)
 
-#### Wikidata Metadata Scoring
-- `wikidataExactMatchScore` - Score for exact name matches (default: 500)
-- `wikidataPrefixMatchScore` - Score for prefix matches (default: 150)
-- `wikidataExpansionMatchScore` - Score for expansion matches (default: 80)
-- `wikidataContainsMatchScore` - Score for contains matches (default: 50)
-- `wikidataGameIndicatorBoost` - Boost for game-related terms (default: 100)
-- `wikidataNoGameIndicatorPenalty` - Penalty for missing game indicators (default: 50)
-- `wikidataNameLengthPenaltyFactor` - Factor for name length penalty (default: 0.5)
-- `wikidataNonGamePenaltyScore` - Score for explicit non-games (default: -1000)
-- `wikidataMinAcceptableScore` - Minimum acceptable score (default: -500)
+### Suggestion Configuration
+- `suggestionExcludeRecentCount` - Number of recent suggestions to exclude (default: 5)
 
-#### Metadata Sync
-- `igdbQueryTimeoutMs` - IGDB query timeout in milliseconds (default: 300000 = 5 minutes)
-
-### External Provider API Keys
-- `steamWebApiKey` - Steam Web API key (optional)
-- `rawgApiKey` - RAWG API key (optional)
-- `twitchClientId` - Twitch client ID (optional)
-- `twitchClientSecret` - Twitch client secret (optional)
-- `boardGameAtlasClientId` - Board Game Atlas client ID (optional)
+### Provider Sync Configuration
+- `syncIntervalMs` - Sync interval in milliseconds
+- `providerHttpTimeoutMs` - Provider HTTP request timeout (default: 30000)
+- `providerHttpMaxConcurrent` - Max concurrent provider HTTP requests (default: 5)
+- `providerCacheListingTtlSeconds` - Cache TTL for listing data (default: 3600)
+- `providerCacheMenuTtlSeconds` - Cache TTL for menu data (default: 1800)
+- `credentialEncryptionKey` - Encryption key for provider credentials
+- `importMaxFileSizeBytes` - Maximum import file size (default: 10485760 = 10MB)
 
 ### Legal Links
 - `imprintUrl` - Imprint page URL

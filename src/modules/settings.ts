@@ -43,16 +43,6 @@ export type Settings = {
     imprintUrl: string;
     privacyPolicyUrl: string;
 
-    // Metadata provider API keys
-    steamWebApiKey: string;
-    rawgApiKey: string;
-    twitchClientId: string;
-    twitchClientSecret: string;
-    boardGameAtlasClientId: string;
-    
-    // Metadata sync configuration
-    metadataEnrichmentQueryTimeoutMs: number;
-
     // Token expiration (in milliseconds)
     tokenExpirationMs: number;
 
@@ -134,16 +124,6 @@ const defaults: Settings = {
     imprintUrl: "http://example.com/imprint",
     privacyPolicyUrl: "http://example.com/privacy",
 
-    // Metadata provider API keys (optional)
-    steamWebApiKey: "",
-    rawgApiKey: "",
-    twitchClientId: "",
-    twitchClientSecret: "",
-    boardGameAtlasClientId: "",
-    
-    // Metadata sync configuration
-    metadataEnrichmentQueryTimeoutMs: 3000000, // 5 minutes default for thorough metadata enrichment
-
     // Token expiration (1 hour in milliseconds)
     tokenExpirationMs: 3600_000,
 
@@ -213,12 +193,6 @@ const keyMap: Record<string, keyof Settings> = {
     APP_PORT: "appPort",
     IMPRINT_URL: "imprintUrl",
     PRIVACY_POLICY_URL: "privacyPolicyUrl",
-    STEAM_WEB_API_KEY: "steamWebApiKey",
-    RAWG_API_KEY: "rawgApiKey",
-    TWITCH_CLIENT_ID: "twitchClientId",
-    TWITCH_CLIENT_SECRET: "twitchClientSecret",
-    BOARD_GAME_ATLAS_CLIENT_ID: "boardGameAtlasClientId",
-    METADATA_ENRICHMENT_QUERY_TIMEOUT_MS: "metadataEnrichmentQueryTimeoutMs",
     TOKEN_EXPIRATION_MS: "tokenExpirationMs",
     RATE_LIMIT_WINDOW_MS: "rateLimitWindowMs",
     RATE_LIMIT_MAX_PUSH_CONNECTOR: "rateLimitMaxPushConnector",
@@ -245,7 +219,6 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     dbPort: (v) => Number(v),
     smtpPort: (v) => Number(v),
     appPort: (v) => Number(v),
-    metadataEnrichmentQueryTimeoutMs: (v) => Number(v),
     tokenExpirationMs: (v) => Number(v),
     rateLimitWindowMs: (v) => Number(v),
     rateLimitMaxPushConnector: (v) => Number(v),
