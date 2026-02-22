@@ -8,16 +8,23 @@ import * as dietInferenceService from '../database/services/DietInferenceService
 import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
 import {ProviderKey} from '../../providers/ProviderKey';
 import {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
-import {ImportConnector} from '../../providers/ImportConnector';
-import {ImportPayload} from '../import/importSchema';
+import {ProviderRestaurant} from '../../providers/ProviderTypes';
 
 /**
- * Provider sync pipeline.
+ * Unified provider sync pipeline.
  *
- * For each {@link RestaurantProviderRef} matched by the requested provider key:
- *   1. Fetch menu from the connector (`fetchMenu`)
- *   2. Upsert menu categories and items via {@link menuService}
- *   3. Recompute diet inference for the restaurant
+ * Supports two connector styles through a **single** code path:
+ *
+ * - **fetch** (default): Look up existing {@link RestaurantProviderRef}
+ *   rows for the requested provider, then fetch menus from the connector.
+ *
+ * - **push**: The connector itself provides a restaurant list via
+ *   `listRestaurants()`.  The pipeline creates / updates restaurants
+ *   and provider refs generically, then processes menus through the
+ *   same shared path.
+ *
+ * The pipeline is connector-agnostic: it never references any specific
+ * connector implementation.
  *
  * Concurrency is guarded by a simple job-table lock: only one
  * `in_progress` job is allowed at a time.
@@ -43,219 +50,192 @@ export interface SyncResult {
     errorMessage?: string | null;
 }
 
+export interface PushSyncRestaurantResult {
+    name: string;
+    success: boolean;
+    error?: string;
+}
+
+export interface PushSyncResult extends SyncResult {
+    restaurants: PushSyncRestaurantResult[];
+}
+
+/** Options for {@link runSync}. */
+export interface RunSyncOptions {
+    /**
+     * When syncing fetch-style connectors, restrict to this provider key.
+     * Omit to sync ALL registered connectors.
+     */
+    providerKey?: ProviderKey;
+
+    /**
+     * Provide a push-style connector instance directly.
+     * The pipeline will call `listRestaurants()` to obtain the data,
+     * then process each restaurant through the shared pipeline.
+     */
+    pushConnector?: DeliveryProviderConnector;
+}
+
 /**
- * Run the sync pipeline for the given provider key, or for ALL
- * registered connectors when `providerKey` is omitted.
+ * Run the sync pipeline.
+ *
+ * - When `pushConnector` is provided the pipeline operates in **push**
+ *   mode: restaurants are obtained from the connector, created/updated
+ *   in the database, and their menus synced.
+ * - Otherwise the pipeline operates in **fetch** mode: existing
+ *   {@link RestaurantProviderRef} rows are looked up, and menus are
+ *   fetched from the registered connector for each one.
  */
-export async function runSync(providerKey?: ProviderKey): Promise<SyncResult> {
+export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult | PushSyncResult> {
+    const {providerKey, pushConnector} = options;
+    const isPush = pushConnector?.syncStyle === 'push';
+    const jobProviderKey = isPush ? pushConnector!.providerKey : (providerKey ?? null);
+
     const jobRepo = AppDataSource.getRepository(SyncJob);
 
     // ── Guard: concurrent runs ──────────────────────────────
     if (await isLocked()) {
         const blocked = jobRepo.create({
-            providerKey: providerKey ?? null,
+            providerKey: jobProviderKey,
             status: 'failed' as SyncJobStatus,
             errorMessage: 'Another sync is already in progress',
             startedAt: new Date(),
             finishedAt: new Date(),
         });
         const saved = await jobRepo.save(blocked);
-        return toResult(saved);
+        return isPush
+            ? {...toResult(saved), restaurants: []}
+            : toResult(saved);
     }
 
     // ── Create job record ───────────────────────────────────
     const job = jobRepo.create({
-        providerKey: providerKey ?? null,
+        providerKey: jobProviderKey,
         status: 'in_progress' as SyncJobStatus,
         startedAt: new Date(),
     });
     await jobRepo.save(job);
 
     try {
-        const refs = await getProviderRefs(providerKey);
-        let synced = 0;
+        let result: SyncResult | PushSyncResult;
 
-        for (const ref of refs) {
-            const connector = ConnectorRegistry.resolve(ref.providerKey as ProviderKey);
-            if (!connector || !ref.externalId) continue;
-
-            await syncMenuFromConnector(connector, ref.externalId, ref.restaurantId);
-
-            // Update lastSyncAt on the provider ref
-            const refRepo = AppDataSource.getRepository(RestaurantProviderRef);
-            ref.lastSyncAt = new Date();
-            await refRepo.save(ref);
-
-            synced++;
+        if (isPush) {
+            result = await runPushPipeline(pushConnector!, job);
+        } else {
+            result = await runFetchPipeline(providerKey, job);
         }
 
-        job.status = 'completed' as SyncJobStatus;
-        job.restaurantsSynced = synced;
-        job.finishedAt = new Date();
-        await jobRepo.save(job);
-        return toResult(job);
+        return result;
     } catch (err: unknown) {
         job.status = 'failed' as SyncJobStatus;
         job.errorMessage = err instanceof Error ? err.message : String(err);
         job.finishedAt = new Date();
         await jobRepo.save(job);
-        return toResult(job);
+        const base = toResult(job);
+        return isPush ? {...base, restaurants: []} : base;
     }
 }
 
-// ── Import sync pipeline ────────────────────────────────────
+// ── Fetch-style pipeline ────────────────────────────────────
 
-export interface ImportSyncRestaurantResult {
-    name: string;
-    success: boolean;
-    error?: string;
-}
-
-export interface ImportSyncResult extends SyncResult {
-    restaurants: ImportSyncRestaurantResult[];
-}
-
-/**
- * Run the import pipeline through the unified sync infrastructure.
- *
- * 1. Load the payload into the {@link ImportConnector}
- * 2. Create a SyncJob (providerKey = IMPORT)
- * 3. For each restaurant: create/update in DB, ensure IMPORT provider ref,
- *    then use `connector.fetchMenu()` → menu upsert pipeline
- * 4. Return per-restaurant results and SyncJob summary
- */
-export async function runImportSync(payload: ImportPayload): Promise<ImportSyncResult> {
+async function runFetchPipeline(providerKey: ProviderKey | undefined, job: SyncJob): Promise<SyncResult> {
     const jobRepo = AppDataSource.getRepository(SyncJob);
-
-    // Load payload into the ImportConnector
-    ImportConnector.loadPayload(payload);
-
-    // Create job record
-    const job = jobRepo.create({
-        providerKey: ProviderKey.IMPORT,
-        status: 'in_progress' as SyncJobStatus,
-        startedAt: new Date(),
-    });
-    await jobRepo.save(job);
-
-    const results: ImportSyncRestaurantResult[] = [];
+    const refs = await getProviderRefs(providerKey);
     let synced = 0;
 
-    try {
-        for (const incoming of payload.restaurants) {
-            try {
-                // Create or update restaurant
-                const existingRestaurants = await restaurantService.listRestaurants({});
-                const existing = existingRestaurants.find(
-                    (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
-                );
+    for (const ref of refs) {
+        const connector = ConnectorRegistry.resolve(ref.providerKey as ProviderKey);
+        if (!connector || !ref.externalId) continue;
 
-                let restaurantId: string;
+        await syncMenuForRestaurant(connector, ref.externalId, ref.restaurantId);
 
-                if (existing) {
-                    await restaurantService.updateRestaurant(existing.id, {
-                        addressLine1: incoming.addressLine1,
-                        addressLine2: incoming.addressLine2 ?? null,
-                        city: incoming.city,
-                        postalCode: incoming.postalCode,
-                        country: incoming.country ?? '',
-                        isActive: true,
-                    });
-                    restaurantId = existing.id;
-                } else {
-                    const created = await restaurantService.createRestaurant({
-                        name: incoming.name,
-                        addressLine1: incoming.addressLine1,
-                        addressLine2: incoming.addressLine2 ?? null,
-                        city: incoming.city,
-                        postalCode: incoming.postalCode,
-                        country: incoming.country ?? '',
-                    });
-                    restaurantId = created.id;
-                }
+        // Update lastSyncAt on the provider ref
+        const refRepo = AppDataSource.getRepository(RestaurantProviderRef);
+        ref.lastSyncAt = new Date();
+        await refRepo.save(ref);
 
-                // Upsert explicit provider refs from import data
-                if (incoming.providerRefs && incoming.providerRefs.length > 0) {
-                    const existingRefs = await providerRefService.listByRestaurant(restaurantId);
-                    const existingRefByKey = new Map(
-                        existingRefs.map((r) => [r.providerKey.toLowerCase(), r]),
-                    );
-
-                    for (const ref of incoming.providerRefs) {
-                        if (!existingRefByKey.has(ref.providerKey.toLowerCase())) {
-                            await providerRefService.addProviderRef({
-                                restaurantId,
-                                providerKey: ref.providerKey,
-                                externalId: ref.externalId ?? null,
-                                url: ref.url,
-                            });
-                        }
-                    }
-                }
-
-                // Ensure IMPORT provider ref exists
-                const allRefs = await providerRefService.listByRestaurant(restaurantId);
-                const hasImportRef = allRefs.some(
-                    (r) => r.providerKey === ProviderKey.IMPORT,
-                );
-                if (!hasImportRef) {
-                    await providerRefService.addProviderRef({
-                        restaurantId,
-                        providerKey: ProviderKey.IMPORT,
-                        externalId: incoming.name,
-                        url: `import://${restaurantId}`,
-                    });
-                }
-
-                // Sync menu via the connector's fetchMenu → unified upsert pipeline
-                await syncMenuFromConnector(ImportConnector, incoming.name, restaurantId);
-
-                results.push({name: incoming.name, success: true});
-                synced++;
-            } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : 'Unknown error';
-                results.push({name: incoming.name, success: false, error: message});
-            }
-        }
-
-        job.status = 'completed' as SyncJobStatus;
-        job.restaurantsSynced = synced;
-        job.finishedAt = new Date();
-        await jobRepo.save(job);
-
-        return {...toResult(job), restaurants: results};
-    } catch (err: unknown) {
-        job.status = 'failed' as SyncJobStatus;
-        job.errorMessage = err instanceof Error ? err.message : String(err);
-        job.finishedAt = new Date();
-        await jobRepo.save(job);
-        return {...toResult(job), restaurants: results};
-    } finally {
-        ImportConnector.clearPayload();
+        synced++;
     }
+
+    job.status = 'completed' as SyncJobStatus;
+    job.restaurantsSynced = synced;
+    job.finishedAt = new Date();
+    await jobRepo.save(job);
+    return toResult(job);
 }
 
-// ── Helpers ─────────────────────────────────────────────────
+// ── Push-style pipeline ─────────────────────────────────────
+
+async function runPushPipeline(connector: DeliveryProviderConnector, job: SyncJob): Promise<PushSyncResult> {
+    const jobRepo = AppDataSource.getRepository(SyncJob);
+    const providerRestaurants = await connector.listRestaurants('');
+
+    const results: PushSyncRestaurantResult[] = [];
+    let synced = 0;
+
+    for (const incoming of providerRestaurants) {
+        try {
+            // Create or update restaurant
+            const restaurantId = await upsertRestaurant(incoming);
+
+            // Ensure provider ref for this connector
+            await ensureProviderRef(
+                restaurantId,
+                connector.providerKey,
+                incoming.externalId,
+                incoming.url,
+            );
+
+            // Upsert any additional provider refs the connector supplies
+            if (incoming.providerRefs) {
+                for (const ref of incoming.providerRefs) {
+                    await ensureProviderRef(
+                        restaurantId,
+                        ref.providerKey,
+                        ref.externalId ?? null,
+                        ref.url,
+                    );
+                }
+            }
+
+            // Sync menu through the shared pipeline
+            await syncMenuForRestaurant(connector, incoming.externalId, restaurantId);
+
+            results.push({name: incoming.name, success: true});
+            synced++;
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            results.push({name: incoming.name, success: false, error: message});
+        }
+    }
+
+    job.status = 'completed' as SyncJobStatus;
+    job.restaurantsSynced = synced;
+    job.finishedAt = new Date();
+    await jobRepo.save(job);
+
+    return {...toResult(job), restaurants: results};
+}
+
+// ── Shared helpers ──────────────────────────────────────────
 
 /**
- * Shared menu sync logic used by both `runSync` and `runImportSync`.
- * Fetches the menu from the connector, upserts categories/items,
- * and recomputes diet inference.
+ * Shared menu sync logic used by both fetch-style and push-style
+ * pipelines.  Fetches the menu from the connector, upserts
+ * categories / items, and recomputes diet inference.
  */
-async function syncMenuFromConnector(
+async function syncMenuForRestaurant(
     connector: DeliveryProviderConnector,
     externalId: string,
     restaurantId: string,
 ): Promise<void> {
     const menu = await connector.fetchMenu(externalId);
 
-    // Upsert categories
     const cats = await menuService.upsertCategories(
         restaurantId,
         menu.categories.map((c, idx) => ({name: c.name, sortOrder: idx})),
     );
 
-    // Upsert items per category
     const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c]));
     for (const provCat of menu.categories) {
         const dbCat = catByName.get(provCat.name.toLowerCase());
@@ -273,8 +253,64 @@ async function syncMenuFromConnector(
         );
     }
 
-    // Recompute diet inference
     await dietInferenceService.recomputeAfterMenuChange(restaurantId);
+}
+
+/**
+ * Create or update a restaurant from normalised provider data.
+ * Returns the restaurant ID.
+ */
+async function upsertRestaurant(incoming: ProviderRestaurant): Promise<string> {
+    const existingRestaurants = await restaurantService.listRestaurants({});
+    const existing = existingRestaurants.find(
+        (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
+    );
+
+    if (existing) {
+        await restaurantService.updateRestaurant(existing.id, {
+            addressLine1: incoming.address ?? '',
+            addressLine2: incoming.addressLine2 ?? null,
+            city: incoming.city ?? '',
+            postalCode: incoming.postalCode ?? '',
+            country: incoming.country ?? '',
+            isActive: true,
+        });
+        return existing.id;
+    }
+
+    const created = await restaurantService.createRestaurant({
+        name: incoming.name,
+        addressLine1: incoming.address ?? '',
+        addressLine2: incoming.addressLine2 ?? null,
+        city: incoming.city ?? '',
+        postalCode: incoming.postalCode ?? '',
+        country: incoming.country ?? '',
+    });
+    return created.id;
+}
+
+/**
+ * Ensure a provider ref exists for the given restaurant / provider key.
+ * Skips creation when a ref with the same key already exists.
+ */
+async function ensureProviderRef(
+    restaurantId: string,
+    providerKey: string,
+    externalId: string | null,
+    url: string,
+): Promise<void> {
+    const existingRefs = await providerRefService.listByRestaurant(restaurantId);
+    const already = existingRefs.some(
+        (r) => r.providerKey.toLowerCase() === providerKey.toLowerCase(),
+    );
+    if (!already) {
+        await providerRefService.addProviderRef({
+            restaurantId,
+            providerKey,
+            externalId,
+            url,
+        });
+    }
 }
 
 async function getProviderRefs(providerKey?: ProviderKey): Promise<RestaurantProviderRef[]> {

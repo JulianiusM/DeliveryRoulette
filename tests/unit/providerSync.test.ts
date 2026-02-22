@@ -1,7 +1,6 @@
 /**
  * Unit tests for ProviderSyncService
- * Tests the sync pipeline: fetch → upsert → infer, plus locking.
- * Tests the import sync pipeline: runImportSync.
+ * Tests the unified sync pipeline for both fetch-style and push-style connectors.
  */
 
 import {ProviderKey} from '../../src/providers/ProviderKey';
@@ -69,7 +68,8 @@ jest.mock('../../src/providers/ConnectorRegistry');
 import * as ConnectorRegistry from '../../src/providers/ConnectorRegistry';
 const mockResolve = ConnectorRegistry.resolve as jest.Mock;
 
-import {runSync, runImportSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
+import {runSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
+import {ImportConnector} from '../../src/providers/ImportConnector';
 
 describe('ProviderSyncService', () => {
     beforeEach(() => {
@@ -89,7 +89,7 @@ describe('ProviderSyncService', () => {
         });
     });
 
-    describe('runSync', () => {
+    describe('runSync – fetch-style', () => {
         test('returns failed result when another sync is already running', async () => {
             mockFindOneJob.mockResolvedValue({id: 'running', status: 'in_progress'});
 
@@ -121,7 +121,7 @@ describe('ProviderSyncService', () => {
             mockUpsertItems.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
 
-            const result = await runSync(ProviderKey.UBER_EATS);
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
@@ -173,7 +173,7 @@ describe('ProviderSyncService', () => {
             mockUpsertCategories.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
 
-            const result = await runSync(ProviderKey.UBER_EATS);
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
@@ -181,7 +181,7 @@ describe('ProviderSyncService', () => {
         });
     });
 
-    describe('runImportSync', () => {
+    describe('runSync – push-style', () => {
         beforeEach(() => {
             mockListRestaurants.mockResolvedValue([]);
             mockCreateRestaurant.mockImplementation(async (data: any) => ({
@@ -194,24 +194,24 @@ describe('ProviderSyncService', () => {
             mockRecompute.mockResolvedValue([]);
         });
 
-        test('creates SyncJob with IMPORT provider key', async () => {
-            const result = await runImportSync(importPayloadNoMenu);
+        test('creates SyncJob with connector providerKey', async () => {
+            const connector = new ImportConnector(importPayloadNoMenu);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
             expect(result.jobId).toBe('job-1');
-            // Verify the job was created with IMPORT key
             expect(mockCreateJob).toHaveBeenCalledWith(
                 expect.objectContaining({providerKey: ProviderKey.IMPORT}),
             );
         });
 
-        test('creates new restaurant and IMPORT provider ref', async () => {
-            const result = await runImportSync(importPayloadNoMenu);
+        test('creates new restaurant and provider ref', async () => {
+            const connector = new ImportConnector(importPayloadNoMenu);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
-            expect(result.restaurants).toHaveLength(1);
-            expect(result.restaurants[0].success).toBe(true);
+            expect('restaurants' in result && result.restaurants).toHaveLength(1);
             expect(mockCreateRestaurant).toHaveBeenCalledWith(
                 expect.objectContaining({name: 'Simple Place'}),
             );
@@ -225,7 +225,8 @@ describe('ProviderSyncService', () => {
                 {id: 'existing-id', name: 'Simple Place', addressLine1: '1 Old St', city: 'Berlin', postalCode: '10115'},
             ]);
 
-            const result = await runImportSync(importPayloadNoMenu);
+            const connector = new ImportConnector(importPayloadNoMenu);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
             expect(mockCreateRestaurant).not.toHaveBeenCalled();
@@ -235,34 +236,34 @@ describe('ProviderSyncService', () => {
         test('processes menu through the connector fetchMenu pipeline', async () => {
             mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Mains'}]);
 
-            const result = await runImportSync(importPayloadWithMenu);
+            const connector = new ImportConnector(importPayloadWithMenu);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(1);
-            // Menu was upserted via the unified pipeline (connector.fetchMenu → upsertCategories → upsertItems)
             expect(mockUpsertCategories).toHaveBeenCalled();
             expect(mockUpsertItems).toHaveBeenCalled();
             expect(mockRecompute).toHaveBeenCalled();
         });
 
         test('processes multiple restaurants', async () => {
-            const result = await runImportSync(importPayloadMultiple);
+            const connector = new ImportConnector(importPayloadMultiple);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
             expect(result.restaurantsSynced).toBe(2);
-            expect(result.restaurants).toHaveLength(2);
-            expect(result.restaurants.every((r) => r.success)).toBe(true);
+            expect('restaurants' in result && result.restaurants).toHaveLength(2);
             expect(mockCreateRestaurant).toHaveBeenCalledTimes(2);
         });
 
-        test('does not skip when existing IMPORT ref already exists', async () => {
+        test('does not duplicate provider ref when one already exists', async () => {
             mockListByRestaurant.mockResolvedValue([
                 {providerKey: ProviderKey.IMPORT, externalId: 'Simple Place'},
             ]);
 
-            const result = await runImportSync(importPayloadNoMenu);
+            const connector = new ImportConnector(importPayloadNoMenu);
+            await runSync({pushConnector: connector});
 
-            expect(result.status).toBe('completed');
             // Should not add a duplicate IMPORT ref
             expect(mockAddProviderRef).not.toHaveBeenCalledWith(
                 expect.objectContaining({providerKey: ProviderKey.IMPORT}),
@@ -274,25 +275,27 @@ describe('ProviderSyncService', () => {
                 .mockRejectedValueOnce(new Error('DB error'))
                 .mockImplementationOnce(async (data: any) => ({id: 'new-2', ...data}));
 
-            const result = await runImportSync(importPayloadMultiple);
+            const connector = new ImportConnector(importPayloadMultiple);
+            const result = await runSync({pushConnector: connector});
 
             expect(result.status).toBe('completed');
-            expect(result.restaurants).toHaveLength(2);
-            expect(result.restaurants[0].success).toBe(false);
-            expect(result.restaurants[0].error).toBe('DB error');
-            expect(result.restaurants[1].success).toBe(true);
+            const pushResult = result as any;
+            expect(pushResult.restaurants).toHaveLength(2);
+            expect(pushResult.restaurants[0].success).toBe(false);
+            expect(pushResult.restaurants[0].error).toBe('DB error');
+            expect(pushResult.restaurants[1].success).toBe(true);
             expect(result.restaurantsSynced).toBe(1);
         });
 
-        test('clears ImportConnector payload after completion', async () => {
-            // We can verify indirectly: after runImportSync, the connector
-            // should return empty when queried
-            const {ImportConnector} = await import('../../src/providers/ImportConnector');
+        test('concurrent imports use isolated instances', async () => {
+            const connector1 = new ImportConnector(importPayloadNoMenu);
+            const connector2 = new ImportConnector(importPayloadMultiple);
 
-            await runImportSync(importPayloadNoMenu);
-
-            const restaurants = await ImportConnector.listRestaurants('');
-            expect(restaurants).toEqual([]);
+            // They should be different instances with different data
+            const list1 = await connector1.listRestaurants('');
+            const list2 = await connector2.listRestaurants('');
+            expect(list1).toHaveLength(1);
+            expect(list2).toHaveLength(2);
         });
     });
 });

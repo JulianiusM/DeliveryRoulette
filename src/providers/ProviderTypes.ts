@@ -31,9 +31,12 @@ export interface ProviderRestaurant {
     name: string;
     url: string;
     address?: string | null;
+    addressLine2?: string | null;
     city?: string | null;
     postalCode?: string | null;
     country?: string | null;
+    /** Additional provider references supplied by push-style connectors. */
+    providerRefs?: Array<{ providerKey: string; externalId?: string | null; url: string }>;
 }
 
 /** Rate-limit policy advertised by a connector. */

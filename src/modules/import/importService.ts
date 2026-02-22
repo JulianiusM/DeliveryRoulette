@@ -192,13 +192,18 @@ export async function computeDiff(payload: ImportPayload): Promise<ImportDiff> {
 /**
  * Apply the entire import payload via the unified sync pipeline.
  *
- * Delegates to {@link runImportSync} which creates a SyncJob, processes
- * each restaurant through the ImportConnector, and upserts menus via
- * the same pipeline used by external-provider sync.
+ * Creates a fresh {@link ImportConnector} instance for this request
+ * (no shared state — concurrent imports are fully isolated) and passes
+ * it to the generic push-style sync pipeline.
  */
 export async function applyImport(payload: ImportPayload): Promise<ImportApplyResult> {
-    const {runImportSync} = await import('../sync/ProviderSyncService');
-    const syncResult = await runImportSync(payload);
+    // Dynamic imports to avoid circular dependency
+    const {ImportConnector} = await import('../../providers/ImportConnector');
+    const {runSync} = await import('../sync/ProviderSyncService');
+    type PushSyncResultType = import('../sync/ProviderSyncService').PushSyncResult;
+
+    const connector = new ImportConnector(payload);
+    const syncResult = await runSync({pushConnector: connector}) as PushSyncResultType;
 
     const restaurants: RestaurantApplyResult[] = syncResult.restaurants.map((r) => ({
         name: r.name,

@@ -6,6 +6,6 @@ export type {
     ProviderRestaurant,
     RateLimitPolicy,
 } from "./ProviderTypes";
-export type {DeliveryProviderConnector} from "./DeliveryProviderConnector";
+export type {DeliveryProviderConnector, SyncStyle} from "./DeliveryProviderConnector";
 export * as ConnectorRegistry from "./ConnectorRegistry";
 export {ImportConnector} from "./ImportConnector";

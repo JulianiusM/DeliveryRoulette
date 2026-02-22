@@ -1,57 +1,56 @@
-import {DeliveryProviderConnector} from "./DeliveryProviderConnector";
+import {DeliveryProviderConnector, SyncStyle} from "./DeliveryProviderConnector";
 import {ProviderKey} from "./ProviderKey";
 import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes";
 import {ImportPayload, ImportRestaurant} from "../modules/import/importSchema";
 
 /**
- * Import connector — wraps the bulk-import ingestion as a provider so
- * that restaurants created via import participate in the unified sync
- * pipeline and receive a {@link RestaurantProviderRef} with
+ * Import connector — wraps a bulk-import payload as a provider so that
+ * restaurants created via import participate in the unified sync pipeline
+ * and receive a {@link RestaurantProviderRef} with
  * `providerKey = "import"`.
  *
- * Unlike external-API connectors, import is **push-style**: the caller
- * loads an {@link ImportPayload} via {@link loadPayload}, after which
- * {@link listRestaurants} and {@link fetchMenu} serve data from that
- * payload.  Call {@link clearPayload} when processing is finished.
+ * Each import flow creates a **new instance** (no shared global state),
+ * so concurrent imports by different users are fully isolated.  State
+ * lives only for the duration of the request — the payload is already
+ * in the client-side hidden form field between HTTP calls, so no
+ * server-side persistence is necessary.
  */
-class ImportConnectorImpl implements DeliveryProviderConnector {
+export class ImportConnector implements DeliveryProviderConnector {
     readonly providerKey = ProviderKey.IMPORT;
     readonly displayName = "Import";
+    readonly syncStyle: SyncStyle = 'push';
 
     /** Restaurants keyed by lowercased name. */
-    private pending = new Map<string, ImportRestaurant>();
+    private readonly restaurants: Map<string, ImportRestaurant>;
 
-    // ── Payload management ──────────────────────────────────
-
-    /** Load an import payload so listRestaurants / fetchMenu can serve it. */
-    loadPayload(payload: ImportPayload): void {
-        this.pending.clear();
-        for (const r of payload.restaurants) {
-            this.pending.set(r.name.toLowerCase(), r);
-        }
-    }
-
-    /** Discard any loaded payload data. */
-    clearPayload(): void {
-        this.pending.clear();
+    constructor(payload: ImportPayload) {
+        this.restaurants = new Map(
+            payload.restaurants.map((r) => [r.name.toLowerCase(), r]),
+        );
     }
 
     // ── DeliveryProviderConnector interface ──────────────────
 
     async listRestaurants(_query: string): Promise<ProviderRestaurant[]> {
-        return [...this.pending.values()].map((r) => ({
+        return [...this.restaurants.values()].map((r) => ({
             externalId: r.name,
             name: r.name,
             url: `import://${r.name}`,
             address: r.addressLine1,
+            addressLine2: r.addressLine2 ?? null,
             city: r.city,
             postalCode: r.postalCode,
             country: r.country ?? null,
+            providerRefs: r.providerRefs?.map((ref) => ({
+                providerKey: ref.providerKey,
+                externalId: ref.externalId ?? null,
+                url: ref.url,
+            })),
         }));
     }
 
     async fetchMenu(externalId: string): Promise<ProviderMenu> {
-        const restaurant = this.pending.get(externalId.toLowerCase());
+        const restaurant = this.restaurants.get(externalId.toLowerCase());
         if (!restaurant?.menuCategories) return {categories: []};
 
         return {
@@ -72,5 +71,3 @@ class ImportConnectorImpl implements DeliveryProviderConnector {
         return {maxRequests: Infinity, windowMs: 60_000};
     }
 }
-
-export const ImportConnector = new ImportConnectorImpl();

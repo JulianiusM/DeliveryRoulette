@@ -10,7 +10,7 @@ export const expectedDisplayName = "Import";
 /** Expected provider key value. */
 export const expectedProviderKey = "import";
 
-/** Sample import payload for testing loadPayload / listRestaurants / fetchMenu. */
+/** Sample import payload for testing constructor / listRestaurants / fetchMenu. */
 export const samplePayload: ImportPayload = {
     version: 1,
     restaurants: [
@@ -29,10 +29,14 @@ export const samplePayload: ImportPayload = {
                     ],
                 },
             ],
+            providerRefs: [
+                {providerKey: 'ubereats', url: 'https://ubereats.com/pizza-palace'},
+            ],
         },
         {
             name: 'Burger Barn',
             addressLine1: '2 Side St',
+            addressLine2: 'Floor 2',
             city: 'Munich',
             postalCode: '80331',
         },
@@ -66,3 +70,9 @@ export const fetchMenuCases = [
         expectedItemCount: 0,
     },
 ];
+
+/** Empty payload for edge-case tests. */
+export const emptyPayload: ImportPayload = {
+    version: 1,
+    restaurants: [],
+};
