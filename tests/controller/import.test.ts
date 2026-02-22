@@ -63,13 +63,26 @@ describe('ImportController', () => {
             mockParseAndValidate.mockReturnValue({valid: true, data: parsed});
             mockComputeDiff.mockResolvedValue(sampleDiff);
 
-            const result = await importController.handleUpload(testCase.fileContent);
+            const fileBuffer = Buffer.from(testCase.fileContent, 'utf-8');
+            const result = await importController.handleUpload(fileBuffer);
 
-            expect(result.payload).toEqual(parsed);
+            expect(result.pageTitle).toBe('Import Preview');
             expect(result.diff).toEqual(sampleDiff);
             expect(result.payloadJson).toBeTruthy();
             expect(mockParseAndValidate).toHaveBeenCalled();
             expect(mockComputeDiff).toHaveBeenCalledWith(parsed);
+        });
+
+        test('rejects missing file buffer', async () => {
+            await expect(
+                importController.handleUpload(undefined),
+            ).rejects.toThrow(ExpectedError);
+
+            await expect(
+                importController.handleUpload(undefined),
+            ).rejects.toMatchObject({
+                message: expect.stringContaining('select a JSON file'),
+            });
         });
 
         test.each(uploadInvalidCases)('$description', async (testCase) => {
@@ -80,25 +93,17 @@ describe('ImportController', () => {
                 });
             }
 
+            const fileBuffer = Buffer.from(testCase.fileContent, 'utf-8');
+
             await expect(
-                importController.handleUpload(testCase.fileContent),
+                importController.handleUpload(fileBuffer),
             ).rejects.toThrow(ExpectedError);
 
             await expect(
-                importController.handleUpload(testCase.fileContent),
+                importController.handleUpload(Buffer.from(testCase.fileContent, 'utf-8')),
             ).rejects.toMatchObject({
                 message: expect.stringContaining(testCase.expectedError),
             });
-        });
-    });
-
-    describe('getPreviewData', () => {
-        test('returns preview data with diff and payloadJson', () => {
-            const result = importController.getPreviewData(sampleDiff, validPayloadJson) as any;
-
-            expect(result.pageTitle).toBe('Import Preview');
-            expect(result.diff).toEqual(sampleDiff);
-            expect(result.payloadJson).toBe(validPayloadJson);
         });
     });
 
@@ -112,6 +117,7 @@ describe('ImportController', () => {
 
             const result = await importController.handleApply(validPayloadJson);
 
+            expect(result.pageTitle).toBe('Import Results');
             expect(result.result).toEqual(sampleApplyResult);
             expect(mockParseAndValidate).toHaveBeenCalled();
             expect(mockApplyImport).toHaveBeenCalled();
@@ -134,15 +140,6 @@ describe('ImportController', () => {
             ).rejects.toMatchObject({
                 message: expect.stringContaining(testCase.expectedError),
             });
-        });
-    });
-
-    describe('getResultData', () => {
-        test('returns result data', () => {
-            const result = importController.getResultData(sampleApplyResult) as any;
-
-            expect(result.pageTitle).toBe('Import Results');
-            expect(result.result).toEqual(sampleApplyResult);
         });
     });
 });

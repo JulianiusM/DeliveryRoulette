@@ -80,6 +80,9 @@ export type Settings = {
     // Suggestion history
     suggestionExcludeRecentCount: number;
 
+    // Import configuration
+    importMaxFileSizeBytes: number;
+
     initialized: boolean;
 };
 
@@ -156,6 +159,9 @@ const defaults: Settings = {
 
     // Suggestion history
     suggestionExcludeRecentCount: 3,
+
+    // Import configuration
+    importMaxFileSizeBytes: 25 * 1024 * 1024, // 25 MB
 };
 
 // CSV_KEY -> settings key
@@ -206,6 +212,7 @@ const keyMap: Record<string, keyof Settings> = {
     MIN_NORMALIZED_TITLE_LENGTH: "minNormalizedTitleLength",
     MIN_SIMILARITY_SCORE: "minSimilarityScore",
     SUGGESTION_EXCLUDE_RECENT_COUNT: "suggestionExcludeRecentCount",
+    IMPORT_MAX_FILE_SIZE_BYTES: "importMaxFileSizeBytes",
 };
 
 // per-field coercion
@@ -229,6 +236,7 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     minNormalizedTitleLength: (v) => Number(v),
     minSimilarityScore: (v) => Number(v),
     suggestionExcludeRecentCount: (v) => Number(v),
+    importMaxFileSizeBytes: (v) => Number(v),
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),

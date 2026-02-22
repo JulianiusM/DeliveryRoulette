@@ -3,10 +3,6 @@ import {ImportPayload} from '../modules/import/importSchema';
 import {ImportDiff, ImportApplyResult} from '../modules/import/importService';
 import {ExpectedError} from '../modules/lib/errors';
 
-const UPLOAD_TEMPLATE = 'import/upload';
-const PREVIEW_TEMPLATE = 'import/preview';
-const RESULT_TEMPLATE = 'import/result';
-
 // ── Upload & Validate ───────────────────────────────────────
 
 /**
@@ -17,14 +13,22 @@ export function getUploadPageData(): {pageTitle: string} {
 }
 
 /**
- * Parse and validate uploaded JSON. Returns validated payload and diff
- * data for the preview page, or throws on validation failure.
+ * Parse, validate, and compute diff for an uploaded file buffer.
+ * Handles file-missing check, buffer-to-string conversion, JSON
+ * parsing, schema validation, and diff computation.
+ * Returns the complete preview template data.
  */
-export async function handleUpload(fileContent: string): Promise<{
-    payload: ImportPayload;
+export async function handleUpload(fileBuffer: Buffer | undefined): Promise<{
+    pageTitle: string;
     diff: ImportDiff;
     payloadJson: string;
 }> {
+    if (!fileBuffer) {
+        throw new ExpectedError('Please select a JSON file to upload.', 'error', 400);
+    }
+
+    const fileContent = fileBuffer.toString('utf-8');
+
     let parsed: unknown;
     try {
         parsed = JSON.parse(fileContent);
@@ -42,22 +46,9 @@ export async function handleUpload(fileContent: string): Promise<{
     const diff = await importService.computeDiff(payload);
 
     return {
-        payload,
-        diff,
-        payloadJson: JSON.stringify(payload),
-    };
-}
-
-// ── Preview Data ────────────────────────────────────────────
-
-/**
- * Return template data for the preview page.
- */
-export function getPreviewData(diff: ImportDiff, payloadJson: string): object {
-    return {
         pageTitle: 'Import Preview',
         diff,
-        payloadJson,
+        payloadJson: JSON.stringify(payload),
     };
 }
 
@@ -66,8 +57,10 @@ export function getPreviewData(diff: ImportDiff, payloadJson: string): object {
 /**
  * Apply the import from the preview step. Expects the payload JSON
  * that was passed through the hidden form field.
+ * Returns the complete result template data.
  */
 export async function handleApply(payloadJson: string): Promise<{
+    pageTitle: string;
     result: ImportApplyResult;
 }> {
     if (!payloadJson) {
@@ -88,13 +81,6 @@ export async function handleApply(payloadJson: string): Promise<{
     }
 
     const result = await importService.applyImport(validation.data);
-    return {result};
-}
-
-/**
- * Return template data for the result page.
- */
-export function getResultData(result: ImportApplyResult): object {
     return {
         pageTitle: 'Import Results',
         result,
