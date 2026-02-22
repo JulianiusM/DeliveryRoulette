@@ -1,0 +1,63 @@
+//- views/import/result.pug – Import Result Page
+extends ../layout
+
+block meta
+    title Import Results | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-clipboard-check.me-2
+        | Import Results
+
+block content
+    - const result = (data && data.result) || { restaurants: [], successCount: 0, errorCount: 0 }
+
+    //── Summary ─────────────────────────────────────────
+    .d-flex.gap-3.mb-4.flex-wrap
+        span.badge.text-bg-success.fs-6
+            i.bi.bi-check-circle.me-1
+            | #{result.successCount} Succeeded
+        if result.errorCount > 0
+            span.badge.text-bg-danger.fs-6
+                i.bi.bi-x-circle.me-1
+                | #{result.errorCount} Failed
+
+    //── Per-restaurant results ──────────────────────────
+    if result.restaurants.length === 0
+        .text-center.text-white-50.py-4
+            p No restaurants were processed.
+    else
+        .table-responsive
+            table.table.table-dark.table-hover
+                thead
+                    tr
+                        th Restaurant
+                        th Status
+                        th Details
+                tbody
+                    each r in result.restaurants
+                        tr(class=(r.success ? '' : 'table-danger'))
+                            td #{r.name}
+                            td
+                                if r.success
+                                    span.badge.text-bg-success
+                                        i.bi.bi-check.me-1
+                                        | Success
+                                else
+                                    span.badge.text-bg-danger
+                                        i.bi.bi-x.me-1
+                                        | Failed
+                            td
+                                if r.error
+                                    span.text-danger #{r.error}
+                                else
+                                    span.text-white-50 Imported successfully
+
+    //── Actions ─────────────────────────────────────────
+    .d-flex.gap-3.mt-4
+        a.btn.btn-primary(href="/import")
+            i.bi.bi-upload.me-1
+            | Import Another
+        a.btn.btn-secondary(href="/restaurants")
+            i.bi.bi-shop.me-1
+            | View Restaurants

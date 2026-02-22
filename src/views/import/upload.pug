@@ -1,0 +1,28 @@
+//- views/import/upload.pug – Import Upload Page
+extends ../layout
+
+block meta
+    title Import | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-upload.me-2
+        | Import Restaurants
+
+block content
+    .row.justify-content-center
+        .col-md-8
+            p.text-white-50.mb-4
+                | Upload a JSON file to import restaurants, menus, and provider references.
+                | The file will be validated and a preview of changes will be shown before applying.
+
+            form(method="POST" action="/import/upload" enctype="multipart/form-data")
+                .mb-3
+                    label.form-label(for="file") JSON Import File
+                    input.form-control.text-bg-dark(type="file" name="file" id="file" accept=".json,application/json" required)
+                    .form-text.text-white-50 Accepted format: JSON (see #[a.text-info(href="/help") documentation] for schema details)
+
+                .d-grid
+                    button.btn.btn-primary(type="submit")
+                        i.bi.bi-cloud-upload.me-1
+                        | Upload &amp; Validate
