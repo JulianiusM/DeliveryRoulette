@@ -2,7 +2,7 @@ import createError from 'http-errors';
 import express, {NextFunction, Request, Response} from 'express';
 import path from 'path';
 import cookieParser from 'cookie-parser';
-import logger from 'morgan';
+import pinoHttp from 'pino-http';
 import session from 'express-session';
 import flash from 'express-flash';
 
@@ -16,8 +16,11 @@ import importRouter from './routes/import';
 import syncRouter from './routes/sync';
 import syncAlertsRouter from './routes/syncAlerts';
 import providersRouter from './routes/providers';
+import healthRouter from './routes/health';
 import settings from './modules/settings';
 import {handleGenericError} from './middleware/genericErrorHandler';
+import {requestIdMiddleware} from './middleware/requestIdMiddleware';
+import logger from './modules/logger';
 
 // Version aus package.json lesen
 import {version} from '../package.json';
@@ -31,7 +34,8 @@ const app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
 
-app.use(logger('dev'));
+app.use(requestIdMiddleware);
+app.use(pinoHttp({logger, genReqId: (req) => req.id}));
 app.use(express.json({limit: '25mb'})); // Increased limit for large import payloads (e.g., Playnite library)
 app.use(express.urlencoded({extended: true, limit: '25mb'}));
 app.use(cookieParser());
@@ -89,7 +93,8 @@ app.use('/api/sync', syncRouter);
 app.use('/sync/alerts', syncAlertsRouter);
 app.use('/providers', providersRouter);
 
-app.get('/healthz', (_req, res) => res.status(200).send('ok'));
+app.use('/health', healthRouter);
+app.get('/healthz', (_req, res) => res.redirect(301, '/health'));
 
 // catch 404 and forward to error handler
 app.use(function (req: Request, res: Response, next: NextFunction) {
