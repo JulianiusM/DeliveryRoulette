@@ -4,7 +4,7 @@
  * Tests use deterministic fixture HTML files.
  * No live HTTP calls are made.
  */
-import {parseListingHtml, parseMenuHtml} from '../../src/modules/providers/lieferando/lieferandoParsing';
+import {parseListingHtml, parseMenuHtml} from '../../src/providers/lieferando/lieferandoParsing';
 import {
     listingHtml,
     menuHtml,

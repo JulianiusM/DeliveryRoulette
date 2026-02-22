@@ -2,7 +2,7 @@
  * Test data for ConnectorRegistry unit tests.
  */
 import {ProviderKey} from '../../../src/providers/ProviderKey';
-import {DeliveryProviderConnector} from '../../../src/providers/DeliveryProviderConnector';
+import {ConnectorCapabilities, DeliveryProviderConnector} from '../../../src/providers/DeliveryProviderConnector';
 import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from '../../../src/providers/ProviderTypes';
 
 /** Helper: build a minimal stub connector for a given key. */
@@ -16,6 +16,8 @@ export function stubConnector(key: ProviderKey, displayName: string): DeliveryPr
             .mockResolvedValue({categories: []}),
         rateLimitPolicy: jest.fn<RateLimitPolicy, []>()
             .mockReturnValue({maxRequests: 60, windowMs: 60_000}),
+        capabilities: jest.fn<ConnectorCapabilities, []>()
+            .mockReturnValue({canDiscoverFromListingUrl: false, canImportFromUrl: false}),
     };
 }
 

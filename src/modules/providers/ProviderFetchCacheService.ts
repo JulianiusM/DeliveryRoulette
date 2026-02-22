@@ -1,17 +1,16 @@
 /**
  * Fetch caching service for provider HTTP responses.
  *
- * Stores fetched HTML in the database with TTL-based expiration.
+ * This is an app-level service that provides cached HTTP fetching.
+ * Connectors do NOT access this directly — the app layer wraps
+ * connector calls with caching as needed.
+ *
  * Uses SHA-256 hash of URL as cache key for stable lookups.
  */
 import crypto from 'node:crypto';
 import {AppDataSource} from '../database/dataSource';
 import {ProviderFetchCache} from '../database/entities/provider/ProviderFetchCache';
 import {fetchUrl} from '../lib/httpClient';
-
-/** Default TTL values in seconds for different page types. */
-export const LISTING_TTL_SECONDS = 6 * 60 * 60;   // 6 hours
-export const MENU_TTL_SECONDS = 24 * 60 * 60;      // 24 hours
 
 /**
  * Get a cached response or fetch and cache a new one.

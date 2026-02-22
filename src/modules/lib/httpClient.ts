@@ -2,21 +2,21 @@
  * Simple HTTP client wrapper for provider connector requests.
  *
  * Uses Node.js native fetch with:
- * - Configurable timeout (default 10s)
+ * - Configurable timeout (from settings)
  * - Honest User-Agent header
  * - Gzip/deflate support
- * - Global concurrency limiting (max 2 concurrent requests)
+ * - Global concurrency limiting (from settings)
  */
+import settings from '../settings';
 
-const DEFAULT_TIMEOUT_MS = 10_000;
-const MAX_CONCURRENT = 2;
 const USER_AGENT = 'DeliveryRoulette/1.0 (provider-sync)';
 
 let activeFetches = 0;
 const waitQueue: Array<() => void> = [];
 
 function acquireSlot(): Promise<void> {
-    if (activeFetches < MAX_CONCURRENT) {
+    const max = settings.value.providerHttpMaxConcurrent;
+    if (activeFetches < max) {
         activeFetches++;
         return Promise.resolve();
     }
@@ -44,14 +44,15 @@ export interface HttpResponse {
  * Fetch a URL with provider-appropriate defaults.
  *
  * @param url  The URL to fetch
- * @param timeoutMs  Request timeout in milliseconds (default: 10000)
+ * @param timeoutMs  Request timeout in milliseconds (default: from settings)
  * @returns Resolved response with status, body text, and ok flag
  */
-export async function fetchUrl(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<HttpResponse> {
+export async function fetchUrl(url: string, timeoutMs?: number): Promise<HttpResponse> {
+    const timeout = timeoutMs ?? settings.value.providerHttpTimeoutMs;
     await acquireSlot();
     try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const timer = setTimeout(() => controller.abort(), timeout);
 
         try {
             const response = await fetch(url, {
