@@ -6,7 +6,8 @@ import logger from "../modules/logger";
 
 export function handleGenericError(err: Error, req: Request, res: Response, next: NextFunction) {
     const status: number = (err as any).status || 500;
-    const log = req.log || logger;
+    // Fallback to root logger when requestIdMiddleware has not run (e.g. early errors)
+    const log = req.log ?? logger;
     if (status >= 500) log.error({err}, 'Unhandled server error');
     res.status(status);
 
