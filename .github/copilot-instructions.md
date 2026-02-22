@@ -46,8 +46,8 @@ All configuration constants are centralized in `src/modules/settings.ts`. This i
 - Rate limiting parameters
 - Pagination defaults and limits
 - Description length constraints
-- Metadata scoring thresholds
-- Similar title matching parameters
+- Provider sync intervals and HTTP settings
+- Cache TTL values (listing, menu)
 
 **Never hardcode these values in business logic**. Always use `settings.value.<propertyName>` to access them.
 
@@ -56,10 +56,10 @@ Example:
 import settings from '../modules/settings';
 
 // Good
-const limit = options?.limit || settings.value.paginationDefaultGames;
+const limit = options?.limit || settings.value.paginationDefaultRestaurants;
 
 // Bad
-const limit = options?.limit || 24;  // Hardcoded constant
+const limit = options?.limit || 30;  // Hardcoded constant
 ```
 
 ## Testing Approach
@@ -113,26 +113,25 @@ E2E tests follow the same data-driven and keyword-driven patterns. Key points:
 **Example:**
 ```typescript
 // Import data and keywords
-import { surveyCreationData } from '../data/e2e/surveyData';
+import { restaurantCreationData } from '../data/e2e/restaurantData';
 import { loginUser } from '../keywords/e2e/authKeywords';
-import { createSurvey } from '../keywords/e2e/entityKeywords';
+import { createRestaurant } from '../keywords/e2e/restaurantKeywords';
 
 // Data-driven test
-for (const data of surveyCreationData) {
+for (const data of restaurantCreationData) {
     test(data.description, async ({ page }) => {
         await loginUser(page, testCredentials.username, testCredentials.password);
         await page.goto(data.createUrl);
-        await createSurvey(page, data.title, data.description, data.submitButtonText);
+        await createRestaurant(page, data.name, data.address);
         await page.waitForURL((url) => data.expectedRedirectPattern.test(url.pathname));
     });
 }
 ```
 
 **E2E Test Organization:**
-- `auth.test.ts` - Authentication and session management
-- `survey.test.ts` / `packing.test.ts` / `activity.test.ts` / `drivers.test.ts` - Entity management
-- `navigation.test.ts` - UI navigation and accessibility
-- `error-handling.test.ts` - Frontend validation and error scenarios
+- `main-workflow.spec.ts` - Register → Restaurant → Menu → Override → Suggest
+- `import-workflow.spec.ts` - Import → Preview → Apply → Suggest
+- `button-functionality.spec.ts` - UI button interactions
 
 **Important E2E Guidelines:**
 - Use Playwright test framework
@@ -145,282 +144,58 @@ for (const data of surveyCreationData) {
 
 For detailed E2E testing patterns and examples, see [TESTING.md](../TESTING.md) and [tests/e2e/README.md](../tests/e2e/README.md).
 
-## Games Module Architecture
+## Provider Integration Architecture
 
-The Games module supports managing game titles, releases, and copies with external provider integration.
+DeliveryRoulette integrates with delivery platforms (currently Lieferando) to sync restaurant and menu data.
 
-### Sync Architecture (CRITICAL)
+### Provider Connector Pattern
 
-The sync pipeline is **modular and unified**. All connectors (fetch-style and push-style) use the SAME processing logic.
-
-**Key File Structure:**
 ```
-src/modules/games/
-├── sync/
-│   ├── GameProcessor.ts       # SINGLE implementation for game processing
-│   ├── MetadataPipeline.ts    # THE UNIFIED IMPLEMENTATION - composable pipeline with modular steps:
-│   │                          #   - Core Steps: searchProvider(), fetchFromProvider(), enrichPlayerCounts(), applyToTitle()
-│   │                          #   - High-level: processGame(), processGameBatch(), searchOptions()
-│   │                          #   - Both manual and batch operations use the SAME core steps
-│   └── MetadataFetcher.ts     # Backwards-compatible wrapper around MetadataPipeline
-├── GameSyncService.ts         # Orchestration and scheduling
-├── GameNameUtils.ts           # Edition extraction and title normalization
-├── connectors/                # External connector implementations
-└── metadata/                  # Metadata provider implementations (providers only, no services)
-
-src/controller/games/          # Modular controller structure
-├── gameTitleController.ts     # Title operations and metadata (uses MetadataFetcher)
-├── gameReleaseController.ts   # Release operations
-├── gameCopyController.ts      # Copy/item operations
-├── gameAccountController.ts   # External account and sync operations
-├── gameMappingController.ts   # Mapping queue and metadata management operations
-├── gamePlatformController.ts  # Platform operations
-├── gameJobsController.ts      # Job listing operations
-├── helpers.ts                 # Shared utility functions
-└── index.ts                   # Module exports
+src/providers/
+├── ProviderKey.ts             # Enum of provider identifiers
+├── DeliveryProviderConnector.ts  # Base class for connectors
+├── ImportConnector.ts         # Base for import-capable providers
+├── ConnectorRegistry.ts       # Service locator for registered connectors
+├── ConnectorBootstrap.ts      # Initialize all provider connectors
+├── ProviderTypes.ts           # Type definitions for connectors
+└── lieferando/                # Lieferando implementation
+    ├── LieferandoConnector.ts # Connector (fetch restaurants, menus, validate URLs)
+    ├── lieferandoParsing.ts   # HTML parsing (JSON-LD, preloaded state, heuristic fallback)
+    └── lieferandoTypes.ts     # Lieferando-specific types
 ```
 
-**Critical Design Rules:**
-1. BOTH fetch-style and push-style connectors use `processGameBatch()` from `GameProcessor.ts` - NO duplicate implementations
-2. ALL metadata operations use the unified `MetadataPipeline.ts` - ONE implementation with modular, composable steps
-3. Edition extraction is ALWAYS performed in `createGameFromData()`
-4. DRY principle enforced: batch processing is just multiple single-game operations with shared state
+**Plugin isolation rules:**
+1. Connectors must NOT import app internals (services, controllers, database)
+2. App code must NOT reference specific connectors by name — use `ConnectorRegistry`
+3. Connectors receive data via method parameters, return results via interfaces
+4. Each connector folder could be extracted to a separate package without breaking the app
 
-**Metadata Management Features:**
-The `/games/mappings` route provides a comprehensive metadata management interface with four tabs:
-1. **Similar Names**: Finds game titles with similar normalized names (potential merge candidates)
-2. **Missing Metadata**: Games without description AND cover image
-3. **Invalid Players**: Multiplayer games with unknown player counts
-4. **Pending Mappings**: Unresolved external game imports from connectors
+### Sync Pipeline
 
-Each issue type supports:
-- Individual dismissal (per-title)
-- Global reset of dismissals
-- Quick actions (merge, edit, fetch metadata)
-
-Dismissal state is tracked via boolean columns on GameTitle entity:
-- `dismissedSimilar`, `dismissedMissingMetadata`, `dismissedInvalidPlayers`
-
-**Metadata Pipeline Architecture:**
 ```
-                    ┌─────────────────────────────────────────────┐
-                    │           MetadataPipeline                  │
-                    │                                             │
-                    │   CORE STEPS (reusable building blocks):    │
-                    │   ├── searchProvider()                      │
-                    │   ├── fetchFromProvider()                   │
-                    │   ├── enrichPlayerCounts()                  │
-                    │   └── applyToTitle()                        │
-                    │                                             │
-                    │   HIGH-LEVEL OPERATIONS (compose steps):    │
-                    │   ├── processGame()      ← Manual sync      │
-                    │   ├── processGameBatch() ← Batch sync       │
-                    │   └── searchOptions()    ← Search UI        │
-                    └─────────────────────────────────────────────┘
-                                      ↑
-                    ┌─────────────────┴─────────────────┐
-                    │                                   │
-             Manual Operations                   Sync Operations
-         (gameTitleController)                (GameSyncService)
-                    │                                   │
-                    └───── SAME core steps ─────────────┘
+ProviderSyncService → ConnectorRegistry.get(providerKey)
+    → connector.listRestaurants(query)     # Discover restaurants
+    → restaurantService.upsert()           # Persist restaurant data
+    → connector.fetchMenu(externalId)      # Fetch menu HTML
+    → menuService.upsert()                 # Persist menu categories/items
+    → dietInferenceService.compute()       # Auto-detect diet suitability
+    → syncAlertService.check()             # Generate alerts for stale data
 ```
-
-**Processing Flow:**
-```
-Connector (fetch/push) → processGameBatch() → safeCreateGameFromData()
-                                                      │
-                              ├── extractEdition(game.name)   ← ALWAYS runs
-                              ├── getOrCreateGameTitle()      ← Uses baseName
-                              └── getOrCreateGameRelease()    ← Uses edition
-```
-
-### Connectors
-
-Connectors sync game libraries from external providers like Steam or Playnite.
-
-**Architecture:**
-```
-src/modules/games/connectors/
-├── ConnectorInterface.ts      # Generic interfaces
-├── ConnectorRegistry.ts       # Connector registration
-├── SteamConnector.ts          # Steam (fetch-style)
-└── playnite/                  # Playnite (push-style aggregator)
-    ├── PlayniteConnector.ts
-    ├── PlayniteImportService.ts
-    └── PlayniteProviders.ts
-```
-
-**Connector Types:**
-- **Fetch-style** (`syncStyle: 'fetch'`): Connector pulls data from external API (e.g., Steam)
-- **Push-style** (`syncStyle: 'push'`): External agent pushes data via unified API (e.g., Playnite)
-
-**Aggregator Pattern:**
-Aggregators like Playnite import games from multiple sources while preserving original provider info:
-- `aggregatorProviderId`: The aggregator (e.g., "playnite")
-- `originalProviderName`: The actual source (e.g., "Steam", "Epic")
-- `originalProviderGameId`: The game ID on the original provider
-
-**Push Import Flow:**
-```
-Device Token → requirePushConnectorAuth → processPushImport()
-                                              │
-                    ├── connector.preprocessImport()   ← Connector-specific validation
-                    ├── processGameBatch()             ← UNIFIED sync pipeline
-                    └── softRemoveUnseenEntries()      ← Shared soft-removal
-```
-
-### Connector Metadata Extraction
-
-Connectors extract as much metadata as possible from their sources:
-
-**Steam Connector:**
-- `name`, `playtimeMinutes`, `lastPlayedAt` from GetOwnedGames API
-- `coverImageUrl` generated from Steam CDN URL
-- `storeUrl` generated from app ID
-- Multiplayer info NOT available from GetOwnedGames API (requires metadata enrichment)
-
-**Playnite Connector:**
-- Basic fields: `name`, `playtimeSeconds`, `lastActivity`, `installed`
-- From `raw` data: `description`, `genres`, `releaseDate`, `developer`, `publisher`
-- Multiplayer support from `features`/`tags`/`categories`:
-  - Online: "online multiplayer", "online co-op", "mmo", etc.
-  - Local: "local multiplayer", "split screen", "couch co-op", etc.
-- Store URLs extracted from `raw.links` array (5-pass algorithm)
-- Cover images: Playnite uses local paths, so metadata providers fill this
-
-### Platform Normalization
-
-Platforms are normalized to prevent duplicates (e.g., "PS5" → "PlayStation 5"):
-- `normalizePlatformName()` in `PlatformService.ts` (sync fallback)
-- `normalizePlatformNameWithDb()` in `PlatformService.ts` (async, uses database aliases)
-- User-defined aliases stored in Platform entity `aliases` column (comma-separated)
-- Unknown platforms are auto-created
-
-### Game Title Merging
-
-Game titles with different editions merge to the same title with different releases:
-- `extractEdition()` in `GameNameUtils.ts` extracts edition from game name
-- `normalizeGameTitle()` handles trademark symbols (™®©), punctuation variants
-- `getOrCreateGameTitle()` finds existing titles by normalized name
-- Example: "The Sims 4", "The Sims™ 4", "The Sims 4 Premium Edition" → same title
-
-### Smart Sync
-
-Syncs are optimized to skip unnecessary processing:
-- Pre-fetch existing items before processing
-- Games with existing copies only update playtime/status (skip metadata)
-- Metadata enrichment only for NEW games
-- Reduces API calls and sync duration
-
-### Metadata Provider Architecture
-
-Metadata providers are standardized with centralized rate limiting:
-- Providers implement `getCapabilities()` and `getRateLimitConfig()`
-- `MetadataFetcher` class in `sync/MetadataFetcher.ts` handles rate limiting
-- Two metadata runs: general info from primary provider, player counts from providers with `hasAccuratePlayerCounts` capability
-- Provider fallback uses capabilities (never hardcoded provider references)
-
-### Player Count Handling
-
-Player counts are handled with explicit "known" vs "unknown" distinction:
-
-**Design Principles:**
-1. **Singleplayer games**: Player count is implied as 1 (no modes enabled = 1 player)
-2. **Multiplayer games**: ALL counts (including overall) can be null = "unknown"
-3. **Never set defaults**: Do NOT set arbitrary defaults that would obscure unknown data
-4. **Invalid data = unknown**: Values ≤0, NaN, or Infinity are treated as "unknown" (null)
-5. **Preserve provider data**: We never change values we get from providers; if invalid, we just don't apply them
-
-**Data Model:**
-- `overallMinPlayers` / `overallMaxPlayers`: **NULLABLE**
-  - `null` = player count unknown
-  - For singleplayer-only games (no modes), null = implied 1 player
-  - For multiplayer games, null = we don't know (UI shows warning)
-- `onlineMaxPlayers` / `couchMaxPlayers` / `lanMaxPlayers` / `physicalMaxPlayers`: **NULLABLE**
-  - `null` = player count unknown for this mode
-  - Valid number = known player count from metadata or user
-
-**UI Behavior:**
-- Overall badge: shows "? players" with warning for multiplayer games with null count
-- Singleplayer-only games (no modes): shows "1 player" even if overall is null
-- Mode badges (Online/Local): show warning icon (⚠️) when mode-specific count is null
-- Details section shows "Unknown (click Fetch Metadata to update)" text
-- Edit form allows leaving player counts empty (= unknown)
-
-**Key Code Locations:**
-- `GameProcessor.ts`: `createGameFromData()` preserves null for unknown counts
-- `MetadataPipeline.ts`: `applyPlayerInfoUpdates()` only applies valid values
-- `GameValidationService.ts`: Allows null for all player counts
-- `GameTitleService.ts`: Interface allows nullable overall counts
-
-### Plugin Isolation Rules (CRITICAL)
-
-**Connectors and Metadata Providers are treated as external plugins.**
-
-#### Rule 1: No direct references to connectors/providers from app code
-- The app (GameSyncService, controllers, etc.) must ONLY use generic interfaces
-- **NEVER** reference a specific connector or provider by name/ID outside their respective folder
-- Use `ConnectorRegistry` and `MetadataProviderRegistry` for all lookups
-- Use capabilities (`getCapabilities()`) to select providers, not hardcoded IDs
-
-**Forbidden in app code:**
-```typescript
-// BAD - hardcoded provider reference
-const igdb = metadataProviderRegistry.getById('igdb');
-
-// GOOD - use capability-based lookup
-const providers = metadataProviderRegistry.getAllByCapability('hasAccuratePlayerCounts');
-```
-
-#### Rule 2: No app internal references from connectors/providers
-- Connectors and providers should ONLY call external APIs (Steam API, IGDB, etc.)
-- **NEVER** import or call app internals (database services, controllers, other modules)
-- They receive data via method parameters and return results via defined interfaces
-- They are stateless external adapters
-
-**Forbidden in connector/provider code:**
-```typescript
-// BAD - importing app internals
-import * as gameTitleService from '../../database/services/GameTitleService';
-
-// GOOD - return data via interface, let app handle persistence
-return { games: [...], success: true };
-```
-
-#### Rule 3: Folder isolation
-- All Playnite-specific code: `src/modules/games/connectors/playnite/`
-- All Steam connector code: `src/modules/games/connectors/SteamConnector.ts`
-- All metadata providers: `src/modules/games/metadata/*.ts`
-- These folders could be moved to separate packages without breaking the app
-
-### Game Suggestion Feature
-
-Random game suggestion helps users decide what to play:
-- **Route**: `/games/suggest` - Wizard-style interface for quick game selection
-- **Service**: `GameSuggestionService.ts` - Filtering and random selection logic
-- **Controller**: `gameSuggestionController.ts` - Form data parsing and result formatting
-
-**Filtering Criteria:**
-- Player count (e.g., 1, 2, 4 players)
-- Platforms (whitelist/blacklist)
-- Game modes (online/local/physical - require/exclude/any)
-- Game types (video game, board game, card game, etc.)
-
-**Implementation Notes:**
-- Uses Fisher-Yates shuffle for unbiased randomization
-- Query builder filters applied at database level for performance
-- Platform filters applied client-side (requires checking releases)
-- Touch-friendly UI with large buttons for common options
-- Advanced options in collapsible section
 
 ### Key Entities
-- **GameTitle**: A game's core info (name, description, player counts)
-- **GameRelease**: Platform-specific release (PC, PS5, etc. with edition/region)
-- **Item** (with `type=GAME_DIGITAL` or `GAME_PHYSICAL`): Game copies
-- **ExternalAccount**: Linked external accounts (Steam, Playnite, etc.)
-- **ConnectorDevice**: Devices for push-style connectors
-- **SyncJob**: Tracks sync history (pending, in_progress, completed, failed)
-- **Platform**: Game platforms with user-defined aliases for normalization
+
+- **Restaurant**: Name, address, city, active status
+- **MenuCategory / MenuItem**: Menu structure with prices
+- **DietTag**: Diet types (vegetarian, vegan, gluten-free, etc.)
+- **DietInferenceResult**: Auto-detected diet suitability per restaurant
+- **DietManualOverride**: User corrections to diet detection
+- **UserDietPreference**: Per-user diet tag selections
+- **UserRestaurantPreference**: Favorites and exclusions
+- **SuggestionHistory**: Past random suggestions
+- **RestaurantProviderRef**: Link between restaurant and external provider
+- **ProviderCredential**: Encrypted API credentials
+- **ProviderSourceConfig**: Provider sync source configuration
+- **ProviderFetchCache**: Cached provider HTTP responses
+- **SyncJob / SyncAlert**: Sync tracking and alert management
 
 ## Additional Resources

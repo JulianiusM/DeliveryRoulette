@@ -27,6 +27,10 @@ Welcome to the DeliveryRoulette documentation. This directory contains comprehen
 #### Operations
 - **[OPERATIONS.md](OPERATIONS.md)** - Health checks, logging, sync, and backups
 
+#### Review
+- **[review/REVIEW_REPORT.md](review/REVIEW_REPORT.md)** - Full repository review report (February 2026)
+- **[review/ACTION_ITEMS.md](review/ACTION_ITEMS.md)** - Prioritized action items and follow-up issues
+
 ### 🤖 For AI Agents
 
 - **[../AGENTS.md](../AGENTS.md)** - General AI agent guide
@@ -50,6 +54,7 @@ Welcome to the DeliveryRoulette documentation. This directory contains comprehen
 - **Run in production** → [OPERATIONS.md](OPERATIONS.md)
 - **Use as AI agent** → [../AGENTS.md](../AGENTS.md)
 - **Learn to use the app** → [user-guide/README.md](user-guide/README.md)
+- **Read the review report** → [review/REVIEW_REPORT.md](review/REVIEW_REPORT.md)
 
 ## Documentation Standards
 

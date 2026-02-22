@@ -1,278 +1,314 @@
 # DeliveryRoulette User Guide
 
-Welcome to DeliveryRoulette! This guide will help you get started with cataloging your items, organizing locations, scanning barcodes, and tracking loans.
+Welcome to DeliveryRoulette! This app helps your team decide where to order food by managing restaurants, tracking dietary preferences, syncing menus from delivery providers, and randomly suggesting a restaurant that works for everyone.
 
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
 2. [Dashboard](#dashboard)
-3. [Managing Items](#managing-items)
-4. [Organizing Locations](#organizing-locations)
-5. [Barcode Scanning](#barcode-scanning)
-6. [Lending & Borrowing](#lending--borrowing)
-7. [Games Module](GAMES.md) - **NEW!** Comprehensive guide for managing your game collection
-8. [Tips & Best Practices](#tips--best-practices)
+3. [Managing Restaurants](#managing-restaurants)
+4. [Menus & Diet Detection](#menus--diet-detection)
+5. [Diet Preferences](#diet-preferences)
+6. [Random Restaurant Suggestion](#random-restaurant-suggestion)
+7. [Provider Integration (Lieferando)](#provider-integration-lieferando)
+8. [Importing Restaurants](#importing-restaurants)
+9. [Sync & Alerts](#sync--alerts)
+10. [Common Issues & Troubleshooting](#common-issues--troubleshooting)
+11. [Tips & Best Practices](#tips--best-practices)
 
 ---
 
 ## Getting Started
 
+### What DeliveryRoulette Does
+
+- **Manage restaurants** your team orders from (name, address, cuisine, status)
+- **Track menus** with categories, items, and prices
+- **Detect dietary suitability** automatically from menu items (vegetarian, vegan, gluten-free, etc.)
+- **Override diet detection** when the heuristics are wrong
+- **Suggest a random restaurant** that matches your group's dietary needs and cuisine preferences
+- **Sync restaurants** from delivery providers like Lieferando
+
+### What It Does *Not* Guarantee
+
+- Diet detection is **heuristic-based** (keyword matching). It may miss items or produce false positives. Always verify with the restaurant directly for serious dietary restrictions.
+- Provider sync depends on external HTML structure. If Lieferando changes their site, sync may stop working until the parser is updated.
+
 ### Creating an Account
 
 1. Navigate to the application and click **Create account**
 2. Fill in your details (username, email, password)
-3. Verify your email address
-4. Log in to access your inventory
+3. Verify your email address if email verification is enabled
+4. Log in to access the application
 
 ### First Steps
 
 After logging in, we recommend:
-1. Create a few **locations** to organize your space (e.g., "Living Room", "Garage", "Office")
-2. Add your first **items** with descriptions and photos
-3. Try the **barcode scanner** to quickly add items with barcodes
+1. **Add a restaurant** you already order from
+2. **Add menu categories and items** for that restaurant
+3. **Set your diet preferences** in Settings
+4. **Try the suggestion engine** to get a random restaurant pick
 
 ---
 
 ## Dashboard
 
-Your dashboard provides a quick overview of your inventory:
+Your dashboard provides a quick overview:
 
-- **Item Count**: Total number of items in your inventory
-- **Location Count**: Number of locations you've created
-- **Active Loans**: Items currently lent out or borrowed
-- **Overdue Loans**: Loans past their due date (highlighted in red)
-
-Quick actions are available to jump directly to:
-- Manage Items
-- Scan Barcode
-- View Locations
-- Lending Dashboard
+- **Restaurant Count**: Total restaurants in the system
+- **Recent Sync Status**: When providers were last synced
+- **Quick Actions**: Jump to restaurants, suggestions, import, or sync
 
 ---
 
-## Managing Items
+## Managing Restaurants
 
-### Adding Items
+### Viewing Restaurants
 
-1. Go to **Items** from the navigation menu
-2. Fill out the "Add New Item" form:
-   - **Name** (required): What is this item called?
-   - **Type**: Book, Tool, Game, Electronics, Clothing, Collectible, or Other
-   - **Location**: Where is it stored?
-   - **Condition**: New, Like New, Good, Fair, or Poor
-   - **Serial Number**: For electronics or valuable items
-   - **Tags**: Comma-separated keywords for filtering
-   - **Description**: Additional notes
-3. Click **Create Item**
+Go to **Restaurants** from the navigation menu. You'll see a list with:
+- Restaurant name and city
+- Active/inactive status
+- Search by name or city
+- Filter by status
 
-### Editing Items
+### Adding a Restaurant
 
-1. Click on an item to view its details
-2. Click the **Edit** button to expand the edit form
-3. Make your changes and click **Save Changes**
+1. Click **Add Restaurant**
+2. Fill in the form:
+   - **Name** (required)
+   - **Address Line 1** and **Address Line 2**
+   - **City**, **Postal Code**, **Country**
+   - **Active** toggle (inactive restaurants are excluded from suggestions)
+3. Click **Create Restaurant**
 
-### Moving Items
+### Restaurant Detail Page
 
-1. From the item detail page, find the "Move Item" card
-2. Select the new location from the dropdown
-3. Optionally add a note explaining the move
-4. Click **Move**
+Click a restaurant to see its full details:
 
-All movements are recorded in the Movement History.
+- **Address & Status** — basic information
+- **User Preferences**:
+  - ⭐ **Favorite** — mark restaurants you love
+  - 🚫 **Do Not Suggest** — exclude from random suggestions
+- **Provider References** — links to delivery platforms (Lieferando, etc.)
+- **Menu** — categories and items with prices
+- **Diet Suitability** — which diets this restaurant supports, based on menu analysis
 
-### Deleting Items
+### Editing and Deleting
 
-1. From the item detail page, scroll to the "Danger Zone"
-2. Click **Delete Item**
-3. Confirm the deletion in the modal
-
-**Warning**: Deleting an item also removes all associated barcodes and movement history.
-
-### Filtering Items
-
-Use the filter bar at the top of the items list to:
-- **Search** by name
-- **Filter by type** (Book, Tool, etc.)
-- **Filter by location** (including "Unassigned")
-
-Click **Clear** to reset all filters.
+- Click **Edit** on a restaurant to modify its details
+- Delete from the detail page (requires confirmation)
 
 ---
 
-## Organizing Locations
+## Menus & Diet Detection
 
-### Location Hierarchy
+### Adding Menu Items
 
-Locations can be nested to reflect your physical organization:
+1. From a restaurant's detail page, click **Add Category**
+2. Enter a category name (e.g., "Salads", "Pasta", "Desserts")
+3. Within a category, click **Add Item** to add menu items:
+   - **Name** (required): e.g., "Margherita Pizza"
+   - **Description**: Ingredients or notes
+   - **Price**: Numeric value
+   - **Currency**: EUR, USD, etc.
 
-```
-Home
-├── Living Room
-│   ├── Bookshelf
-│   └── TV Stand
-├── Garage
-│   ├── Shelf A
-│   │   ├── Box 1
-│   │   └── Box 2
-│   └── Workbench
-└── Office
-    └── Desk Drawer
-```
+### How Diet Detection Works (Heuristics)
 
-### Creating Locations
+DeliveryRoulette automatically analyzes menu items to infer which diets a restaurant supports:
 
-1. Go to **Locations** from the navigation menu
-2. Fill out the "Add New Location" form:
-   - **Name** (required): e.g., "Garage Shelf A"
-   - **Kind**: Room, Shelf, Box, Bin, Drawer, Cabinet, or Other
-   - **Parent Location**: Select a parent to create nested locations
-   - **QR Code**: Optional unique code for scanning
-3. Click **Create Location**
+1. **Keyword matching** — Menu item names and descriptions are scanned for diet-related keywords
+   - *Vegetarian*: "vegetarisch", "veggie", "ohne Fleisch", etc.
+   - *Vegan*: "vegan", "pflanzlich", etc.
+   - *Gluten-free*: "glutenfrei", "gluten-free", etc.
+2. **Confidence scoring** — Each match produces a confidence score
+3. **Aggregation** — If enough items match a diet tag, the restaurant is marked as supporting that diet
 
-### Location QR Codes
+**Important:** This is a best-effort heuristic. It works well for clearly labeled menus but may miss items without diet keywords or produce false positives for ambiguous names.
 
-Assign QR codes to your locations for quick navigation:
-1. Use a consistent prefix like `LOC:` (e.g., `LOC:garage-shelf-1`)
-2. Print labels with these codes
-3. Scan them to jump directly to that location
+### Manual Diet Overrides
 
-### Editing Locations
+When the automatic detection is wrong, you can override it:
 
-1. Click on a location to view its details
-2. Click **Edit** to expand the edit form
-3. Make your changes and click **Save Changes**
+1. Go to the restaurant's detail page
+2. Find the **Diet Suitability** section
+3. Click a diet tag to toggle its override:
+   - **Force Yes** — restaurant definitely supports this diet
+   - **Force No** — restaurant does not support this diet
+   - **Auto** — revert to heuristic detection
 
-### Deleting Locations
-
-1. From the location detail page, scroll to the "Danger Zone"
-2. Click **Delete Location**
-3. Confirm the deletion
-
-**Note**: Items at this location will become "Unassigned". Child locations will move to the top level.
+Overrides take precedence over automatic inference and persist across menu updates.
 
 ---
 
-## Barcode Scanning
+## Diet Preferences
 
-### Using the Camera Scanner
+### Setting Your Preferences
 
-1. Go to **Scan** from the navigation menu
-2. Click **Start Scanning**
-3. Allow camera access when prompted
-4. Point your camera at a barcode
-5. The scanner will automatically detect and look up the code
+1. Go to **Settings** from your user menu
+2. In the **Diet Preferences** section, select the diet tags that apply to you:
+   - Vegetarian, Vegan, Pescatarian, Gluten-Free, Lactose-Free, Halal, Kosher, etc.
+3. Save your preferences
 
-### Supported Barcode Formats
-
-- **EAN-13** / **EAN-8**: Most retail products
-- **UPC-A** / **UPC-E**: US retail products
-- **QR Code**: Quick Response codes (great for custom labels)
-- **Code 128**: Logistics and shipping
-
-### Manual Entry
-
-If camera scanning doesn't work:
-1. Enter the barcode number in the "Manual Entry" field
-2. Click **Lookup**
-
-### Scan Results
-
-When you scan a code, one of three things happens:
-
-1. **Item Found**: The code is already mapped to one of your items. Click to view it.
-2. **Location Found**: The code matches a location QR code. Click to navigate there.
-3. **Unknown Code**: The code isn't in your database. Create a new item and map the barcode to it.
-
-### Mapping Barcodes to Items
-
-1. Create or find the item you want to map
-2. Go to the item detail page
-3. In the "Barcodes" section, enter the code
-4. Click **Map**
-
-One item can have multiple barcodes (e.g., a book might have both ISBN-10 and ISBN-13).
+Your preferences are used when generating suggestions — only restaurants that support your diets will be suggested.
 
 ---
 
-## Lending & Borrowing
+## Random Restaurant Suggestion
 
-### Creating a Loan
+### Getting a Suggestion
 
-1. Go to **Lending** from the navigation menu
-2. Click **New Loan** to expand the form
-3. Fill out the details:
-   - **Item**: Which item are you lending/borrowing?
-   - **Type**: "Lending out" (you give) or "Borrowing" (you receive)
-   - **Condition at handoff**: Document the item's condition
-   - **Counterparty Name**: Who are you lending to / borrowing from?
-   - **Email/Phone**: Optional contact info
-   - **Due Date**: When should it be returned?
-   - **Notes**: Any additional information
-4. Click **Create Loan**
+1. Go to **Suggest** from the navigation menu
+2. Click the **Suggest!** button
+3. The app picks a random restaurant from your eligible pool
 
-### Returning a Loan
+### How Suggestions Work
 
-1. Find the loan in the "Active" tab
-2. Click the **Return** button
-3. The loan moves to the "History" tab with the return date recorded
+The suggestion engine filters restaurants by:
+1. **Active status** — only active restaurants are considered
+2. **Diet compatibility** — restaurants must support diets of all selected users/tags
+3. **Cuisine filters** — optional include/exclude lists
+4. **Favorites and exclusions** — respects "Do Not Suggest" preferences
 
-### Loan History
+### Advanced Filters
 
-The "History" tab shows all completed loans with:
-- What was lent/borrowed
-- Who it was with
-- Condition at both handoff and return
-- Date range
+Expand the **Advanced Filters** section to:
+- **Diet Requirements** — check specific diet tags for group dining (e.g., if one person is vegan, check "Vegan")
+- **Cuisine Include** — only suggest restaurants with these cuisines
+- **Cuisine Exclude** — never suggest restaurants with these cuisines
 
-This is useful for:
-- Tracking how often items are borrowed
-- Checking condition changes over time
-- Auditing your lending activity
+### Rerolling
 
-### Overdue Loans
+If you don't like the suggestion, click **Suggest!** again for a new pick. The candidate count shows how many restaurants matched your filters.
 
-Loans past their due date are highlighted in red. The dashboard shows your overdue count.
+---
+
+## Provider Integration (Lieferando)
+
+### What Providers Do
+
+Provider connectors sync restaurant data from external delivery platforms. Currently supported:
+- **Lieferando** (lieferando.de) — Germany's delivery platform
+
+### Syncing Restaurants from a Listing
+
+1. Go to **Providers** from the navigation menu
+2. For the Lieferando provider, paste a **listing URL** (a Lieferando page showing restaurants in your area)
+3. Click **Sync** to discover and import all restaurants on that page
+
+### Importing a Single Restaurant by URL
+
+1. On the Providers page, find the **Import from URL** section
+2. Paste a Lieferando **restaurant menu URL** (e.g., `https://www.lieferando.de/en/menu/restaurant-name`)
+3. Click **Import** to fetch that restaurant's details and menu
+
+### What Gets Imported
+
+- Restaurant name and address
+- Menu categories and items with prices
+- Provider reference (link back to Lieferando page)
+- Diet suitability is automatically inferred from the imported menu
+
+---
+
+## Importing Restaurants
+
+### Bulk Import (JSON/CSV)
+
+For importing many restaurants at once:
+
+1. Go to **Import** from the navigation menu
+2. Upload a **JSON** or **CSV** file with restaurant data
+3. **Preview** the import:
+   - Badges show which restaurants are **New**, **Updated**, or **Unchanged**
+   - Review field changes (old vs. new values)
+   - Check menu categories and item counts
+4. Click **Apply** to execute the import
+5. Review the **Result** page for per-restaurant success/failure status
+
+### Import Format
+
+See [docs/import-schema.md](../import-schema.md) for the complete JSON/CSV format specification.
+
+---
+
+## Sync & Alerts
+
+### Sync Jobs
+
+Provider sync runs either manually or on a schedule (configurable). Each sync creates a **Sync Job** record tracking:
+- Start/end time
+- Status (in progress, completed, failed)
+- Per-restaurant results
+
+### Sync Alerts
+
+The system generates alerts when:
+- **Restaurant gone** — A previously synced restaurant is no longer returned by the provider
+- **Diet override stale** — A menu change may have invalidated a manual diet override
+
+View and manage alerts from the **Sync Alerts** page.
+
+---
+
+## Common Issues & Troubleshooting
+
+### "No restaurants found"
+
+- **Check filters**: Your diet/cuisine filters may be too strict. Try removing some filters.
+- **Check active status**: Inactive restaurants are excluded. Go to Restaurants and check the status.
+- **Check diet preferences**: If your diet tags don't match any restaurant, no results will appear.
+
+### "Menu import failed"
+
+- **URL format**: Ensure you're pasting a full Lieferando restaurant URL (e.g., `https://www.lieferando.de/en/menu/restaurant-name`)
+- **Site changes**: If Lieferando changed their HTML structure, the parser may need updating. Check sync alert details.
+- **Network issues**: The server needs internet access to fetch provider pages.
+
+### "Diet filter is too strict"
+
+- Try selecting fewer diet requirements in the suggestion filter
+- Check if restaurants have manual diet overrides that might be incorrect
+- Re-run menu sync to update diet inference with latest menu data
+
+### "Suggestions feel repetitive"
+
+- Add more restaurants to increase the pool
+- Sync from Lieferando to discover new restaurants in your area
+- Check if many restaurants are set to inactive or "Do Not Suggest"
+- Expand your cuisine filters
 
 ---
 
 ## Tips & Best Practices
 
-### Organizing Your Inventory
+### Getting Good Suggestions
 
-1. **Start with locations**: Set up your location hierarchy first
-2. **Be consistent with naming**: Use a standard format (e.g., "Garage - Shelf A - Box 1")
-3. **Use tags effectively**: Add tags like "electronics", "fragile", "valuable" for easy filtering
-4. **Document condition**: Record condition when adding items and during loans
+1. **Keep menus updated**: Re-sync from providers periodically
+2. **Set diet preferences accurately**: The suggestion engine relies on these
+3. **Use manual overrides**: Fix incorrect diet detection rather than ignoring it
+4. **Mark favorites and exclusions**: Fine-tune your pool
 
-### Using Barcodes Effectively
+### For Teams
 
-1. **Scan retail barcodes**: Books, games, and products already have barcodes
-2. **Create custom QR codes**: Use free QR generators for your own labels
-3. **Label locations**: Print QR code labels for bins and shelves
-4. **Map multiple codes**: One item can have multiple barcodes
-
-### Tracking Loans
-
-1. **Always set a due date**: Makes it easy to track overdue items
-2. **Document condition**: Take photos and note condition at handoff
-3. **Get contact info**: Email or phone for sending reminders
-4. **Check the dashboard**: Keep an eye on your overdue count
+1. **Everyone should set their diet preferences**: The suggestion engine considers all selected diets
+2. **Use cuisine filters for variety**: Exclude recently-ordered cuisines
+3. **Check the candidate count**: If it's low, relax some filters
 
 ### Security
 
 1. **Use a strong password**: Combine letters, numbers, and symbols
 2. **Don't share accounts**: Each user should have their own account
-3. **Log out on shared devices**: Keep your inventory private
+3. **Log out on shared devices**: Keep your preferences private
 
 ---
 
 ## Need Help?
 
-Click the **Help** link in the navigation menu to access the full documentation.
+Click the **Help** link in the navigation menu to access documentation.
 
 If you encounter issues, check:
-1. The Help documentation
-2. The README file in the repository
+1. The in-app Help pages
+2. The [project README](../../README.md)
 3. Open an issue on GitHub
 
-Happy organizing! 📦
+Happy ordering! 🍕

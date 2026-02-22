@@ -31,7 +31,6 @@ The project uses **data-driven** and **keyword-driven** testing approaches.
 
 - **Test data** is separated into `tests/data/` directory organized by test type
 - **Test keywords** (reusable actions) are in `tests/keywords/` directory
-- **Test builders** for creating test objects are in `tests/data/builders/`
 
 ## Test Organization
 
@@ -45,9 +44,8 @@ The project uses **data-driven** and **keyword-driven** testing approaches.
 
 - **Use data-driven tests**: Externalize test data into data files, use `test.each()` for parameterized tests
 - **Use test keywords**: Leverage reusable keywords from `tests/keywords/` for common operations
-- **Use builders**: Use test data builders from `tests/data/builders/` for creating test objects
 - **Separate concerns**: Test data in `tests/data/`, test logic in test files, test utilities in keywords
-- **Mock wisely**: Mock external dependencies using existing mock utilities in `tests/util/`
+- **Mock wisely**: Mock external dependencies using existing mock utilities in `tests/mocks/`
 - **Database tests**: Must use the MariaDB test datasource mock
 - **E2E tests**: Must use the `.env.e2e` configuration
 

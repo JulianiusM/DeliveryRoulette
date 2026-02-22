@@ -4,7 +4,7 @@ This document provides guidance for AI coding agents working on the DeliveryRoul
 
 ## Project Overview
 
-DeliveryRoulette is a TypeScript-based item cataloging and tracking application with comprehensive testing and documentation. The project uses:
+DeliveryRoulette is a TypeScript-based restaurant management and delivery suggestion application with comprehensive testing and documentation. The project uses:
 
 - **Backend**: Express.js + TypeORM + MariaDB
 - **Frontend**: Pug templates + Bootstrap (dark theme) + Vanilla TypeScript
@@ -428,7 +428,7 @@ DeliveryRoulette has comprehensive, well-organized documentation:
 
 ### For End Users
 - **[docs/user-guide/](docs/user-guide/)** - Complete user documentation
-  - Getting started, dashboard, items, locations, loans, scanning
+  - Getting started, restaurants, menus, diet preferences, suggestions, provider sync, importing
 
 ### For AI Agents
 - **This file** - General AI agent guidance
