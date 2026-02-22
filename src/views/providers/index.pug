@@ -23,6 +23,7 @@ block content
                             | Discovery – Listing URL
                         p.text-white-50 Paste a delivery area listing URL to discover restaurants.
                         form(method="POST" action=`/providers/${provider.providerKey}/sync`)
+                            +csrf
                             .mb-3
                                 label.form-label(for=`listingUrl-${provider.providerKey}`)= provider.capabilities.listingUrlLabel || 'Listing URL'
                                 input.form-control.bg-dark.text-white.border-secondary(
@@ -47,6 +48,7 @@ block content
                             | Import – Paste Restaurant URL
                         p.text-white-50 Paste a restaurant menu URL to import a single restaurant.
                         form(method="POST" action=`/providers/${provider.providerKey}/import-url`)
+                            +csrf
                             .mb-3
                                 label.form-label(for=`menuUrl-${provider.providerKey}`)= provider.capabilities.importUrlLabel || 'Restaurant URL'
                                 input.form-control.bg-dark.text-white.border-secondary(

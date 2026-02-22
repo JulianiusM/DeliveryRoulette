@@ -97,6 +97,7 @@ block content
             i.bi.bi-arrow-left.me-1
             | Back
         form(method="POST" action="/import/apply")
+            +csrf
             input(type="hidden" name="payloadJson" value=payloadJson)
             button.btn.btn-success(type="submit")
                 i.bi.bi-check-lg.me-1

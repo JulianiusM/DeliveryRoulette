@@ -55,10 +55,12 @@ block content
                 .card-body
                     .d-flex.flex-column.gap-2
                         form(method="POST" action=`/restaurants/${r.id}/toggle-favorite`)
+                            +csrf
                             button.btn.btn-sm.w-100(type="submit" class=isFavorite ? 'btn-warning' : 'btn-outline-warning')
                                 i.bi.me-1(class=isFavorite ? 'bi-star-fill' : 'bi-star')
                                 | #{isFavorite ? 'Unfavorite' : 'Favorite'}
                         form(method="POST" action=`/restaurants/${r.id}/toggle-do-not-suggest`)
+                            +csrf
                             button.btn.btn-sm.w-100(type="submit" class=doNotSuggest ? 'btn-danger' : 'btn-outline-danger')
                                 i.bi.me-1(class=doNotSuggest ? 'bi-x-circle-fill' : 'bi-x-circle')
                                 | #{doNotSuggest ? 'Allow Suggestions' : 'Do Not Suggest'}
@@ -79,6 +81,7 @@ block content
         .card-body
             #addProviderForm.collapse.mb-3
                 form(method="POST" action=`/restaurants/${r.id}/providers`)
+                    +csrf
                     .row.g-2
                         .col-md-3
                             input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key (e.g. uber_eats)" required)
@@ -116,6 +119,7 @@ block content
                                         span.badge(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
                                     td
                                         form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
+                                            +csrf
                                             button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove")
                                                 i.bi.bi-trash
 

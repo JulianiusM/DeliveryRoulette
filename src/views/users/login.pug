@@ -11,6 +11,7 @@ block title
 
 block content
     form.row.gy-3.justify-content-center(action="/users/login" method="post")
+        +csrf
         if settings.localLoginEnabled
             //── Username ────────────────────────────────────────
             .col-md-6

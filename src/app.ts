@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import session from 'express-session';
 import flash from 'express-flash';
+import {doubleCsrf} from 'csrf-csrf';
 
 import indexRouter from './routes';
 import apiRouter from './routes/api';
@@ -86,9 +87,36 @@ app.use(
 
 app.use(flash());
 
+// ── CSRF protection (double-submit cookie pattern) ──────────
+const {doubleCsrfProtection, generateCsrfToken} = doubleCsrf({
+    getSecret: () => settings.value.sessionSecret,
+    getSessionIdentifier: (req) => req.session?.id ?? '',
+    cookieName: '__csrf',
+    cookieOptions: {
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        path: '/',
+    },
+    getCsrfTokenFromRequest: (req) =>
+        (req.body as Record<string, string>)?._csrf
+        ?? req.headers['x-csrf-token'] as string | undefined,
+    errorConfig: {statusCode: 403, message: 'Invalid CSRF token', code: 'EBADCSRFTOKEN'},
+});
+
+// Skip CSRF for API routes (they use auth tokens, not sessions) and health checks
+app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+        return next();
+    }
+    doubleCsrfProtection(req, res, next);
+});
+
 app.use(function (req: Request, res: Response, next: NextFunction) {
     res.locals.user = req.session.user;
     res.locals.version = version;
+    // Make CSRF token available to all templates
+    res.locals.csrfToken = req.csrfToken ? req.csrfToken() : '';
     res.locals.settings = {
         localLoginEnabled: settings.value.localLoginEnabled,
         oidcEnabled: settings.value.oidcEnabled,

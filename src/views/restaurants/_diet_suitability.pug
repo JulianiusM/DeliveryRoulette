@@ -12,6 +12,7 @@
     .card-body
         #addOverrideForm.collapse.mb-3
             form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
+                +csrf
                 .row.g-2
                     .col-md-4
                         select.form-select.form-select-sm(name="dietTagId" required)
@@ -60,6 +61,7 @@
                                         i.bi.bi-info-circle
                                 if ds.source === 'override' && ds.override
                                     form.d-inline(method="POST" action=`/restaurants/${r.id}/diet-overrides/${ds.override.id}/delete`)
+                                        +csrf
                                         button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove Override")
                                             i.bi.bi-trash
 

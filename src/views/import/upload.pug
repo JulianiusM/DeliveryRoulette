@@ -17,6 +17,7 @@ block content
                 | The file will be validated and a preview of changes will be shown before applying.
 
             form(method="POST" action="/import/upload" enctype="multipart/form-data")
+                +csrf
                 .mb-3
                     label.form-label(for="file") Import File (JSON or CSV)
                     input.form-control.text-bg-dark(type="file" name="file" id="file" accept=".json,.csv,application/json,text/csv" required)
