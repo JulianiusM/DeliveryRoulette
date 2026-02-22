@@ -206,7 +206,6 @@ export const dietInferenceAllowedData = [
 export const dietOverrideDuplicateData = [
     {
         description: 'rejects duplicate (restaurant_id, diet_tag_id)',
-        userId: 0, // placeholder; set at runtime
         first: {
             id: uuidv4(),
             restaurant_id: ids.restaurant1,

@@ -33,7 +33,7 @@ import {
 } from '../data/database/constraintData';
 
 let ds: DataSource;
-let userId: number;
+let userId = 0;
 
 beforeAll(async () => {
     ds = createFullDataSource();

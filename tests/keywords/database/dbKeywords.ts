@@ -112,7 +112,7 @@ export async function insertRow(
     ds: DataSource,
     table: string,
     data: Record<string, unknown>,
-): Promise<any> {
+): Promise<{insertId: number}> {
     const cols = Object.keys(data).map((c) => `\`${c}\``).join(', ');
     const placeholders = Object.keys(data).map(() => '?').join(', ');
     const values = Object.values(data);
