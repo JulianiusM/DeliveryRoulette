@@ -7,9 +7,11 @@ import * as menuService from '../database/services/MenuService';
 import * as providerRefService from '../database/services/RestaurantProviderRefService';
 import * as dietInferenceService from '../database/services/DietInferenceService';
 import * as syncAlertService from '../database/services/SyncAlertService';
+import * as providerFetchCache from '../providers/ProviderFetchCacheService';
 import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
 import {ProviderKey} from '../../providers/ProviderKey';
 import {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
+import settings from '../settings';
 
 /**
  * Unified provider sync pipeline.
@@ -36,6 +38,29 @@ export async function isLocked(): Promise<boolean> {
     const repo = AppDataSource.getRepository(SyncJob);
     const running = await repo.findOne({where: {status: 'in_progress' as SyncJobStatus}});
     return running !== null;
+}
+
+/**
+ * Atomically acquire the sync lock by inserting a new in_progress job.
+ * Returns the created job or null if another job is already in progress.
+ * Uses INSERT + check to minimise the race window.
+ */
+async function acquireSyncLock(providerKey: string | null): Promise<SyncJob | null> {
+    const jobRepo = AppDataSource.getRepository(SyncJob);
+
+    // Double-check under a short transaction to narrow the race window
+    return AppDataSource.transaction(async (manager) => {
+        const txRepo = manager.getRepository(SyncJob);
+        const running = await txRepo.findOne({where: {status: 'in_progress' as SyncJobStatus}});
+        if (running) return null;
+
+        const job = txRepo.create({
+            providerKey,
+            status: 'in_progress' as SyncJobStatus,
+            startedAt: new Date(),
+        });
+        return await txRepo.save(job);
+    });
 }
 
 // ── Result types ────────────────────────────────────────────
@@ -90,8 +115,9 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
 
     const jobRepo = AppDataSource.getRepository(SyncJob);
 
-    // ── Guard: concurrent runs ──────────────────────────────
-    if (await isLocked()) {
+    // ── Guard: concurrent runs (atomic lock) ────────────────
+    const job = await acquireSyncLock(jobProviderKey);
+    if (!job) {
         const blocked = jobRepo.create({
             providerKey: jobProviderKey,
             status: 'failed' as SyncJobStatus,
@@ -102,14 +128,6 @@ export async function runSync(options: RunSyncOptions = {}): Promise<SyncResult>
         const saved = await jobRepo.save(blocked);
         return {...toResult(saved), restaurants: []};
     }
-
-    // ── Create job record ───────────────────────────────────
-    const job = jobRepo.create({
-        providerKey: jobProviderKey,
-        status: 'in_progress' as SyncJobStatus,
-        startedAt: new Date(),
-    });
-    await jobRepo.save(job);
 
     try {
         // ── Resolve connector(s) ────────────────────────────

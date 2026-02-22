@@ -62,10 +62,7 @@ export type Settings = {
     rateLimitMaxDeviceRegistration: number;
 
     // Pagination defaults
-    paginationDefaultItems: number;
-    paginationDefaultLocations: number;
-    paginationDefaultGames: number;
-    paginationDefaultLoans: number;
+    paginationDefaultRestaurants: number;
     paginationMaxPerPage: number;
     paginationMaxTimezoneItems: number;
 
@@ -156,10 +153,7 @@ const defaults: Settings = {
     rateLimitMaxDeviceRegistration: 5,
 
     // Pagination defaults
-    paginationDefaultItems: 30,
-    paginationDefaultLocations: 50,
-    paginationDefaultGames: 24,
-    paginationDefaultLoans: 30,
+    paginationDefaultRestaurants: 30,
     paginationMaxPerPage: 100,
     paginationMaxTimezoneItems: 200,
 
@@ -229,10 +223,7 @@ const keyMap: Record<string, keyof Settings> = {
     RATE_LIMIT_WINDOW_MS: "rateLimitWindowMs",
     RATE_LIMIT_MAX_PUSH_CONNECTOR: "rateLimitMaxPushConnector",
     RATE_LIMIT_MAX_DEVICE_REGISTRATION: "rateLimitMaxDeviceRegistration",
-    PAGINATION_DEFAULT_ITEMS: "paginationDefaultItems",
-    PAGINATION_DEFAULT_LOCATIONS: "paginationDefaultLocations",
-    PAGINATION_DEFAULT_GAMES: "paginationDefaultGames",
-    PAGINATION_DEFAULT_LOANS: "paginationDefaultLoans",
+    PAGINATION_DEFAULT_RESTAURANTS: "paginationDefaultRestaurants",
     PAGINATION_MAX_PER_PAGE: "paginationMaxPerPage",
     PAGINATION_MAX_TIMEZONE_ITEMS: "paginationMaxTimezoneItems",
     MIN_VALID_DESCRIPTION_LENGTH: "minValidDescriptionLength",
@@ -259,10 +250,7 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     rateLimitWindowMs: (v) => Number(v),
     rateLimitMaxPushConnector: (v) => Number(v),
     rateLimitMaxDeviceRegistration: (v) => Number(v),
-    paginationDefaultItems: (v) => Number(v),
-    paginationDefaultLocations: (v) => Number(v),
-    paginationDefaultGames: (v) => Number(v),
-    paginationDefaultLoans: (v) => Number(v),
+    paginationDefaultRestaurants: (v) => Number(v),
     paginationMaxPerPage: (v) => Number(v),
     paginationMaxTimezoneItems: (v) => Number(v),
     minValidDescriptionLength: (v) => Number(v),

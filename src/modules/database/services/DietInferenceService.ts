@@ -186,47 +186,49 @@ export async function getActiveMenuItems(
 export async function computeForRestaurant(
     restaurantId: string,
 ): Promise<DietInferenceResult[]> {
-    const tagRepo = AppDataSource.getRepository(DietTag);
-    const resultRepo = AppDataSource.getRepository(DietInferenceResult);
+    return AppDataSource.transaction(async (manager) => {
+        const tagRepo = manager.getRepository(DietTag);
+        const resultRepo = manager.getRepository(DietInferenceResult);
 
-    const dietTags = await tagRepo.find();
-    const items = await getActiveMenuItems(restaurantId);
+        const dietTags = await tagRepo.find();
+        const items = await getActiveMenuItems(restaurantId);
 
-    const results: DietInferenceResult[] = [];
+        const results: DietInferenceResult[] = [];
 
-    for (const tag of dietTags) {
-        const output = inferForTag(tag, items);
+        for (const tag of dietTags) {
+            const output = inferForTag(tag, items);
 
-        // Try to find an existing result for this (restaurant, tag, version)
-        let existing = await resultRepo.findOne({
-            where: {
-                restaurantId,
-                dietTagId: tag.id,
-                engineVersion: ENGINE_VERSION,
-            },
-        });
-
-        if (existing) {
-            existing.score = output.score;
-            existing.confidence = output.confidence;
-            existing.reasonsJson = JSON.stringify(output.reasons);
-            existing.computedAt = new Date();
-            results.push(await resultRepo.save(existing));
-        } else {
-            const entity = resultRepo.create({
-                restaurantId,
-                dietTagId: tag.id,
-                score: output.score,
-                confidence: output.confidence,
-                reasonsJson: JSON.stringify(output.reasons),
-                engineVersion: ENGINE_VERSION,
-                computedAt: new Date(),
+            // Try to find an existing result for this (restaurant, tag, version)
+            let existing = await resultRepo.findOne({
+                where: {
+                    restaurantId,
+                    dietTagId: tag.id,
+                    engineVersion: ENGINE_VERSION,
+                },
             });
-            results.push(await resultRepo.save(entity));
-        }
-    }
 
-    return results;
+            if (existing) {
+                existing.score = output.score;
+                existing.confidence = output.confidence;
+                existing.reasonsJson = JSON.stringify(output.reasons);
+                existing.computedAt = new Date();
+                results.push(await resultRepo.save(existing));
+            } else {
+                const entity = resultRepo.create({
+                    restaurantId,
+                    dietTagId: tag.id,
+                    score: output.score,
+                    confidence: output.confidence,
+                    reasonsJson: JSON.stringify(output.reasons),
+                    engineVersion: ENGINE_VERSION,
+                    computedAt: new Date(),
+                });
+                results.push(await resultRepo.save(entity));
+            }
+        }
+
+        return results;
+    });
 }
 
 /**

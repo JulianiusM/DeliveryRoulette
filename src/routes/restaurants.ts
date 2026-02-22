@@ -4,6 +4,11 @@ import * as restaurantController from "../controller/restaurantController";
 import * as menuController from "../controller/menuController";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
+import {handleValidationError} from '../middleware/validationErrorHandler';
+import {
+    validateRestaurant, validateProviderRef, validateDietOverride,
+    validateMenuCategory, validateMenuItem,
+} from '../middleware/validationChains';
 
 const app = express.Router();
 
@@ -23,7 +28,7 @@ app.get('/new', asyncHandler(async (_req: Request, res: Response) => {
 }));
 
 // POST /restaurants/new - Create restaurant
-app.post('/new', asyncHandler(async (req: Request, res: Response) => {
+app.post('/new', validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const restaurant = await restaurantController.createRestaurant(req.body);
     res.redirect(`/restaurants/${restaurant.id}`);
 }));
@@ -42,7 +47,7 @@ app.get('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /restaurants/:id/edit - Update restaurant
-app.post('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/edit', validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const restaurant = await restaurantController.updateRestaurant(req.params.id, req.body);
     res.redirect(`/restaurants/${restaurant.id}`);
 }));
@@ -50,7 +55,7 @@ app.post('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
 // ── Provider Reference routes ───────────────────────────────
 
 // POST /restaurants/:id/providers - Add provider reference
-app.post('/:id/providers', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/providers', validateProviderRef, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await restaurantController.addProviderRef(req.params.id, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -64,7 +69,7 @@ app.post('/:id/providers/:refId/delete', asyncHandler(async (req: Request, res: 
 // ── Diet Override routes ────────────────────────────────────
 
 // POST /restaurants/:id/diet-overrides - Add/update diet override
-app.post('/:id/diet-overrides', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/diet-overrides', validateDietOverride, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const userId = (req.session as any)?.userId ?? 0;
     await restaurantController.addDietOverride(req.params.id, req.body, userId);
     res.redirect(`/restaurants/${req.params.id}`);
@@ -109,7 +114,7 @@ app.get('/:id/menu/categories/new', asyncHandler(async (req: Request, res: Respo
 }));
 
 // POST /restaurants/:id/menu/categories/new
-app.post('/:id/menu/categories/new', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/new', validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.createCategory(req.params.id, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -121,7 +126,7 @@ app.get('/:id/menu/categories/:catId/edit', asyncHandler(async (req: Request, re
 }));
 
 // POST /restaurants/:id/menu/categories/:catId/edit
-app.post('/:id/menu/categories/:catId/edit', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/:catId/edit', validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.updateCategory(req.params.id, req.params.catId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -135,7 +140,7 @@ app.get('/:id/menu/categories/:catId/items/new', asyncHandler(async (req: Reques
 }));
 
 // POST /restaurants/:id/menu/categories/:catId/items/new
-app.post('/:id/menu/categories/:catId/items/new', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/:catId/items/new', validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.createItem(req.params.id, req.params.catId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -147,7 +152,7 @@ app.get('/:id/menu/items/:itemId/edit', asyncHandler(async (req: Request, res: R
 }));
 
 // POST /restaurants/:id/menu/items/:itemId/edit
-app.post('/:id/menu/items/:itemId/edit', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/items/:itemId/edit', validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.updateItem(req.params.id, req.params.itemId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));

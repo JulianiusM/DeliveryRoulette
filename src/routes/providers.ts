@@ -3,6 +3,8 @@ import {requireAuth} from '../middleware/authMiddleware';
 import * as providerController from '../controller/providerController';
 import renderer from '../modules/renderer';
 import {asyncHandler} from '../modules/lib/asyncHandler';
+import {handleValidationError} from '../middleware/validationErrorHandler';
+import {validateProviderSync, validateProviderImportUrl} from '../middleware/validationChains';
 
 const router = express.Router();
 
@@ -21,7 +23,7 @@ router.get('/', requireAuth, asyncHandler(async (req: Request, res: Response) =>
  * POST /providers/:providerKey/sync
  * Trigger sync from listing URL for any provider.
  */
-router.post('/:providerKey/sync', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.post('/:providerKey/sync', requireAuth, validateProviderSync, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const userId = String(req.session.user!.id);
     const {providerKey} = req.params;
     const {listingUrl} = req.body;
@@ -41,7 +43,7 @@ router.post('/:providerKey/sync', requireAuth, asyncHandler(async (req: Request,
  * POST /providers/:providerKey/import-url
  * Import a single restaurant from a pasted menu URL for any provider.
  */
-router.post('/:providerKey/import-url', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.post('/:providerKey/import-url', requireAuth, validateProviderImportUrl, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const userId = String(req.session.user!.id);
     const {providerKey} = req.params;
     const {menuUrl} = req.body;

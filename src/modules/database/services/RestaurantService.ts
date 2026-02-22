@@ -72,14 +72,32 @@ export async function listRestaurants(options: ListRestaurantsOptions = {}): Pro
 /**
  * Create or update a restaurant from normalised provider data.
  * Returns the restaurant ID.
+ * Wrapped in a transaction to prevent partial writes.
  */
 export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<string> {
-    const existing = (await listRestaurants({})).find(
-        (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
-    );
+    return AppDataSource.transaction(async (manager) => {
+        const repo = manager.getRepository(Restaurant);
+        const all = await repo.find();
+        const existing = all.find(
+            (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
+        );
 
-    if (existing) {
-        await updateRestaurant(existing.id, {
+        if (existing) {
+            Object.assign(existing, {
+                addressLine1: incoming.address ?? '',
+                addressLine2: incoming.addressLine2 ?? null,
+                city: incoming.city ?? '',
+                postalCode: incoming.postalCode ?? '',
+                country: incoming.country ?? '',
+                isActive: true,
+            });
+            existing.updatedAt = new Date();
+            await repo.save(existing);
+            return existing.id;
+        }
+
+        const created = repo.create({
+            name: incoming.name,
             addressLine1: incoming.address ?? '',
             addressLine2: incoming.addressLine2 ?? null,
             city: incoming.city ?? '',
@@ -87,16 +105,7 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
             country: incoming.country ?? '',
             isActive: true,
         });
-        return existing.id;
-    }
-
-    const created = await createRestaurant({
-        name: incoming.name,
-        addressLine1: incoming.address ?? '',
-        addressLine2: incoming.addressLine2 ?? null,
-        city: incoming.city ?? '',
-        postalCode: incoming.postalCode ?? '',
-        country: incoming.country ?? '',
+        const saved = await repo.save(created);
+        return saved.id;
     });
-    return created.id;
 }
