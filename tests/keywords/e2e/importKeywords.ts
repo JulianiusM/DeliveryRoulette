@@ -4,6 +4,7 @@
 import { type Page, expect } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { selectors, urls } from '../../data/e2e/importData';
 
 /**
@@ -14,7 +15,7 @@ export async function uploadImportFile(
     payload: object,
 ): Promise<void> {
     // Write the payload to a temp file
-    const tmpDir = '/tmp/e2e-import';
+    const tmpDir = path.join(os.tmpdir(), 'e2e-import');
     fs.mkdirSync(tmpDir, { recursive: true });
     const filePath = path.join(tmpDir, `import-${Date.now()}.json`);
     fs.writeFileSync(filePath, JSON.stringify(payload), 'utf-8');
@@ -49,5 +50,5 @@ export async function verifyImportResult(
     page: Page,
     restaurantName: string,
 ): Promise<void> {
-    await expect(page.locator('body')).toContainText(restaurantName);
+    await expect(page.locator('main')).toContainText(restaurantName);
 }

@@ -63,7 +63,8 @@ export async function verifyMenuCategoryExists(
     page: Page,
     categoryName: string,
 ): Promise<void> {
-    await expect(page.locator('body')).toContainText(categoryName);
+    const mainContent = page.locator('main');
+    await expect(mainContent).toContainText(categoryName);
 }
 
 /**
@@ -73,7 +74,8 @@ export async function verifyMenuItemExists(
     page: Page,
     itemName: string,
 ): Promise<void> {
-    await expect(page.locator('body')).toContainText(itemName);
+    const mainContent = page.locator('main');
+    await expect(mainContent).toContainText(itemName);
 }
 
 /**

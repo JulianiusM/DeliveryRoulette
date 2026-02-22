@@ -45,7 +45,7 @@ export async function registerUser(
  * Verify that registration succeeded by checking the success message.
  */
 export async function verifyRegistrationSuccess(page: Page): Promise<void> {
-    await expect(page.locator('body')).toContainText('Account successfully registered');
+    await expect(page.locator('.alert')).toContainText('Account successfully registered');
 }
 
 /**

@@ -40,12 +40,13 @@ export async function addDietOverride(
 }
 
 /**
- * Verify that a diet override badge is displayed.
+ * Verify that a diet override badge is displayed in the diet suitability section.
  */
 export async function verifyDietOverrideDisplayed(
     page: Page,
     dietTagLabel: string,
 ): Promise<void> {
-    // The diet suitability section should show the tag name
-    await expect(page.locator('body')).toContainText(dietTagLabel);
+    const mainContent = page.locator('main');
+    await expect(mainContent).toContainText(dietTagLabel);
+    await expect(mainContent).toContainText('Manual Override');
 }
