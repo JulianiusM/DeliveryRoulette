@@ -31,11 +31,12 @@ The GitHub Actions CI pipeline:
 
 - Runs on push to `master` or `dev` branches
 - Runs on pull requests to `master` or `dev`
+- Also triggers on the `ts-migration` branch
 - Sets up MariaDB 10.11 service container
 - Sets up Node.js 24
 - Creates test and E2E databases with proper users
-- Runs all unit, integration, and E2E tests
-- Uploads Playwright reports as artifacts
+- Runs all unit, integration, frontend, and E2E tests
+- Uploads coverage reports and Playwright reports as artifacts
 
 ### Environment Files
 
