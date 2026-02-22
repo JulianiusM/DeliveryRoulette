@@ -1,7 +1,6 @@
 /**
  * Test data for ProviderSyncService unit tests.
  */
-import {ProviderKey} from '../../../src/providers/ProviderKey';
 import {ProviderMenu} from '../../../src/providers/ProviderTypes';
 
 /** A minimal ProviderMenu used by sync tests. */
@@ -26,24 +25,55 @@ export const sampleProviderMenu: ProviderMenu = {
 /** An empty menu (no categories). */
 export const emptyProviderMenu: ProviderMenu = {categories: []};
 
-/** Provider ref fixtures. */
-export const providerRefFixtures = {
-    active: {
-        id: 'ref-1',
-        restaurantId: 'rest-1',
-        providerKey: ProviderKey.UBER_EATS,
-        externalId: 'ext-rest-1',
-        url: 'https://example.com/rest-1',
-        status: 'active',
-        lastSyncAt: null,
-    },
-    noExternalId: {
-        id: 'ref-2',
-        restaurantId: 'rest-2',
-        providerKey: ProviderKey.UBER_EATS,
-        externalId: null,
-        url: 'https://example.com/rest-2',
-        status: 'active',
-        lastSyncAt: null,
-    },
+/** Import payload with menu for sync tests. */
+export const importPayloadWithMenu = {
+    version: 1 as const,
+    restaurants: [
+        {
+            name: 'Import Place',
+            addressLine1: '10 Import St',
+            city: 'Berlin',
+            postalCode: '10115',
+            menuCategories: [
+                {
+                    name: 'Mains',
+                    items: [
+                        {name: 'Burger', price: 9.99, currency: 'EUR'},
+                    ],
+                },
+            ],
+        },
+    ],
+};
+
+/** Import payload without menu. */
+export const importPayloadNoMenu = {
+    version: 1 as const,
+    restaurants: [
+        {
+            name: 'Simple Place',
+            addressLine1: '5 Simple St',
+            city: 'Munich',
+            postalCode: '80331',
+        },
+    ],
+};
+
+/** Import payload with two restaurants. */
+export const importPayloadMultiple = {
+    version: 1 as const,
+    restaurants: [
+        {
+            name: 'First Place',
+            addressLine1: '1 First St',
+            city: 'Berlin',
+            postalCode: '10115',
+        },
+        {
+            name: 'Second Place',
+            addressLine1: '2 Second St',
+            city: 'Munich',
+            postalCode: '80331',
+        },
+    ],
 };

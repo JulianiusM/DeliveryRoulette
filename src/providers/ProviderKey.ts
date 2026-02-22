@@ -9,4 +9,5 @@ export enum ProviderKey {
     DOORDASH = "doordash",
     GRUBHUB = "grubhub",
     JUST_EAT = "just_eat",
+    IMPORT = "import",
 }

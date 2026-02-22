@@ -27,5 +27,5 @@ export async function triggerSync(providerKey?: string): Promise<SyncResult> {
         key = providerKey as ProviderKey;
     }
 
-    return await runSync(key);
+    return await runSync({providerKey: key});
 }

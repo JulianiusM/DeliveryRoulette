@@ -7,6 +7,12 @@ import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes
  * Connectors are thin adapters that translate a provider's external API
  * into the normalised types consumed by the application.
  * They must NOT access application internals (database, controllers, etc.).
+ *
+ * The sync pipeline always follows the same flow for every connector:
+ *   1. `listRestaurants()` — discover / list available restaurants
+ *   2. Upsert each restaurant and its provider ref in the database
+ *   3. `fetchMenu()` — fetch menu data per restaurant
+ *   4. Upsert menu categories / items and recompute diet inference
  */
 export interface DeliveryProviderConnector {
     /** The unique key that identifies this provider. */
