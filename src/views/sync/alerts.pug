@@ -1,0 +1,116 @@
+//- views/sync/alerts.pug – Sync Alerts
+extends ../layout
+
+block meta
+    title Sync Alerts | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-bell.me-2
+        | Sync Alerts
+        if data && data.activeCount > 0
+            span.badge.text-bg-danger.ms-2= data.activeCount
+
+block content
+    - const alerts = (data && data.alerts) || []
+    - const filterType = (data && data.filterType) || ''
+    - const filterProvider = (data && data.filterProvider) || ''
+    - const filterStatus = (data && data.filterStatus) || 'active'
+    - const alertTypes = (data && data.alertTypes) || []
+    - const providerKeys = (data && data.providerKeys) || []
+
+    //── Filter Form ──────────────────────────────────────
+    form.row.g-2.mb-4(method="GET" action="/sync/alerts")
+        .col-md-3
+            label.form-label.text-white-50(for="typeFilter") Alert Type
+            select.form-select.text-bg-dark#typeFilter(name="type")
+                option(value="" selected=(filterType === '')) All Types
+                each t in alertTypes
+                    option(value=t.value selected=(filterType === t.value))= t.label
+
+        .col-md-3
+            label.form-label.text-white-50(for="providerFilter") Provider
+            select.form-select.text-bg-dark#providerFilter(name="provider")
+                option(value="" selected=(filterProvider === '')) All Providers
+                each pk in providerKeys
+                    option(value=pk selected=(filterProvider === pk))= pk
+
+        .col-md-3
+            label.form-label.text-white-50(for="statusFilter") Status
+            select.form-select.text-bg-dark#statusFilter(name="status")
+                option(value="active" selected=(filterStatus === 'active')) Active
+                option(value="dismissed" selected=(filterStatus === 'dismissed')) Dismissed
+                option(value="all" selected=(filterStatus === 'all')) All
+
+        .col-md-3.d-flex.align-items-end
+            button.btn.btn-primary.w-100(type="submit")
+                i.bi.bi-funnel.me-1
+                | Filter
+
+    //── Bulk Actions ────────────────────────────────────
+    if alerts.length > 0 && filterStatus !== 'dismissed'
+        form.d-flex.justify-content-end.mb-3(method="POST" action="/sync/alerts/dismiss-all")
+            input(type="hidden" name="type" value=filterType)
+            input(type="hidden" name="provider" value=filterProvider)
+            button.btn.btn-outline-warning(type="submit" onclick="return confirm('Dismiss all matching alerts?')")
+                i.bi.bi-check-all.me-1
+                | Dismiss All
+
+    //── Alerts Table ───────────────────────────────────
+    if alerts.length === 0
+        .text-center.text-white-50.py-4
+            i.bi.bi-bell-slash.d-block.display-4.mb-2
+            p No alerts found.
+    else
+        .table-responsive
+            table.table.table-dark.table-hover
+                thead
+                    tr
+                        th Type
+                        th Restaurant
+                        th Provider
+                        th Message
+                        th Date
+                        th Status
+                        th Actions
+                tbody
+                    each a in alerts
+                        tr(class=(a.dismissed ? 'opacity-50' : ''))
+                            td
+                                if a.type === 'restaurant_gone'
+                                    span.badge.text-bg-danger
+                                        i.bi.bi-shop.me-1
+                                        | Gone
+                                else if a.type === 'menu_changed'
+                                    span.badge.text-bg-warning.text-dark
+                                        i.bi.bi-card-list.me-1
+                                        | Menu
+                                else if a.type === 'diet_override_stale'
+                                    span.badge.text-bg-info.text-dark
+                                        i.bi.bi-heart-pulse.me-1
+                                        | Diet
+                                else
+                                    span.badge.text-bg-secondary= a.type
+                            td
+                                if a.restaurant
+                                    a.text-white(href=`/restaurants/${a.restaurantId}`)= a.restaurant.name
+                                else
+                                    span.text-white-50= a.restaurantId
+                            td
+                                span.badge.text-bg-secondary= a.providerKey
+                            td= a.message
+                            td.text-white-50
+                                - const d = new Date(a.createdAt)
+                                | #{d.toLocaleDateString()} #{d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                            td
+                                if a.dismissed
+                                    span.badge.text-bg-secondary Dismissed
+                                else
+                                    span.badge.text-bg-success Active
+                            td
+                                if !a.dismissed
+                                    form.d-inline(method="POST" action=`/sync/alerts/${a.id}/dismiss`)
+                                        button.btn.btn-sm.btn-outline-warning(type="submit" title="Dismiss")
+                                            i.bi.bi-check-lg
+                                a.btn.btn-sm.btn-outline-light.ms-1(href=`/restaurants/${a.restaurantId}` title="View Restaurant")
+                                    i.bi.bi-eye
