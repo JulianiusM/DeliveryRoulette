@@ -3,10 +3,11 @@ import settings from './modules/settings';
 import {initDataSource} from "./modules/database/dataSource";
 import {startScheduler} from "./modules/sync/SyncScheduler";
 import {registerConnectors} from './providers/ConnectorBootstrap';
+import logger from './modules/logger';
 
 async function bootstrap() {
     try {
-        console.log('🔧 Initializing database connection...');
+        logger.info('Initializing database connection...');
         await settings.read();
         await initDataSource();
 
@@ -16,11 +17,11 @@ async function bootstrap() {
         const {default: app} = await import('./app');
         const server = http.createServer(app);
         server.listen(settings.value.appPort, () => {
-            console.log(`🚀 Server listening on ${settings.value.rootUrl}`);
+            logger.info({url: settings.value.rootUrl}, 'Server listening');
             startScheduler();
         });
     } catch (err) {
-        console.error('❌ Failed to initialize app:', err);
+        logger.fatal({err}, 'Failed to initialize app');
         process.exit(1);
     }
 }

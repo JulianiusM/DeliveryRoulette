@@ -2,10 +2,12 @@ import {NextFunction, Request, Response} from "express";
 
 import {APIError, ExpectedError, ValidationError} from "../modules/lib/errors";
 import renderer from "../modules/renderer";
+import logger from "../modules/logger";
 
 export function handleGenericError(err: Error, req: Request, res: Response, next: NextFunction) {
     const status: number = (err as any).status || 500;
-    if (status >= 500) console.error(err);
+    const log = req.log || logger;
+    if (status >= 500) log.error({err}, 'Unhandled server error');
     res.status(status);
 
     if (err instanceof ExpectedError) {
@@ -26,7 +28,7 @@ export function handleGenericError(err: Error, req: Request, res: Response, next
         )
     }
 
-    console.log(err);
+    log.warn({err}, 'Validation or rendering error');
 
     if (err instanceof ValidationError) {
         // form validation or business errors with template/data
