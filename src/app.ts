@@ -36,7 +36,24 @@ app.set('view engine', 'pug');
 
 app.use(requestIdMiddleware);
 app.use(pinoHttp({logger, genReqId: (req) => req.id}));
-app.use(express.json({limit: '25mb'})); // Increased limit for large import payloads (e.g., Playnite library)
+
+// Basic Content-Security-Policy header
+app.use((_req, res, next) => {
+    res.setHeader(
+        'Content-Security-Policy',
+        [
+            "default-src 'self'",
+            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'",
+            "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+            "font-src 'self' https://cdn.jsdelivr.net",
+            "img-src 'self' data:",
+            "connect-src 'self'",
+        ].join('; '),
+    );
+    next();
+});
+
+app.use(express.json({limit: '25mb'})); // Increased limit for large import payloads
 app.use(express.urlencoded({extended: true, limit: '25mb'}));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -57,6 +74,7 @@ app.use(
             maxAge: 1000 * 60 * 60 * 24,
             secure: process.env.NODE_ENV === "production", // HTTPS only in prod
             sameSite: "lax",
+            httpOnly: true,
         },
         store: new TypeormStore({
             cleanupLimit: 2,          // prune expired sessions periodically

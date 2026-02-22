@@ -14,7 +14,7 @@ app.get('/', asyncHandler((req: Request, res: Response) => {
     res.redirect('/users/dashboard');
 }));
 
-// User dashboard - overview of user's inventory
+// User dashboard - overview of user's delivery preferences
 app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
@@ -23,12 +23,10 @@ app.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
     const preferences = await settingsController.getSettings(req.session.user.id);
 
     renderer.renderWithData(res, 'users/dashboard', {
-        itemCount: 0,
-        locationCount: 0,
-        activeLoanCount: 0,
-        overdueLoanCount: 0,
-        recentItems: [],
-        activeLoans: [],
+        restaurantCount: 0,
+        suggestionCount: 0,
+        syncAlertCount: 0,
+        dietTagCount: 0,
         preferences,
     });
 }));

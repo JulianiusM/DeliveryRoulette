@@ -88,6 +88,9 @@ export class LieferandoConnector implements DeliveryProviderConnector {
 
     validateImportUrl(url: string): void {
         const parsed = parseUrl(url);
+        if (parsed.protocol !== 'https:') {
+            throw new Error('URL must use HTTPS protocol');
+        }
         const host = parsed.hostname.toLowerCase();
         if (host !== 'lieferando.de' && host !== 'www.lieferando.de') {
             throw new Error('URL must be from lieferando.de');
@@ -99,6 +102,9 @@ export class LieferandoConnector implements DeliveryProviderConnector {
 
     validateListingUrl(url: string): void {
         const parsed = parseUrl(url);
+        if (parsed.protocol !== 'https:') {
+            throw new Error('URL must use HTTPS protocol');
+        }
         const host = parsed.hostname.toLowerCase();
         if (host !== 'lieferando.de' && host !== 'www.lieferando.de') {
             throw new Error('URL must be from lieferando.de');

@@ -9,13 +9,13 @@ block meta
     )
     meta(
         name="keywords"
-        content="inventory, items, locations, barcodes, lending, tracking, catalog, games, collection"
+        content="restaurants, delivery, food, suggestions, diet, preferences, lieferando"
     )
     meta(name="author" content="DeliveryRoulette")
     meta(property="og:title" content="DeliveryRoulette – Discover your next favorite delivery")
     meta(
         property="og:description"
-        content="A single place to catalog things, know where they are, know who has them, scan barcodes, and manage your game collection."
+        content="Manage restaurants, sync menus from delivery providers, track dietary preferences, and get random suggestions for your team."
     )
     meta(property="og:image" content="/img/logo.png")
     meta(property="og:url" content=settings.rootUrl)
@@ -24,7 +24,7 @@ block meta
 block title
     //- Card header
     h1.card-header.text-center.py-3.mb-0
-        i.bi.bi-box-seam.me-2
+        i.bi.bi-shuffle.me-2
         | DeliveryRoulette
 
 block content
@@ -35,43 +35,43 @@ block content
                 | Welcome back, 
                 span.text-info #{user.name || user.username}
                 | !
-            p.text-white-50.mb-4 Your complete inventory and collection management system.
+            p.text-white-50.mb-4 Your team's delivery restaurant management and suggestion system.
 
         //- Quick action buttons for logged-in users
         .row.g-3.mb-5
             .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-primary.h-100.text-decoration-none.hover-lift(href="/items")
+                a.card.text-bg-dark.border-primary.h-100.text-decoration-none.hover-lift(href="/restaurants")
                     .card-body.text-center.py-4
-                        i.bi.bi-box-seam.fs-1.text-primary.mb-3
-                        h3.h5.mb-2 Items
-                        p.small.text-white-50.mb-0 View & manage your inventory
+                        i.bi.bi-shop.fs-1.text-primary.mb-3
+                        h3.h5.mb-2 Restaurants
+                        p.small.text-white-50.mb-0 View & manage restaurants
             .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-success.h-100.text-decoration-none.hover-lift(href="/games/suggest")
+                a.card.text-bg-dark.border-success.h-100.text-decoration-none.hover-lift(href="/suggest")
                     .card-body.text-center.py-4
                         i.bi.bi-shuffle.fs-1.text-success.mb-3
-                        h3.h5.mb-2 Random Game
-                        p.small.text-white-50.mb-0 Can't decide what to play?
+                        h3.h5.mb-2 Suggest
+                        p.small.text-white-50.mb-0 Get a random restaurant pick
             .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-info.h-100.text-decoration-none.hover-lift(href="/scan")
+                a.card.text-bg-dark.border-info.h-100.text-decoration-none.hover-lift(href="/import")
                     .card-body.text-center.py-4
-                        i.bi.bi-upc-scan.fs-1.text-info.mb-3
-                        h3.h5.mb-2 Scan
-                        p.small.text-white-50.mb-0 Quickly add or find items
+                        i.bi.bi-upload.fs-1.text-info.mb-3
+                        h3.h5.mb-2 Import
+                        p.small.text-white-50.mb-0 Bulk import restaurants
             .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-warning.h-100.text-decoration-none.hover-lift(href="/games")
+                a.card.text-bg-dark.border-warning.h-100.text-decoration-none.hover-lift(href="/providers")
                     .card-body.text-center.py-4
-                        i.bi.bi-controller.fs-1.text-warning.mb-3
-                        h3.h5.mb-2 Games
-                        p.small.text-white-50.mb-0 Browse your game library
+                        i.bi.bi-plug.fs-1.text-warning.mb-3
+                        h3.h5.mb-2 Providers
+                        p.small.text-white-50.mb-0 Sync from Lieferando
 
     else
         .text-center.mb-4
             p.lead.mb-3 
-                | Your all-in-one 
-                span.text-info inventory & collection
-                |  management system
+                | Your team's 
+                span.text-info delivery restaurant
+                |  suggestion system
             p.text-white-50.mb-4
-                | Catalog items, track locations, scan barcodes, manage loans, and organize your game collection.
+                | Manage restaurants, sync menus from delivery providers, track dietary preferences, and get random suggestions.
 
         .d-flex.flex-wrap.justify-content-center.gap-3.mb-5
             a.btn.btn-primary.btn-lg.px-4.d-inline-flex.align-items-center.gap-2(href="/users/register")
@@ -90,100 +90,100 @@ block content
 
     //- Main feature grid
     .row.row-cols-1.row-cols-md-2.row-cols-xl-3.g-4.mb-5
-        //- Items
+        //- Restaurants
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body
                     .d-flex.align-items-center.mb-3
                         .bg-primary.rounded-circle.p-3.me-3
-                            i.bi.bi-box-seam.fs-4.text-white
+                            i.bi.bi-shop.fs-4.text-white
                         div
-                            h2.h5.mb-0 Items
-                            p.small.text-white-50.mb-0 Comprehensive cataloging
+                            h2.h5.mb-0 Restaurants
+                            p.small.text-white-50.mb-0 Full restaurant management
                     ul.small.mb-0.text-white-50
-                        li Name, description, condition, photos
-                        li Serial numbers & warranty info
-                        li Custom tags for filtering
-                        li Multiple barcodes per item
-                        li Track value and purchase date
+                        li Name, address, city, active status
+                        li Favorite and exclude restaurants
+                        li Provider references (Lieferando)
+                        li Diet suitability per restaurant
+                        li Search and filter by name or city
                     if user
-                        a.btn.btn-sm.btn-outline-primary.mt-3(href="/items") View Items →
+                        a.btn.btn-sm.btn-outline-primary.mt-3(href="/restaurants") View Restaurants →
 
-        //- Games Module
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-warning.rounded-circle.p-3.me-3
-                            i.bi.bi-controller.fs-4.text-dark
-                        div
-                            h2.h5.mb-0 Games Collection
-                            p.small.text-white-50.mb-0 Video, board & card games
-                    ul.small.mb-0.text-white-50
-                        li Track games across all platforms
-                        li Sync with Steam & external services
-                        li Player counts & multiplayer modes
-                        li Random game suggestions
-                        li Filter by platform, mode, players
-                    if user
-                        a.btn.btn-sm.btn-outline-warning.mt-3(href="/games") Browse Games →
-
-        //- Locations
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-info.rounded-circle.p-3.me-3
-                            i.bi.bi-geo-alt.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Locations
-                            p.small.text-white-50.mb-0 Hierarchical organization
-                    ul.small.mb-0.text-white-50
-                        li Rooms, shelves, boxes, bins
-                        li Nested location trees
-                        li QR codes for quick navigation
-                        li See all items at any location
-                        li Movement history tracking
-                    if user
-                        a.btn.btn-sm.btn-outline-info.mt-3(href="/locations") Manage Locations →
-
-        //- Barcode Scanning
+        //- Suggestions
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body
                     .d-flex.align-items-center.mb-3
                         .bg-success.rounded-circle.p-3.me-3
-                            i.bi.bi-upc-scan.fs-4.text-white
+                            i.bi.bi-shuffle.fs-4.text-white
                         div
-                            h2.h5.mb-0 Barcode Scanning
-                            p.small.text-white-50.mb-0 Fast camera-based entry
+                            h2.h5.mb-0 Random Suggestions
+                            p.small.text-white-50.mb-0 Can't decide where to order?
                     ul.small.mb-0.text-white-50
-                        li Scan EAN, UPC, QR, Code128
-                        li Instant lookup of items
-                        li Map barcodes to items
-                        li Print custom QR labels
-                        li Manual entry fallback
+                        li Diet-aware random picks
+                        li Cuisine include/exclude filters
+                        li Respects favorites & exclusions
+                        li Shows candidate count
+                        li Suggestion history tracking
                     if user
-                        a.btn.btn-sm.btn-outline-success.mt-3(href="/scan") Start Scanning →
+                        a.btn.btn-sm.btn-outline-success.mt-3(href="/suggest") Get Suggestion →
 
-        //- Lending & Borrowing
+        //- Diet Preferences
+        .col
+            .card.h-100.text-bg-dark.border-secondary
+                .card-body
+                    .d-flex.align-items-center.mb-3
+                        .bg-info.rounded-circle.p-3.me-3
+                            i.bi.bi-heart-pulse.fs-4.text-white
+                        div
+                            h2.h5.mb-0 Diet Preferences
+                            p.small.text-white-50.mb-0 Dietary tracking per user
+                    ul.small.mb-0.text-white-50
+                        li Vegetarian, vegan, gluten-free, etc.
+                        li Auto-detect from menu keywords
+                        li Manual overrides when needed
+                        li Per-user diet tag selections
+                        li Group-compatible suggestions
+                    if user
+                        a.btn.btn-sm.btn-outline-info.mt-3(href="/users/settings") Set Preferences →
+
+        //- Provider Sync
+        .col
+            .card.h-100.text-bg-dark.border-secondary
+                .card-body
+                    .d-flex.align-items-center.mb-3
+                        .bg-warning.rounded-circle.p-3.me-3
+                            i.bi.bi-plug.fs-4.text-dark
+                        div
+                            h2.h5.mb-0 Provider Sync
+                            p.small.text-white-50.mb-0 Lieferando integration
+                    ul.small.mb-0.text-white-50
+                        li Sync restaurants from listing URLs
+                        li Import single restaurant by URL
+                        li Auto-import menus and prices
+                        li Stale restaurant detection
+                        li Diet override conflict alerts
+                    if user
+                        a.btn.btn-sm.btn-outline-warning.mt-3(href="/providers") Manage Providers →
+
+        //- Import
         .col
             .card.h-100.text-bg-dark.border-secondary
                 .card-body
                     .d-flex.align-items-center.mb-3
                         .bg-danger.rounded-circle.p-3.me-3
-                            i.bi.bi-arrow-left-right.fs-4.text-white
+                            i.bi.bi-upload.fs-4.text-white
                         div
-                            h2.h5.mb-0 Lending
-                            p.small.text-white-50.mb-0 Track loans & borrowing
+                            h2.h5.mb-0 Bulk Import
+                            p.small.text-white-50.mb-0 JSON & CSV upload
                     ul.small.mb-0.text-white-50
-                        li Record who has what
-                        li Set due dates & reminders
-                        li Note condition at handoff
-                        li Complete loan history
-                        li Overdue tracking
+                        li Upload restaurant data files
+                        li Preview with diff badges
+                        li New/Updated/Unchanged status
+                        li Apply or discard changes
+                        li Per-restaurant result reporting
                     if user
-                        a.btn.btn-sm.btn-outline-danger.mt-3(href="/loans") Manage Loans →
+                        a.btn.btn-sm.btn-outline-danger.mt-3(href="/import") Import Data →
 
         //- Help & Documentation
         .col
@@ -198,47 +198,10 @@ block content
                     ul.small.mb-0.text-white-50
                         li Getting started guides
                         li Feature documentation
-                        li Games module guide
+                        li Diet detection explained
                         li Tips & best practices
                         li Troubleshooting help
                     a.btn.btn-sm.btn-outline-secondary.mt-3(href="/help") View Documentation →
-
-    //- Divider
-    .position-relative.text-center.my-5
-        hr
-        span.position-absolute.top-50.start-50.translate-middle.px-3.bg-dark.rounded-pill.border.border-secondary.text-white-50.small
-            | Supported Item Types
-
-    //- Item types showcase
-    .row.row-cols-2.row-cols-md-4.row-cols-xl-7.g-3.mb-4.text-center
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-book.fs-2.mb-2.text-primary
-                .small Books
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-tools.fs-2.mb-2.text-warning
-                .small Tools
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-controller.fs-2.mb-2.text-success
-                .small Games
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-cpu.fs-2.mb-2.text-info
-                .small Electronics
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-bag.fs-2.mb-2.text-danger
-                .small Clothing
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-gem.fs-2.mb-2.text-primary
-                .small Collectibles
-        .col
-            .card.text-bg-dark.border-secondary.py-3.hover-scale
-                i.bi.bi-three-dots.fs-2.mb-2.text-secondary
-                .small Other
 
     if !user
         //- Call to action for non-logged users
@@ -246,8 +209,8 @@ block content
             .card.text-bg-dark.border-primary.p-4
                 h3.h4.mb-3
                     i.bi.bi-rocket-takeoff.me-2
-                    | Ready to get organized?
-                p.text-white-50.mb-4 Join now and start managing your inventory in minutes.
+                    | Ready to find your next meal?
+                p.text-white-50.mb-4 Join now and start managing your team's delivery restaurants.
                 .d-flex.flex-wrap.justify-content-center.gap-3
                     a.btn.btn-primary.btn-lg.px-4(href="/users/register")
                         i.bi.bi-person-plus.me-2
@@ -264,10 +227,4 @@ block scripts
         .hover-lift:hover {
             transform: translateY(-4px);
             box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-        }
-        .hover-scale {
-            transition: transform 0.2s ease;
-        }
-        .hover-scale:hover {
-            transform: scale(1.05);
         }

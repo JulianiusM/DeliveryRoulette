@@ -13,7 +13,7 @@ Items are prioritized P0 (critical/blocking) → P1 (high/should-fix-soon) → P
 |----------|-------|------------|
 | P0 | 3 | Security, Documentation |
 | P1 | 4 | Data Layer, Provider Integration |
-| P2 | 9 | Tests, UX, Cleanup |
+| P2 | 13 | Tests, UX, Cleanup, Security, Instructions |
 
 ---
 
@@ -342,23 +342,94 @@ Several documentation files describe features from a different application templ
 
 ---
 
+### Issue 17: Fix Copilot/AI instruction references
+
+**Labels:** `type:docs`, `area:docs`, `prio:P2`
+
+**Description:**
+The testing quick reference file references `tests/data/builders/` which does not exist. The reference should be corrected.
+
+**Acceptance Criteria:**
+- [ ] Fix or remove reference to `tests/data/builders/` in `.github/copilot/testing-quick-reference.md`
+- [ ] Verify all file paths in AI instruction files are accurate
+
+**File Pointers:**
+- `.github/copilot/testing-quick-reference.md`
+
+---
+
+### Issue 18: Remove settings for non-existent features
+
+**Labels:** `type:chore`, `area:backend`, `prio:P2`
+
+**Description:**
+`src/modules/settings.ts` still contains `paginationDefaultGames` which references a non-existent Games module.
+
+**Acceptance Criteria:**
+- [ ] Remove `paginationDefaultGames` from settings type, defaults, key mapping, and coercion
+- [ ] Verify no code references this setting
+
+**File Pointers:**
+- `src/modules/settings.ts`
+
+---
+
+### Issue 19: Fix dashboard to show actual DeliveryRoulette metrics
+
+**Labels:** `type:bug`, `area:frontend`, `prio:P2`
+
+**Description:**
+`dashboard.pug` shows item/loan stats and quick action buttons for non-existent features (Items, Locations, Barcode Scan, Lending). It should show restaurant count, suggestion stats, and relevant quick actions.
+
+**Acceptance Criteria:**
+- [ ] Replace item/loan stats with restaurant and suggestion metrics
+- [ ] Update quick action buttons to point to Restaurants, Suggestions, Import, Providers
+- [ ] Update route handler to pass correct data
+
+**File Pointers:**
+- `src/views/users/dashboard.pug`
+- `src/routes/users.ts`
+
+---
+
+### Issue 20: Add OIDC/email module tests
+
+**Labels:** `type:test`, `area:backend`, `prio:P2`
+
+**Description:**
+OIDC authentication flow and email sending have no tests. At minimum, unit tests for the non-external-dependent logic should exist.
+
+**Acceptance Criteria:**
+- [ ] Add basic tests for email template generation
+- [ ] Add tests for OIDC session handling helpers
+
+**File Pointers:**
+- `src/modules/oidc.ts`
+- `src/modules/email.ts`
+
+---
+
 ## Dependency Map
 
 ```
-Issue 1 (CSRF)     — independent
-Issue 2 (Validation) — independent
-Issue 3 (Dead links) — independent
-Issue 4 (Transactions) — independent
-Issue 5 (FK indexes) — independent
+Issue 1 (CSRF)          — independent
+Issue 2 (Validation)    — independent
+Issue 3 (Dead links)    — independent
+Issue 4 (Transactions)  — independent
+Issue 5 (FK indexes)    — independent
 Issue 6 (Rate limiting) — independent, but complements Issue 7
 Issue 7 (Cache integration) — depends on Issue 8 (cache tests)
-Issue 8 (Cache tests) — independent
+Issue 8 (Cache tests)   — independent
 Issue 9 (Connector tests) — independent
 Issue 10 (Middleware tests) — independent
 Issue 11 (Protocol validation) — independent
-Issue 12 (Cookie/CSP) — independent
+Issue 12 (Cookie/CSP)   — independent
 Issue 13 (Sync locking) — independent
-Issue 14 (Delete docs) — independent
+Issue 14 (Delete docs)  — independent
 Issue 15 (Rewrite ARCHITECTURE.md) — after Issue 14
 Issue 16 (Service tests) — independent
+Issue 17 (AI instruction refs) — independent
+Issue 18 (Dead settings) — independent
+Issue 19 (Dashboard fix) — extends Issue 3
+Issue 20 (OIDC/email tests) — independent
 ```
