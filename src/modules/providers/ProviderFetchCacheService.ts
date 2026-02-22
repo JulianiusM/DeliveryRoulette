@@ -67,7 +67,9 @@ export async function getOrFetch(
         }
 
         return {body: response.body, statusCode: response.status};
-    } catch {
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[ProviderFetchCache] Failed to fetch ${url}: ${msg}`);
         return null;
     }
 }

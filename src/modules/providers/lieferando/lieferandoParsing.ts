@@ -267,7 +267,7 @@ function parseMenuFromHtml($: cheerio.CheerioAPI, warnings: string[]): ParsedMen
 function parseDataQaMenu(
     $: cheerio.CheerioAPI,
     menuItems: cheerio.Cheerio<AnyNode>,
-    _warnings: string[],
+    warnings: string[],
 ): ParsedMenuCategory[] {
     const categories: ParsedMenuCategory[] = [];
     let currentCategory: ParsedMenuCategory = {name: 'Menu', items: []};
@@ -303,6 +303,10 @@ function parseDataQaMenu(
         categories.push(currentCategory);
     }
 
+    if (categories.length === 0 && menuItems.length > 0) {
+        warnings.push(`Found ${menuItems.length} menu-item elements but could not extract item data`);
+    }
+
     return categories;
 }
 
@@ -326,7 +330,7 @@ function parseMenuItem($: cheerio.CheerioAPI, $el: cheerio.Cheerio<AnyNode>): Pa
     return {name, description: description || null, price, currency};
 }
 
-function parseHeadingBasedMenu($: cheerio.CheerioAPI, _warnings: string[]): ParsedMenuCategory[] {
+function parseHeadingBasedMenu($: cheerio.CheerioAPI, warnings: string[]): ParsedMenuCategory[] {
     const categories: ParsedMenuCategory[] = [];
     let currentCategory: ParsedMenuCategory = {name: 'Menu', items: []};
 
@@ -361,6 +365,10 @@ function parseHeadingBasedMenu($: cheerio.CheerioAPI, _warnings: string[]): Pars
 
     if (currentCategory.items.length > 0) {
         categories.push(currentCategory);
+    }
+
+    if (categories.length === 0) {
+        warnings.push('No menu items found using heading-based parsing');
     }
 
     return categories;
