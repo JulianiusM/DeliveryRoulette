@@ -196,11 +196,18 @@ function tryPreloadedState($: cheerio.CheerioAPI): ParsedMenuCategory[] {
         for (const pattern of patterns) {
             if (text.includes(pattern)) {
                 try {
-                    // Try to extract JSON from the script
-                    const jsonMatch = text.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const json = JSON.parse(jsonMatch[0]);
+                    // For __NEXT_DATA__ with type="application/json", parse the full text
+                    const type = $(el).attr('type');
+                    if (type === 'application/json') {
+                        const json = JSON.parse(text);
                         searchForMenuData(json, categories, 0);
+                    } else {
+                        // Try to extract first top-level JSON object from assignment
+                        const assignMatch = text.match(/=\s*(\{[\s\S]*\})\s*;?\s*$/);
+                        if (assignMatch) {
+                            const json = JSON.parse(assignMatch[1]);
+                            searchForMenuData(json, categories, 0);
+                        }
                     }
                 } catch {
                     // Ignore parse errors
@@ -212,8 +219,10 @@ function tryPreloadedState($: cheerio.CheerioAPI): ParsedMenuCategory[] {
     return categories;
 }
 
+const MAX_JSON_SEARCH_DEPTH = 10;
+
 function searchForMenuData(obj: unknown, categories: ParsedMenuCategory[], depth: number): void {
-    if (depth > 10 || !obj || typeof obj !== 'object') return;
+    if (depth > MAX_JSON_SEARCH_DEPTH || !obj || typeof obj !== 'object') return;
 
     if (Array.isArray(obj)) {
         // Check if this is an array of menu-like items
