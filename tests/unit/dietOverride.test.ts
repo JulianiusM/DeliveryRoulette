@@ -153,6 +153,57 @@ describe('DietOverrideService', () => {
             expect(vegan!.inference!.reasons!.matchedItems).toHaveLength(2);
         });
 
+        test('multiple overrides and inferences coexist per restaurant', async () => {
+            const testCase = effectiveSuitabilityTestData[5];
+            const tagRepo = createMockRepo(sampleDietTags);
+            const overrideRepo = createMockRepo(testCase.overrides);
+            const inferenceRepo = createMockRepo(testCase.inferences);
+
+            mockGetRepository
+                .mockReturnValueOnce(tagRepo)
+                .mockReturnValueOnce(overrideRepo)
+                .mockReturnValueOnce(inferenceRepo);
+
+            const results = await dietOverrideService.computeEffectiveSuitability('r-1');
+
+            const vegan = results.find(r => r.dietTagKey === 'VEGAN');
+            expect(vegan).toBeDefined();
+            expect(vegan!.supported).toBe(testCase.expectedVegan!.supported);
+            expect(vegan!.source).toBe(testCase.expectedVegan!.source);
+
+            const vegetarian = results.find(r => r.dietTagKey === 'VEGETARIAN');
+            expect(vegetarian).toBeDefined();
+            expect(vegetarian!.supported).toBe(testCase.expectedVegetarian!.supported);
+            expect(vegetarian!.source).toBe(testCase.expectedVegetarian!.source);
+
+            const gf = results.find(r => r.dietTagKey === 'GLUTEN_FREE');
+            expect(gf).toBeDefined();
+            expect(gf!.supported).toBe(testCase.expectedGf!.supported);
+            expect(gf!.source).toBe(testCase.expectedGf!.source);
+        });
+
+        test('inference with null reasonsJson still produces result', async () => {
+            const testCase = effectiveSuitabilityTestData[6];
+            const tagRepo = createMockRepo(sampleDietTags);
+            const overrideRepo = createMockRepo(testCase.overrides);
+            const inferenceRepo = createMockRepo(testCase.inferences);
+
+            mockGetRepository
+                .mockReturnValueOnce(tagRepo)
+                .mockReturnValueOnce(overrideRepo)
+                .mockReturnValueOnce(inferenceRepo);
+
+            const results = await dietOverrideService.computeEffectiveSuitability('r-1');
+
+            const vegan = results.find(r => r.dietTagKey === 'VEGAN');
+            expect(vegan).toBeDefined();
+            expect(vegan!.supported).toBe(true);
+            expect(vegan!.source).toBe('inference');
+            expect(vegan!.inference).toBeDefined();
+            expect(vegan!.inference!.score).toBe(30);
+            expect(vegan!.inference!.reasons).toBeUndefined();
+        });
+
         test('returns results for all diet tags', async () => {
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo([]);

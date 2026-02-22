@@ -43,18 +43,26 @@ export const DIET_KEYWORD_RULES: Record<string, string[]> = {
     VEGAN: [
         'vegan', 'plant-based', 'plant based', 'tofu',
         'tempeh', 'seitan', 'dairy-free', 'dairy free',
+        // German
+        'pflanzlich', 'pflanzenbasiert',
     ],
     VEGETARIAN: [
         'vegetarian', 'veggie', 'vegan', 'meat-free',
         'meat free', 'meatless',
+        // German
+        'vegetarisch', 'fleischlos', 'ohne fleisch',
     ],
     GLUTEN_FREE: [
         'gluten-free', 'gluten free', 'gf', 'celiac',
         'coeliac', 'no gluten',
+        // German
+        'glutenfrei', 'ohne gluten',
     ],
     LACTOSE_FREE: [
         'lactose-free', 'lactose free', 'dairy-free',
         'dairy free', 'no dairy', 'no lactose',
+        // German
+        'laktosefrei', 'ohne laktose', 'milchfrei',
     ],
     HALAL: [
         'halal',

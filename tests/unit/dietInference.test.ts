@@ -7,6 +7,8 @@ import {
     normalizeTextData,
     scoreAndConfidenceData,
     inferForTagData,
+    germanKeywordExpectations,
+    engineVersionData,
 } from '../data/unit/dietInferenceData';
 import {
     normalizeText,
@@ -19,7 +21,20 @@ import {
 describe('DietInferenceService', () => {
     describe('ENGINE_VERSION', () => {
         test('is a non-empty semver-like string', () => {
-            expect(ENGINE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+            expect(ENGINE_VERSION).toMatch(engineVersionData.validFormat);
+        });
+
+        test('matches expected current version', () => {
+            expect(ENGINE_VERSION).toBe(engineVersionData.expectedCurrent);
+        });
+
+        test('version components are non-negative integers', () => {
+            const parts = ENGINE_VERSION.split('.').map(Number);
+            expect(parts).toHaveLength(3);
+            for (const part of parts) {
+                expect(Number.isInteger(part)).toBe(true);
+                expect(part).toBeGreaterThanOrEqual(0);
+            }
         });
     });
 
@@ -39,6 +54,23 @@ describe('DietInferenceService', () => {
                 }
             }
         });
+
+        test('no duplicate keywords within the same tag', () => {
+            for (const [key, keywords] of Object.entries(DIET_KEYWORD_RULES)) {
+                const unique = new Set(keywords);
+                expect(unique.size).toBe(keywords.length);
+            }
+        });
+
+        test.each(germanKeywordExpectations)(
+            'includes German keywords for $key',
+            ({key, expectedKeywords}) => {
+                const rules = DIET_KEYWORD_RULES[key];
+                for (const kw of expectedKeywords) {
+                    expect(rules).toContain(kw);
+                }
+            },
+        );
     });
 
     describe('normalizeText', () => {
