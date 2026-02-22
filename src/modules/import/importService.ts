@@ -12,6 +12,7 @@ import * as providerRefService from '../database/services/RestaurantProviderRefS
 import * as dietInferenceService from '../database/services/DietInferenceService';
 import {AppDataSource} from '../database/dataSource';
 import {Restaurant} from '../database/entities/restaurant/Restaurant';
+import {ProviderKey} from '../../providers/ProviderKey';
 
 // ── Diff types ──────────────────────────────────────────────
 
@@ -270,6 +271,20 @@ async function applySingleRestaurant(incoming: ImportRestaurant): Promise<Restau
                         });
                     }
                 }
+            }
+
+            // Ensure an IMPORT provider ref exists for this restaurant
+            const allRefs = await providerRefService.listByRestaurant(restaurantId);
+            const hasImportRef = allRefs.some(
+                (r) => r.providerKey === ProviderKey.IMPORT,
+            );
+            if (!hasImportRef) {
+                await providerRefService.addProviderRef({
+                    restaurantId,
+                    providerKey: ProviderKey.IMPORT,
+                    externalId: null,
+                    url: `import://${restaurantId}`,
+                });
             }
 
             // Trigger diet inference recompute after menu changes
