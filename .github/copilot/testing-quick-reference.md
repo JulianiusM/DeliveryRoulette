@@ -55,7 +55,7 @@ The project uses **data-driven** and **keyword-driven** testing approaches.
 - Export arrays of test cases with descriptive names
 - Include both success and failure scenarios
 - Cover edge cases and boundary conditions
-- Use test builders for complex objects
+- Use test data files for complex objects
 
 ## Test Keywords Guidelines
 
