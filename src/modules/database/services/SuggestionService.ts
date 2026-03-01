@@ -9,6 +9,7 @@ import {
     parseProviderCuisineList,
 } from './CuisineInferenceService';
 import {normalizeText} from './DietInferenceService';
+import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -25,6 +26,8 @@ export interface SuggestionFilters {
     doNotSuggestIds?: string[];
     /** Restaurant IDs marked as favorites (boosted in random selection) */
     favoriteIds?: string[];
+    /** When true, only suggest restaurants that are currently open */
+    openOnly?: boolean;
 }
 
 export interface DietMatchDetail {
@@ -79,6 +82,13 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
         filtered = filtered.filter((restaurant) =>
             cuisineExcludes.every((query) => !restaurantMatchesCuisineQuery(restaurant, query)),
         );
+    }
+
+    if (filters.openOnly) {
+        filtered = filtered.filter((restaurant) => {
+            const isOpen = computeIsOpenNowFromOpeningHours(restaurant.openingHours);
+            return isOpen === true;
+        });
     }
 
     return filtered;

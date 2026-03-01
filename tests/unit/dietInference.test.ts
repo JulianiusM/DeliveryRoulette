@@ -16,6 +16,7 @@ import {
     inferForTag,
     ENGINE_VERSION,
     DIET_KEYWORD_RULES,
+    ALLERGEN_DIET_EXCLUSIONS,
 } from '../../src/modules/database/services/DietInferenceService';
 
 describe('DietInferenceService', () => {
@@ -87,6 +88,34 @@ describe('DietInferenceService', () => {
             );
             expect(score).toBe(testCase.expectedScore);
             expect(confidence).toBe(testCase.expectedConfidence);
+        });
+    });
+
+    describe('ALLERGEN_DIET_EXCLUSIONS', () => {
+        test('has exclusion entries for egg allergens', () => {
+            expect(ALLERGEN_DIET_EXCLUSIONS['egg']).toContain('VEGAN');
+            expect(ALLERGEN_DIET_EXCLUSIONS['eggs']).toContain('VEGAN');
+            expect(ALLERGEN_DIET_EXCLUSIONS['ei']).toContain('VEGAN');
+        });
+
+        test('has exclusion entries for milk allergens', () => {
+            expect(ALLERGEN_DIET_EXCLUSIONS['milk']).toContain('VEGAN');
+            expect(ALLERGEN_DIET_EXCLUSIONS['milk']).toContain('LACTOSE_FREE');
+        });
+
+        test('has exclusion entries for gluten allergens', () => {
+            expect(ALLERGEN_DIET_EXCLUSIONS['gluten']).toContain('GLUTEN_FREE');
+            expect(ALLERGEN_DIET_EXCLUSIONS['wheat']).toContain('GLUTEN_FREE');
+        });
+
+        test('has exclusion entries for pork allergens', () => {
+            expect(ALLERGEN_DIET_EXCLUSIONS['pork']).toContain('HALAL');
+        });
+
+        test('all exclusion keys are lowercase', () => {
+            for (const key of Object.keys(ALLERGEN_DIET_EXCLUSIONS)) {
+                expect(key).toBe(key.toLowerCase());
+            }
         });
     });
 

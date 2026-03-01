@@ -14,15 +14,20 @@ jest.mock('../../src/modules/database/dataSource', () => ({
 jest.mock('../../src/modules/database/services/DietOverrideService');
 import * as dietOverrideService from '../../src/modules/database/services/DietOverrideService';
 
+// Mock the openingHours module
+jest.mock('../../src/modules/lib/openingHours');
+import * as openingHours from '../../src/modules/lib/openingHours';
+const mockComputeIsOpenNow = openingHours.computeIsOpenNowFromOpeningHours as jest.Mock;
+
 import {AppDataSource} from '../../src/modules/database/dataSource';
 import * as suggestionService from '../../src/modules/database/services/SuggestionService';
 
 const mockComputeEffectiveSuitability = dietOverrideService.computeEffectiveSuitability as jest.Mock;
 
 const sampleRestaurants = [
-    {id: 'r1', name: 'Vegan Garden', isActive: true},
-    {id: 'r2', name: 'Pizza Palace', isActive: true},
-    {id: 'r3', name: 'Burger Joint', isActive: true},
+    {id: 'r1', name: 'Vegan Garden', isActive: true, openingHours: 'delivery: Mon 10:00-22:00'},
+    {id: 'r2', name: 'Pizza Palace', isActive: true, openingHours: 'delivery: Mon 10:00-22:00'},
+    {id: 'r3', name: 'Burger Joint', isActive: true, openingHours: 'delivery: Mon 10:00-22:00'},
 ];
 
 // Mock query builder chain
@@ -192,6 +197,34 @@ describe('SuggestionService', () => {
             const result = await suggestionService.findActiveRestaurants({cuisineIncludes: ['indisch']});
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe('r1');
+        });
+
+        test('filters by open-only when openOnly is true', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            // r1 is open, r2 is closed, r3 has unknown hours
+            mockComputeIsOpenNow
+                .mockReturnValueOnce(true)
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(null);
+
+            const result = await suggestionService.findActiveRestaurants({openOnly: true});
+            expect(result).toHaveLength(1);
+            expect(result[0].id).toBe('r1');
+        });
+
+        test('does not filter by open status when openOnly is false', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            const result = await suggestionService.findActiveRestaurants({openOnly: false});
+            expect(result).toHaveLength(3);
+            expect(mockComputeIsOpenNow).not.toHaveBeenCalled();
         });
     });
 

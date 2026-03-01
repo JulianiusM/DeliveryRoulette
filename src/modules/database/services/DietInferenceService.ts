@@ -6,7 +6,7 @@ import {MenuItemDietOverride} from '../entities/diet/MenuItemDietOverride';
 import {MenuCategory} from '../entities/menu/MenuCategory';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '3.0.0';
+export const ENGINE_VERSION = '4.0.0';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -58,6 +58,7 @@ export interface InferenceMenuItem {
     description?: string | null;
     dietContext?: string | null;
     categoryName?: string | null;
+    allergens?: string | null;
 }
 
 /**
@@ -211,6 +212,75 @@ const CONTRADICTION_PATTERNS: Record<string, RegExp[]> = {
         /\bnot halal\b/i,
     ],
 };
+
+/**
+ * Map of normalized allergen tokens to the diet tags they disqualify.
+ * When an item's allergen list contains a matching token, the item is excluded
+ * for the corresponding diet tags. This provides a strong signal that overrides
+ * positive keyword matches, reducing false positives from items like
+ * "Asian Noodles with Tofu" that contain eggs despite having vegan keywords.
+ *
+ * Keys are lowercase tokens matched via word-boundary regex against the
+ * normalized allergen string. Values are arrays of diet-tag keys the allergen
+ * disqualifies.
+ */
+export const ALLERGEN_DIET_EXCLUSIONS: Record<string, string[]> = {
+    // Egg allergens → exclude VEGAN
+    egg: ['VEGAN'],
+    eggs: ['VEGAN'],
+    ei: ['VEGAN'],
+    eier: ['VEGAN'],
+    // Milk/dairy allergens → exclude VEGAN, LACTOSE_FREE
+    milk: ['VEGAN', 'LACTOSE_FREE'],
+    milch: ['VEGAN', 'LACTOSE_FREE'],
+    dairy: ['VEGAN', 'LACTOSE_FREE'],
+    lactose: ['LACTOSE_FREE'],
+    laktose: ['LACTOSE_FREE'],
+    // Gluten allergens → exclude GLUTEN_FREE
+    gluten: ['GLUTEN_FREE'],
+    wheat: ['GLUTEN_FREE'],
+    weizen: ['GLUTEN_FREE'],
+    barley: ['GLUTEN_FREE'],
+    gerste: ['GLUTEN_FREE'],
+    rye: ['GLUTEN_FREE'],
+    roggen: ['GLUTEN_FREE'],
+    // Pork allergens → exclude HALAL
+    pork: ['HALAL'],
+    schwein: ['HALAL'],
+    // Fish/shellfish (informational) → exclude VEGAN, VEGETARIAN
+    fish: ['VEGAN', 'VEGETARIAN'],
+    fisch: ['VEGAN', 'VEGETARIAN'],
+    shellfish: ['VEGAN', 'VEGETARIAN'],
+    crustaceans: ['VEGAN', 'VEGETARIAN'],
+};
+
+/**
+ * Parse a comma-separated allergen string into normalized tokens.
+ */
+function parseAllergenTokens(allergens?: string | null): string[] {
+    if (!allergens || !allergens.trim()) return [];
+    return allergens
+        .split(/[,|;]+/)
+        .flatMap((part) => part.trim().toLowerCase().split(/\s+/))
+        .filter((token) => token.length > 0);
+}
+
+/**
+ * Check if an item's allergens disqualify it for a specific diet tag.
+ * Returns the list of allergen tokens that triggered the exclusion.
+ */
+function findAllergenExclusions(allergens: string | null | undefined, dietTagKey: string): string[] {
+    const tokens = parseAllergenTokens(allergens);
+    if (tokens.length === 0) return [];
+    const exclusions: string[] = [];
+    for (const token of tokens) {
+        const excludedDiets = ALLERGEN_DIET_EXCLUSIONS[token];
+        if (excludedDiets && excludedDiets.includes(dietTagKey)) {
+            exclusions.push(token);
+        }
+    }
+    return [...new Set(exclusions)];
+}
 
 function hasCrossContamination(text: string): boolean {
     return CROSS_CONTAMINATION_PATTERNS.some((pattern) => pattern.test(text));
@@ -547,6 +617,7 @@ export function inferForTag(
         const contradiction = hasContradiction(dietTag.key, text);
         const contextFalsePositive = hasContextFalsePositive(dietTag.key, text, nameText);
         const crossContamination = hasCrossContamination(text);
+        const allergenExclusions = findAllergenExclusions(item.allergens, dietTag.key);
 
         if (contradiction) {
             penalties.push('contradiction');
@@ -554,6 +625,10 @@ export function inferForTag(
 
         if (contextFalsePositive) {
             penalties.push('context-false-positive');
+        }
+
+        if (allergenExclusions.length > 0) {
+            penalties.push(`allergen:${allergenExclusions.join(',')}`);
         }
 
         if (negativeHits.length > 0 && !crossContamination) {
@@ -637,6 +712,7 @@ export async function getActiveMenuItems(restaurantId: string): Promise<Inferenc
                 description: item.description ?? null,
                 dietContext: item.dietContext ?? null,
                 categoryName: category.name,
+                allergens: item.allergens ?? null,
             });
         }
     }
