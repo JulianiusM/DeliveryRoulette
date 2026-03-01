@@ -2,6 +2,7 @@ import {AppDataSource} from '../dataSource';
 import {DietManualOverride} from '../entities/diet/DietManualOverride';
 import {DietInferenceResult} from '../entities/diet/DietInferenceResult';
 import {DietTag} from '../entities/diet/DietTag';
+import {ENGINE_VERSION} from './DietInferenceService';
 
 // ── Override CRUD ──────────────────────────────────────────
 
@@ -84,17 +85,53 @@ export interface EffectiveSuitability {
         score: number;
         confidence: string;
         reasons?: {
-            matchedItems: Array<{itemId: string; itemName: string; keywords: string[]}>;
+            matchedItems: Array<{
+                itemId: string;
+                itemName: string;
+                keywords: string[];
+                source?: 'heuristic' | 'manual_override';
+            }>;
+            excludedItems?: Array<{
+                itemId: string;
+                itemName: string;
+                keywords: string[];
+                excludedBy: string[];
+            }>;
             totalMenuItems: number;
             matchRatio: number;
+            scoreBreakdown?: {
+                ratioScore: number;
+                confidenceMultiplier: number;
+                evidenceBoost: number;
+                evidencePenalty: number;
+                finalScore: number;
+            };
         };
     };
 }
 
 interface InferenceReasons {
-    matchedItems: Array<{itemId: string; itemName: string; keywords: string[]}>;
+    matchedItems: Array<{
+        itemId: string;
+        itemName: string;
+        keywords: string[];
+        source?: 'heuristic' | 'manual_override';
+    }>;
+    excludedItems?: Array<{
+        itemId: string;
+        itemName: string;
+        keywords: string[];
+        excludedBy: string[];
+    }>;
     totalMenuItems: number;
     matchRatio: number;
+    scoreBreakdown?: {
+        ratioScore: number;
+        confidenceMultiplier: number;
+        evidenceBoost: number;
+        evidencePenalty: number;
+        finalScore: number;
+    };
 }
 
 /**
@@ -108,8 +145,10 @@ function parseReasons(reasonsJson: string | undefined | null): InferenceReasons 
         if (parsed && Array.isArray(parsed.matchedItems)) {
             return {
                 matchedItems: parsed.matchedItems,
+                excludedItems: Array.isArray(parsed.excludedItems) ? parsed.excludedItems : undefined,
                 totalMenuItems: parsed.totalMenuItems ?? 0,
                 matchRatio: parsed.matchRatio ?? 0,
+                scoreBreakdown: parsed.scoreBreakdown ?? undefined,
             };
         }
     } catch { /* ignore malformed JSON */ }
@@ -140,10 +179,21 @@ export async function computeEffectiveSuitability(
 
     const dietTags = await tagRepo.find({order: {key: 'ASC'}});
     const overrides = await overrideRepo.find({where: {restaurantId}});
-    const inferences = await inferenceRepo.find({where: {restaurantId}});
+    const inferences = await inferenceRepo.find({
+        where: {
+            restaurantId,
+            engineVersion: ENGINE_VERSION,
+        },
+        order: {computedAt: 'DESC'},
+    });
 
     const overrideMap = new Map(overrides.map(o => [o.dietTagId, o]));
-    const inferenceMap = new Map(inferences.map(i => [i.dietTagId, i]));
+    const inferenceMap = new Map<string, DietInferenceResult>();
+    for (const inference of inferences) {
+        if (!inferenceMap.has(inference.dietTagId)) {
+            inferenceMap.set(inference.dietTagId, inference);
+        }
+    }
 
     return dietTags.map(tag => {
         const override = overrideMap.get(tag.id);
@@ -168,13 +218,15 @@ export async function computeEffectiveSuitability(
         }
 
         if (inference) {
+            const inferenceDetail = buildInferenceDetail(inference);
+            const matchedCount = inferenceDetail.reasons?.matchedItems?.length ?? 0;
             return {
                 dietTagId: tag.id,
                 dietTagKey: tag.key,
                 dietTagLabel: tag.label,
-                supported: inference.score > 0,
+                supported: inference.score > 0 || matchedCount > 0,
                 source: 'inference' as const,
-                inference: buildInferenceDetail(inference),
+                inference: inferenceDetail,
             };
         }
 

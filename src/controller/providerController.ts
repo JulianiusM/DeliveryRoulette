@@ -8,7 +8,7 @@
 import * as ConnectorRegistry from '../providers/ConnectorRegistry';
 import {ProviderKey} from '../providers/ProviderKey';
 import {ConnectorCapabilities} from '../providers/DeliveryProviderConnector';
-import {runSync} from '../modules/sync/ProviderSyncService';
+import {queueSync, queueImportFromUrl, QueuedSyncJob} from '../modules/sync/ProviderSyncService';
 import {AppDataSource} from '../modules/database/dataSource';
 import {ProviderSourceConfig} from '../modules/database/entities/provider/ProviderSourceConfig';
 import {ExpectedError} from '../modules/lib/errors';
@@ -51,7 +51,7 @@ export async function getProvidersPageData(userId: string): Promise<{providers: 
 /**
  * Trigger a listing-based sync for a provider.
  */
-export async function syncProvider(userId: string, providerKey: string, listingUrl: string) {
+export async function syncProvider(userId: string, providerKey: string, listingUrl: string): Promise<QueuedSyncJob> {
     if (!listingUrl?.trim()) {
         throw new ExpectedError('Please provide a listing URL', 'error', 400);
     }
@@ -76,15 +76,16 @@ export async function syncProvider(userId: string, providerKey: string, listingU
     // Save config
     await saveSourceConfig(userId, providerKey, listingUrl.trim());
 
-    // Run the unified sync pipeline with the listing URL as query
-    const result = await runSync({connector, query: listingUrl.trim()});
-    return result;
+    return await queueSync({
+        providerKey: connector.providerKey as ProviderKey,
+        query: listingUrl.trim(),
+    });
 }
 
 /**
  * Import a single restaurant from a URL via a provider.
  */
-export async function importFromUrl(userId: string, providerKey: string, menuUrl: string) {
+export async function importFromUrl(userId: string, providerKey: string, menuUrl: string): Promise<QueuedSyncJob> {
     if (!menuUrl?.trim()) {
         throw new ExpectedError('Please provide a restaurant URL', 'error', 400);
     }
@@ -106,10 +107,10 @@ export async function importFromUrl(userId: string, providerKey: string, menuUrl
         }
     }
 
-    // Use the unified sync pipeline: listRestaurants with the menu URL as query
-    // The connector's listRestaurants treats a menu URL as a single-restaurant listing
-    const result = await runSync({connector, query: menuUrl.trim()});
-    return result;
+    return await queueImportFromUrl(
+        connector.providerKey as ProviderKey,
+        menuUrl.trim(),
+    );
 }
 
 // ── Internal helpers ──────────────────────────────────────────

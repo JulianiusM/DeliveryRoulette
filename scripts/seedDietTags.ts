@@ -1,36 +1,23 @@
 import 'reflect-metadata';
 import {DataSource} from 'typeorm';
-import {DietTag} from '../src/modules/database/entities/diet/DietTag';
 import {entities, migrations, subscribers} from '../src/modules/database/__index__';
+import {
+    DEFAULT_DIET_TAGS as SERVICE_DEFAULT_DIET_TAGS,
+    ensureDefaultDietTags,
+} from '../src/modules/database/services/DietTagService';
 
 /**
  * Default diet tags to seed.
  * Each entry has a unique key and a human-readable label.
  */
-export const DEFAULT_DIET_TAGS: { key: string; label: string }[] = [
-    {key: 'VEGAN', label: 'Vegan'},
-    {key: 'VEGETARIAN', label: 'Vegetarian'},
-    {key: 'GLUTEN_FREE', label: 'Gluten-free'},
-    {key: 'LACTOSE_FREE', label: 'Lactose-free'},
-    {key: 'HALAL', label: 'Halal'},
-];
+export const DEFAULT_DIET_TAGS = SERVICE_DEFAULT_DIET_TAGS;
 
 /**
  * Idempotent seed: inserts only tags whose key does not already exist.
  * Safe to run multiple times – never duplicates rows.
  */
 export async function seedDietTags(dataSource: DataSource): Promise<number> {
-    const repo = dataSource.getRepository(DietTag);
-
-    const existingTags = await repo.find({select: ['key']});
-    const existingKeys = new Set(existingTags.map((t) => t.key));
-
-    const newTags = DEFAULT_DIET_TAGS.filter((t) => !existingKeys.has(t.key));
-    if (newTags.length > 0) {
-        await repo.save(newTags.map((t) => repo.create(t)));
-    }
-
-    return newTags.length;
+    return ensureDefaultDietTags(dataSource);
 }
 
 /* ---- CLI entry-point ---- */

@@ -7,6 +7,11 @@ block title
             | Provider Settings
 
 block content
+    .d-flex.justify-content-end.mb-3
+        a.btn.btn-outline-light(href="/sync/jobs")
+            i.bi.bi-list-check.me-1
+            | View Sync Jobs
+
     if data.providers && data.providers.length > 0
         each provider in data.providers
             .card.bg-dark.text-white.mb-4

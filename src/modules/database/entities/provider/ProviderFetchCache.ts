@@ -17,12 +17,19 @@ export class ProviderFetchCache {
     @Column("int", {name: "status_code"})
     statusCode!: number;
 
-    @Column("timestamp", {name: "fetched_at"})
+    @Column("timestamp", {
+        name: "fetched_at",
+        default: () => "CURRENT_TIMESTAMP",
+    })
     fetchedAt!: Date;
 
-    @Column("timestamp", {name: "expires_at"})
+    @Column("timestamp", {
+        name: "expires_at",
+        default: () => "CURRENT_TIMESTAMP",
+    })
     expiresAt!: Date;
 
     @Column("longtext", {name: "body", nullable: true})
     body?: string | null;
 }
+

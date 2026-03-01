@@ -68,7 +68,12 @@ block content
                                 checked=tag.selected)
                             label.form-check-label(for=("diet-" + tag.key))= tag.label
             else
-                p.text-white-50 No diet tags available. Run the diet tag seed script to add them.
+                p.text-white-50 No diet tags available right now.
+
+        .col-12
+            a.btn.btn-outline-info.btn-sm(href="/users/settings/diets")
+                i.bi.bi-sliders.me-1
+                | Configure Global Diet Heuristics
 
         //── Buttons ──────────────────────────────────
         .col-12.d-flex.gap-2.mt-2

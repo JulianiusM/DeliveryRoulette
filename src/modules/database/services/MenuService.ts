@@ -66,6 +66,8 @@ export async function deleteCategory(id: string): Promise<boolean> {
 export async function createItem(data: {
     name: string;
     description?: string | null;
+    dietContext?: string | null;
+    allergens?: string | null;
     price?: number | null;
     currency?: string | null;
     sortOrder?: number;
@@ -75,6 +77,8 @@ export async function createItem(data: {
     const item = repo.create({
         name: data.name,
         description: data.description ?? null,
+        dietContext: data.dietContext ?? null,
+        allergens: data.allergens ?? null,
         price: data.price ?? null,
         currency: data.currency ?? null,
         sortOrder: data.sortOrder ?? 0,
@@ -87,6 +91,8 @@ export async function createItem(data: {
 export async function updateItem(id: string, data: {
     name?: string;
     description?: string | null;
+    dietContext?: string | null;
+    allergens?: string | null;
     price?: number | null;
     currency?: string | null;
     sortOrder?: number;
@@ -138,7 +144,14 @@ export async function upsertCategories(
     const seenIds = new Set<string>();
     const results: MenuCategory[] = [];
 
-    for (const data of incoming) {
+    const normalizedIncoming = incoming
+        .map((entry) => ({
+            name: entry.name.trim(),
+            sortOrder: entry.sortOrder,
+        }))
+        .filter((entry) => entry.name.length > 0);
+
+    for (const data of normalizedIncoming) {
         const key = data.name.toLowerCase();
         const found = existingByName.get(key);
         if (found) {
@@ -151,6 +164,7 @@ export async function upsertCategories(
             const created = await createCategory({name: data.name, sortOrder: data.sortOrder, restaurantId});
             results.push(created);
             seenIds.add(created.id);
+            existingByName.set(key, created);
         }
     }
 
@@ -172,7 +186,15 @@ export async function upsertCategories(
  */
 export async function upsertItems(
     categoryId: string,
-    incoming: Array<{name: string; description?: string | null; price?: number | null; currency?: string | null; sortOrder?: number}>,
+    incoming: Array<{
+        name: string;
+        description?: string | null;
+        dietContext?: string | null;
+        allergens?: string | null;
+        price?: number | null;
+        currency?: string | null;
+        sortOrder?: number;
+    }>,
 ): Promise<MenuItem[]> {
     const repo = AppDataSource.getRepository(MenuItem);
     const existing = await repo.find({where: {categoryId}});
@@ -180,11 +202,20 @@ export async function upsertItems(
     const seenIds = new Set<string>();
     const results: MenuItem[] = [];
 
-    for (const data of incoming) {
+    const normalizedIncoming = incoming
+        .map((entry) => ({
+            ...entry,
+            name: entry.name.trim(),
+        }))
+        .filter((entry) => entry.name.length > 0);
+
+    for (const data of normalizedIncoming) {
         const key = data.name.toLowerCase();
         const found = existingByName.get(key);
         if (found) {
             found.description = data.description ?? found.description;
+            found.dietContext = data.dietContext ?? found.dietContext;
+            found.allergens = data.allergens ?? found.allergens;
             found.price = data.price ?? found.price;
             found.currency = data.currency ?? found.currency;
             found.sortOrder = data.sortOrder ?? found.sortOrder;
@@ -196,6 +227,7 @@ export async function upsertItems(
             const created = await createItem({...data, categoryId});
             results.push(created);
             seenIds.add(created.id);
+            existingByName.set(key, created);
         }
     }
 

@@ -28,15 +28,9 @@ router.post('/:providerKey/sync', requireAuth, validateProviderSync, handleValid
     const {providerKey} = req.params;
     const {listingUrl} = req.body;
     const result = await providerController.syncProvider(userId, providerKey, listingUrl);
+    req.flash('info', `Sync job queued (${result.jobId}). Track progress on Sync Jobs.`);
 
-    if (result.restaurants.some(r => !r.success)) {
-        const errors = result.restaurants.filter(r => !r.success).map(r => r.error).join('; ');
-        req.flash('error', `Synced ${result.restaurantsSynced} restaurants. Errors: ${errors}`);
-    } else {
-        req.flash('success', `Successfully synced ${result.restaurantsSynced} restaurants.`);
-    }
-
-    res.redirect('/providers');
+    res.redirect('/sync/jobs');
 }));
 
 /**
@@ -48,14 +42,9 @@ router.post('/:providerKey/import-url', requireAuth, validateProviderImportUrl, 
     const {providerKey} = req.params;
     const {menuUrl} = req.body;
     const result = await providerController.importFromUrl(userId, providerKey, menuUrl);
+    req.flash('info', `Import job queued (${result.jobId}). Track progress on Sync Jobs.`);
 
-    if (result.restaurantsSynced > 0) {
-        req.flash('success', `Successfully imported ${result.restaurantsSynced} restaurant(s).`);
-    } else {
-        req.flash('info', 'Import completed but no restaurants were found at the given URL.');
-    }
-
-    res.redirect('/providers');
+    res.redirect('/sync/jobs');
 }));
 
 export default router;

@@ -31,11 +31,17 @@ describe('DietTag seed', () => {
             const store = [...existingTags];
             const mockRepo = {
                 find: jest.fn(() => Promise.resolve(store.map((t) => ({key: t.key})))),
-                create: jest.fn((data: { key: string; label: string }) => ({...data})),
-                save: jest.fn((entities: { key: string; label: string }[]) => {
-                    const toSave = Array.isArray(entities) ? entities : [entities];
-                    store.push(...toSave);
-                    return Promise.resolve(toSave);
+                upsert: jest.fn((entities: { key: string; label: string }[]) => {
+                    const values = Array.isArray(entities) ? entities : [entities];
+                    for (const value of values) {
+                        const existingIndex = store.findIndex((item) => item.key === value.key);
+                        if (existingIndex >= 0) {
+                            store[existingIndex] = {...store[existingIndex], label: value.label};
+                        } else {
+                            store.push({...value});
+                        }
+                    }
+                    return Promise.resolve({identifiers: [], generatedMaps: [], raw: []});
                 }),
             } as unknown as Repository<DietTag>;
 

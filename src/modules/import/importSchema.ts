@@ -12,6 +12,7 @@ export const CURRENT_SCHEMA_VERSION = 1;
 export interface ImportMenuItem {
     name: string;
     description?: string | null;
+    allergens?: string[] | null;
     price?: number | null;
     currency?: string | null;
     sortOrder?: number;
@@ -54,6 +55,7 @@ const menuItemSchema = Joi.object<ImportMenuItem>({
     name: Joi.string().trim().min(1).max(150).required()
         .messages({"string.empty": "Menu item name must not be empty"}),
     description: Joi.string().trim().max(500).allow(null).optional(),
+    allergens: Joi.array().items(Joi.string().trim().min(1).max(100)).allow(null).optional(),
     price: Joi.number().precision(2).min(0).allow(null).optional(),
     currency: Joi.string().trim().length(3).allow(null).optional()
         .messages({"string.length": "Currency must be a 3-letter ISO 4217 code"}),

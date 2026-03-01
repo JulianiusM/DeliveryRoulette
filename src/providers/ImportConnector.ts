@@ -59,6 +59,7 @@ export class ImportConnector implements DeliveryProviderConnector {
                     externalId: item.name,
                     name: item.name,
                     description: item.description ?? null,
+                    allergens: item.allergens ?? null,
                     price: item.price ?? null,
                     currency: item.currency ?? null,
                 })),

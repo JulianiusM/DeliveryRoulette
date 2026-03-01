@@ -19,6 +19,9 @@ export class SyncJob {
     @Column("text", {name: "error_message", nullable: true})
     errorMessage?: string | null;
 
+    @Column("text", {name: "sync_query", nullable: true})
+    syncQuery?: string | null;
+
     @Column("timestamp", {
         name: "started_at",
         nullable: true,

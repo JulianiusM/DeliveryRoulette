@@ -7,12 +7,21 @@ export interface DiscoveredRestaurant {
     name: string;
     menuUrl: string;
     cuisines?: string | null;
+    address?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    openingHours?: string | null;
+    openingDays?: string | null;
 }
 
 /** A menu item parsed from a Lieferando menu page. */
 export interface ParsedMenuItem {
+    sourceId?: string | null;
     name: string;
     description?: string | null;
+    dietContext?: string | null;
+    allergens?: string[] | null;
     price?: number | null;
     currency?: string | null;
 }
@@ -26,6 +35,14 @@ export interface ParsedMenuCategory {
 /** Result of parsing a Lieferando menu page. */
 export interface ParsedMenu {
     restaurantName?: string | null;
+    restaurantDetails?: {
+        address?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        country?: string | null;
+        openingHours?: string | null;
+        openingDays?: string | null;
+    } | null;
     categories: ParsedMenuCategory[];
     rawText: string;
     parseOk: boolean;

@@ -92,9 +92,89 @@ export const listRestaurantsData = [
         expectCount: 0,
     },
     {
-        description: 'returns empty array on fetch failure',
+        description: 'returns parsed restaurants for a reachable listing',
         query: 'https://www.lieferando.de/en/delivery/food/berlin',
-        html: null,
+        html: '<html><body><a href="/en/menu/pizza-palast">Pizza Palast</a></body></html>',
         expectCount: 0,
+    },
+];
+
+export const listRestaurantsFailureData = [
+    {
+        description: 'throws when listing request fails with HTTP 403',
+        query: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+        response: {
+            ok: false,
+            status: 403,
+            statusText: 'Forbidden',
+            html: '<html><body>Forbidden</body></html>',
+        },
+        expectedError: 'listing request failed: HTTP 403 Forbidden',
+    },
+    {
+        description: 'throws when network request fails',
+        query: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+        response: null,
+        expectedError: 'Network error',
+    },
+    {
+        description: 'throws when bot-protection page is returned with HTTP 200',
+        query: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+        response: {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            html: '<html><title>Just a moment...</title><body>Cloudflare</body></html>',
+        },
+        expectedError: 'bot-protection page',
+    },
+];
+
+export const listRestaurantsExternalIdData = [
+    {
+        description: 'maps /menu/ URLs to slug external IDs',
+        query: 'https://www.lieferando.de/en/delivery/food/berlin',
+        discovered: [
+            {name: 'Pizza Palast', menuUrl: 'https://www.lieferando.de/en/menu/pizza-palast', cuisines: null},
+        ],
+        expected: [
+            {externalId: 'pizza-palast', name: 'Pizza Palast', url: 'https://www.lieferando.de/en/menu/pizza-palast'},
+        ],
+    },
+    {
+        description: 'maps /restaurant/ URLs to slug external IDs',
+        query: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+        discovered: [
+            {
+                name: 'Burger Point',
+                menuUrl: 'https://www.lieferando.de/en/restaurant/burger-point-neutraubling?cid=abc123',
+                cuisines: null,
+            },
+        ],
+        expected: [
+            {
+                externalId: 'burger-point-neutraubling',
+                name: 'Burger Point',
+                url: 'https://www.lieferando.de/en/restaurant/burger-point-neutraubling?cid=abc123',
+            },
+        ],
+    },
+    {
+        description: 'falls back to stable URL without query/hash when no slug can be derived',
+        query: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+        discovered: [
+            {
+                name: 'Fallback Restaurant',
+                menuUrl: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073?foo=bar#section',
+                cuisines: null,
+            },
+        ],
+        expected: [
+            {
+                externalId: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073',
+                name: 'Fallback Restaurant',
+                url: 'https://www.lieferando.de/en/delivery/food/neutraubling-93073?foo=bar#section',
+            },
+        ],
     },
 ];

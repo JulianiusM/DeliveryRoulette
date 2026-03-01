@@ -1,4 +1,4 @@
-//- views/restaurants/_diet_suitability.pug – Diet Suitability Partial
+//- views/restaurants/_diet_suitability.pug - Diet Suitability Partial
 //- Expects: r (restaurant), dietSuitability (EffectiveSuitability[])
 
 .card.text-bg-dark.border-secondary.mt-4
@@ -6,9 +6,15 @@
         span
             i.bi.bi-heart-pulse.me-2
             | Diet Suitability
-        button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
-            i.bi.bi-plus-lg.me-1
-            | Add Override
+        .d-flex.gap-2
+            form(method="POST" action=`/restaurants/${r.id}/diet/recompute`)
+                +csrf
+                button.btn.btn-sm.btn-outline-info(type="submit" title="Re-run heuristic analysis")
+                    i.bi.bi-arrow-repeat.me-1
+                    | Re-run Heuristics
+            button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
+                i.bi.bi-plus-lg.me-1
+                | Add Override
     .card-body
         #addOverrideForm.collapse.mb-3
             form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
@@ -16,14 +22,14 @@
                 .row.g-2
                     .col-md-4
                         select.form-select.form-select-sm(name="dietTagId" required)
-                            option(value="" disabled selected) Select diet tag…
+                            option(value="" disabled selected) Select diet tag...
                             each dt in dietSuitability
                                 option(value=dt.dietTagId) #{dt.dietTagLabel}
                     .col-md-3
                         select.form-select.form-select-sm(name="supported" required)
                             option(value="" disabled selected) Supports?
-                            option(value="true") Yes — Supports
-                            option(value="false") No — Does not support
+                            option(value="true") Yes - Supports
+                            option(value="false") No - Does not support
                     .col-md-3
                         input.form-control.form-control-sm(type="text" name="notes" placeholder="Notes (optional)")
                     .col-md-2
@@ -48,13 +54,18 @@
                                     span.badge.text-bg-danger Not Supported
                                 else
                                     span.badge.text-bg-secondary No Data
+
                                 if ds.source === 'override'
-                                    span.badge.text-bg-warning Manual Override
+                                    span.badge.text-bg-warning.text-dark Manual Override
                                 else if ds.source === 'inference'
-                                    span.badge.text-bg-info Heuristic
+                                    span.badge.text-bg-info.text-dark Heuristic
+
                                 if ds.inference
                                     span.badge.text-bg-dark.border.border-secondary Score: #{ds.inference.score}%
                                     span.badge.text-bg-dark.border.border-secondary #{ds.inference.confidence}
+                                    if ds.inference.reasons && ds.inference.reasons.scoreBreakdown
+                                        span.badge.text-bg-dark.border.border-secondary Ratio: #{ds.inference.reasons.scoreBreakdown.ratioScore}%
+
                             .d-flex.align-items-center.gap-1
                                 if ds.source === 'override' || ds.source === 'inference'
                                     button.btn.btn-sm.btn-outline-light(type="button" data-bs-toggle="collapse" data-bs-target=`#explanation-${ds.dietTagId}` title="Show explanation")
@@ -65,7 +76,6 @@
                                         button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove Override")
                                             i.bi.bi-trash
 
-                        //- Explanation panel
                         if ds.source === 'override'
                             .collapse.mt-2(id=`explanation-${ds.dietTagId}`)
                                 .card.text-bg-dark.border-secondary
@@ -87,7 +97,7 @@
                                             p.text-white-50.mb-1
                                                 small
                                                     i.bi.bi-robot.me-1
-                                                    | Heuristic also available — Score: #{ds.inference.score}% (#{ds.inference.confidence})
+                                                    | Heuristic also available - Score: #{ds.inference.score}% (#{ds.inference.confidence})
 
                         else if ds.source === 'inference' && ds.inference
                             .collapse.mt-2(id=`explanation-${ds.dietTagId}`)
@@ -101,16 +111,34 @@
                                                 | Matched&nbsp;
                                                 strong #{ds.inference.reasons.matchedItems.length}
                                                 |  of #{ds.inference.reasons.totalMenuItems} menu items (#{Math.round(ds.inference.reasons.matchRatio * 100)}%)
-                                            ul.list-unstyled.mb-0.ms-2
+                                            if ds.inference.reasons.scoreBreakdown
+                                                p.text-white-50.small.mb-2
+                                                    | Weighted score #{ds.inference.reasons.scoreBreakdown.finalScore}% = ratio #{ds.inference.reasons.scoreBreakdown.ratioScore}% + evidence #{ds.inference.reasons.scoreBreakdown.evidenceBoost} - penalties #{ds.inference.reasons.scoreBreakdown.evidencePenalty}, confidence multiplier #{ds.inference.reasons.scoreBreakdown.confidenceMultiplier}.
+                                            ul.list-unstyled.mb-2.ms-2
                                                 each mi in ds.inference.reasons.matchedItems
                                                     li.mb-1
                                                         i.bi.bi-check2.text-success.me-1
-                                                        | #{mi.itemName}
-                                                        span.text-white-50.ms-1
-                                                            | — keywords:&nbsp;
-                                                            each kw, idx in mi.keywords
-                                                                if idx > 0
-                                                                    | ,&nbsp;
-                                                                span.badge.text-bg-secondary.me-1 #{kw}
+                                                        a.link-light.text-decoration-none(href=`#menu-item-${mi.itemId}`) #{mi.itemName}
+                                                        if mi.source === 'manual_override'
+                                                            span.badge.text-bg-warning.text-dark.ms-1 Manual
+                                                        if mi.keywords && mi.keywords.length > 0
+                                                            span.text-white-50.ms-1
+                                                                | - keywords:&nbsp;
+                                                                each kw, idx in mi.keywords
+                                                                    if idx > 0
+                                                                        | ,&nbsp;
+                                                                    span.badge.text-bg-secondary.me-1 #{kw}
                                         else
-                                            p.text-white-50.mb-0 No matching menu items found.
+                                            p.text-white-50.mb-2 No matching menu items found.
+
+                                        if ds.inference.reasons && ds.inference.reasons.excludedItems && ds.inference.reasons.excludedItems.length > 0
+                                            p.mb-1.mt-2.text-warning
+                                                strong Excluded by safeguards:
+                                            ul.list-unstyled.mb-0.ms-2
+                                                each ex in ds.inference.reasons.excludedItems
+                                                    li.mb-1
+                                                        i.bi.bi-shield-exclamation.text-warning.me-1
+                                                        a.link-light.text-decoration-none(href=`#menu-item-${ex.itemId}`) #{ex.itemName}
+                                                        if ex.excludedBy && ex.excludedBy.length > 0
+                                                            span.text-white-50.ms-1
+                                                                | - #{ex.excludedBy.join(', ')}

@@ -21,6 +21,8 @@ echo "Using repository: ${OWNER_REPO}"
 echo "Building key -> issue number map..."
 
 ISSUES_JSON="$(gh issue list --state all --limit 200 --json number,title)"
+export ISSUES_JSON
+export ISSUES_JSON
 
 python3 - <<'PY'
 import json, os, re, subprocess, tempfile

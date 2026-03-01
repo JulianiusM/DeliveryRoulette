@@ -2,6 +2,13 @@ import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
 import * as dietOverrideService from './DietOverrideService';
 import {EffectiveSuitability} from './DietOverrideService';
+import {
+    getRestaurantCuisineTokens,
+    matchesCuisineFilter,
+    parseCuisineInference,
+    parseProviderCuisineList,
+} from './CuisineInferenceService';
+import {normalizeText} from './DietInferenceService';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -30,6 +37,13 @@ export interface DietMatchDetail {
 
 export interface SuggestionReason {
     matchedDiets: DietMatchDetail[];
+    matchedCuisines: Array<{
+        key: string;
+        label: string;
+        score: number;
+        confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+        source: 'provider' | 'heuristic';
+    }>;
     totalCandidates: number;
 }
 
@@ -48,23 +62,26 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
     const qb = repo.createQueryBuilder('r')
         .where('r.is_active = :active', {active: 1});
 
-    if (filters.cuisineIncludes && filters.cuisineIncludes.length > 0) {
-        const conditions = filters.cuisineIncludes.map((_kw, i) => `r.name LIKE :ci${i}`);
-        const params: Record<string, string> = {};
-        filters.cuisineIncludes.forEach((kw, i) => {
-            params[`ci${i}`] = `%${kw}%`;
-        });
-        qb.andWhere(`(${conditions.join(' OR ')})`, params);
-    }
-
-    if (filters.cuisineExcludes && filters.cuisineExcludes.length > 0) {
-        filters.cuisineExcludes.forEach((kw, i) => {
-            qb.andWhere(`r.name NOT LIKE :ce${i}`, {[`ce${i}`]: `%${kw}%`});
-        });
-    }
-
     qb.orderBy('r.name', 'ASC');
-    return await qb.getMany();
+    const active = await qb.getMany();
+
+    const cuisineIncludes = filters.cuisineIncludes ?? [];
+    const cuisineExcludes = filters.cuisineExcludes ?? [];
+    let filtered = active;
+
+    if (cuisineIncludes.length > 0) {
+        filtered = filtered.filter((restaurant) =>
+            cuisineIncludes.some((query) => restaurantMatchesCuisineQuery(restaurant, query)),
+        );
+    }
+
+    if (cuisineExcludes.length > 0) {
+        filtered = filtered.filter((restaurant) =>
+            cuisineExcludes.every((query) => !restaurantMatchesCuisineQuery(restaurant, query)),
+        );
+    }
+
+    return filtered;
 }
 
 /**
@@ -167,6 +184,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
             restaurant: picked,
             reason: {
                 matchedDiets: [],
+                matchedCuisines: extractMatchedCuisines(picked),
                 totalCandidates: pool.length,
             },
         };
@@ -195,7 +213,48 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
         restaurant: picked.restaurant,
         reason: {
             matchedDiets: picked.matchedDiets,
+            matchedCuisines: extractMatchedCuisines(picked.restaurant),
             totalCandidates: pool.length,
         },
     };
+}
+
+function restaurantMatchesCuisineQuery(restaurant: Restaurant, query: string): boolean {
+    const tokens = getRestaurantCuisineTokens(restaurant);
+    if (tokens.size > 0) {
+        return matchesCuisineFilter(tokens, query);
+    }
+
+    const normalizedName = normalizeText(restaurant.name);
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return false;
+    return normalizedName.includes(normalizedQuery);
+}
+
+function extractMatchedCuisines(restaurant: Restaurant): Array<{
+    key: string;
+    label: string;
+    score: number;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    source: 'provider' | 'heuristic';
+}> {
+    const profile = parseCuisineInference(restaurant.cuisineInferenceJson);
+    if (profile && profile.cuisines.length > 0) {
+        return profile.cuisines.slice(0, 8).map((entry) => ({
+            key: entry.key,
+            label: entry.label,
+            score: entry.score,
+            confidence: entry.confidence,
+            source: entry.source,
+        }));
+    }
+
+    const providerCuisines = parseProviderCuisineList(restaurant.providerCuisinesJson);
+    return providerCuisines.slice(0, 8).map((label) => ({
+        key: normalizeText(label).replace(/\s+/g, '_').toUpperCase(),
+        label,
+        score: 100,
+        confidence: 'HIGH',
+        source: 'provider',
+    }));
 }

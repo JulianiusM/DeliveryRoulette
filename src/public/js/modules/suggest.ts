@@ -50,6 +50,7 @@ function renderResult(data: any): void {
     const r = data.restaurant;
     const reason = data.reason || {};
     const matchedDiets: any[] = reason.matchedDiets || [];
+    const matchedCuisines: any[] = reason.matchedCuisines || [];
 
     // Restaurant name & link
     document.getElementById('resultName')!.textContent = r.name;
@@ -80,6 +81,29 @@ function renderResult(data: any): void {
         }
     } else {
         dietContainer.innerHTML = '<p class="text-white-50 mb-0">No diet filters applied.</p>';
+    }
+
+    const cuisineContainer = document.getElementById('resultCuisines')!;
+    cuisineContainer.innerHTML = '';
+    if (matchedCuisines.length > 0) {
+        const title = document.createElement('p');
+        title.className = 'text-white-50 mb-1';
+        title.innerHTML = '<small>Detected cuisines:</small>';
+        cuisineContainer.appendChild(title);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'd-flex flex-wrap gap-1';
+
+        for (const cuisine of matchedCuisines) {
+            const badge = document.createElement('span');
+            badge.className = cuisine.source === 'provider'
+                ? 'badge text-bg-info text-dark'
+                : 'badge text-bg-dark border border-secondary';
+            badge.textContent = `${cuisine.label} (${cuisine.score}% ${cuisine.confidence})`;
+            wrap.appendChild(badge);
+        }
+
+        cuisineContainer.appendChild(wrap);
     }
 
     // Candidate count

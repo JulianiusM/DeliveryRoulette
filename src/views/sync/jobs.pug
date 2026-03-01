@@ -1,0 +1,105 @@
+//- views/sync/jobs.pug - Sync job status page
+extends ../layout
+
+block meta
+    title Sync Jobs | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-list-check.me-2
+        | Sync Jobs
+
+block content
+    - const jobs = (data && data.jobs) || []
+    - const filterStatus = (data && data.filterStatus) || 'all'
+    - const filterProvider = (data && data.filterProvider) || ''
+    - const providerKeys = (data && data.providerKeys) || []
+    - const hasRunningJobs = !!(data && data.hasRunningJobs)
+
+    form.row.g-2.mb-4(method="GET" action="/sync/jobs")
+        .col-md-4
+            label.form-label.text-white-50(for="statusFilter") Status
+            select.form-select.text-bg-dark#statusFilter(name="status")
+                option(value="all" selected=(filterStatus === 'all')) All
+                option(value="pending" selected=(filterStatus === 'pending')) Pending
+                option(value="in_progress" selected=(filterStatus === 'in_progress')) In Progress
+                option(value="completed" selected=(filterStatus === 'completed')) Completed
+                option(value="failed" selected=(filterStatus === 'failed')) Failed
+        .col-md-4
+            label.form-label.text-white-50(for="providerFilter") Provider
+            select.form-select.text-bg-dark#providerFilter(name="provider")
+                option(value="" selected=(filterProvider === '')) All Providers
+                each key in providerKeys
+                    option(value=key selected=(filterProvider === key))= key
+        .col-md-4.d-flex.align-items-end.gap-2
+            button.btn.btn-primary.flex-fill(type="submit")
+                i.bi.bi-funnel.me-1
+                | Filter
+            a.btn.btn-outline-light.flex-fill(href="/sync/jobs")
+                i.bi.bi-arrow-clockwise.me-1
+                | Refresh
+
+    if jobs.length === 0
+        .text-center.text-white-50.py-4
+            i.bi.bi-inbox.d-block.display-4.mb-2
+            p No sync jobs found.
+    else
+        .table-responsive
+            table.table.table-dark.table-hover
+                thead
+                    tr
+                        th Job ID
+                        th Provider
+                        th Query
+                        th Status
+                        th Synced
+                        th Started
+                        th Finished
+                        th Error
+                tbody
+                    each job in jobs
+                        tr
+                            td
+                                code.small= job.id
+                            td
+                                span.badge.text-bg-secondary= job.providerKey || 'all'
+                            td
+                                if job.syncQuery
+                                    code.small= job.syncQuery.length > 80 ? `${job.syncQuery.slice(0, 80)}...` : job.syncQuery
+                                else
+                                    span.text-white-50 -
+                            td
+                                if job.status === 'completed'
+                                    span.badge.text-bg-success Completed
+                                else if job.status === 'failed'
+                                    span.badge.text-bg-danger Failed
+                                else if job.status === 'in_progress'
+                                    span.badge.text-bg-primary In Progress
+                                else
+                                    span.badge.text-bg-warning.text-dark Pending
+                            td= job.restaurantsSynced
+                            td
+                                if job.startedAt
+                                    | #{new Date(job.startedAt).toLocaleString()}
+                                else
+                                    span.text-white-50 -
+                            td
+                                if job.finishedAt
+                                    | #{new Date(job.finishedAt).toLocaleString()}
+                                else
+                                    span.text-white-50 -
+                            td
+                                if job.errorMessage
+                                    span.text-danger= job.errorMessage
+                                else
+                                    span.text-white-50 -
+
+    if hasRunningJobs
+        p.text-white-50.small.mt-3.mb-0
+            i.bi.bi-info-circle.me-1
+            | Active jobs detected. This page auto-refreshes every 5 seconds.
+
+block scripts
+    if hasRunningJobs
+        script.
+            setTimeout(() => window.location.reload(), 5000);

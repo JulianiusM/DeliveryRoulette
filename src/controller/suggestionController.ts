@@ -32,6 +32,13 @@ export interface SuggestionResultData {
             supported: boolean | null;
             source: 'override' | 'inference' | 'none';
         }>;
+        matchedCuisines: Array<{
+            key: string;
+            label: string;
+            score: number;
+            confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+            source: 'provider' | 'heuristic';
+        }>;
         totalCandidates: number;
     };
 }
@@ -137,6 +144,7 @@ export async function processSuggestion(body: {
  */
 function formatResult(result: SuggestionResult): SuggestionResultData {
     const r = result.restaurant;
+    const matchedCuisines = result.reason.matchedCuisines ?? [];
     return {
         restaurant: {
             id: r.id,
@@ -153,6 +161,13 @@ function formatResult(result: SuggestionResult): SuggestionResultData {
                 dietTagLabel: d.dietTagLabel,
                 supported: d.supported,
                 source: d.source,
+            })),
+            matchedCuisines: matchedCuisines.map((entry) => ({
+                key: entry.key,
+                label: entry.label,
+                score: entry.score,
+                confidence: entry.confidence,
+                source: entry.source,
             })),
             totalCandidates: result.reason.totalCandidates,
         },

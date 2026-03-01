@@ -48,7 +48,7 @@ export const normalizeTextData = [
     {
         description: 'normalizes German text with umlauts',
         input: '  Käsespätzle  Vegetarisch  ',
-        expected: 'käsespätzle vegetarisch',
+        expected: 'kasespatzle vegetarisch',
     },
     {
         description: 'normalizes mixed German/English text',
@@ -78,14 +78,14 @@ export const scoreAndConfidenceData = [
         description: 'low ratio with many items yields MEDIUM confidence',
         matchRatio: 0.1,
         totalMenuItems: 20,
-        expectedScore: 10,
+        expectedScore: 9,
         expectedConfidence: 'MEDIUM',
     },
     {
         description: 'high ratio with many items yields HIGH confidence',
         matchRatio: 0.5,
         totalMenuItems: 10,
-        expectedScore: 50,
+        expectedScore: 52,
         expectedConfidence: 'HIGH',
     },
     {
@@ -99,21 +99,21 @@ export const scoreAndConfidenceData = [
         description: 'small menu with half matches yields MEDIUM',
         matchRatio: 0.5,
         totalMenuItems: 4,
-        expectedScore: 50,
+        expectedScore: 48,
         expectedConfidence: 'MEDIUM',
     },
     {
         description: 'small menu with low ratio yields LOW',
         matchRatio: 0.25,
         totalMenuItems: 4,
-        expectedScore: 25,
+        expectedScore: 21,
         expectedConfidence: 'LOW',
     },
     {
         description: 'threshold ratio 0.3 with many items yields HIGH',
         matchRatio: 0.3,
         totalMenuItems: 10,
-        expectedScore: 30,
+        expectedScore: 31,
         expectedConfidence: 'HIGH',
     },
 ];
@@ -314,6 +314,69 @@ export const inferForTagData = [
         expectedMatchCount: 0,
         expectedMatchedItemIds: [],
     },
+    {
+        description: 'context disclaimer: plant-based item with dairy disclaimer is not vegan',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Plant-Based Burger', description: 'Plant-based patty. The cheese contains dairy products.'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'cross-contamination warning does not automatically exclude vegan alternative',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Vegan Nuggets', description: 'The beef alternatives are prepared on the same grill as the beef patties and may come into contact with them.'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'default dish whitelist detects vegan dishes without explicit vegan keyword',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Falafel Plate', description: 'Served with tahini and salad'},
+            {id: 'item-2', name: 'Chicken Schnitzel', description: 'Breaded chicken breast'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'context false positive: vegan mayo mention on whopper should not mark vegan',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {id: 'item-1', name: 'Whopper', description: 'Whopper also comes with our vegan salad mayonnaise.'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'plant-based whopper is considered vegan when title carries strong qualifier',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Whopper',
+                description: 'The Plant-based Whopper also comes with our vegan salad mayonnaise.',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'explicit vegan claim outweighs serving-context meat words',
+        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        items: [
+            {
+                id: 'item-1',
+                name: 'Teriyaki Dip 25ml',
+                description: "The Teriyaki Sauce is brand new on our menu - and it's vegan too. It's best enjoyed by dipping the new King Nuggets Chicken or the new King Nuggets Plant-based.",
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
     // ── Sample menu fixtures ───────────────────────────────────
     {
         description: 'fully vegan menu: all items match VEGAN tag',
@@ -368,5 +431,6 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '1.0.0',
+    expectedCurrent: '3.0.0',
 };
+

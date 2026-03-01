@@ -1,4 +1,4 @@
-//- views/restaurants/menu/itemForm.pug – Create / Edit Menu Item
+//- views/restaurants/menu/itemForm.pug - Create / Edit Menu Item
 extends ../../layout
 
 block meta
@@ -20,11 +20,12 @@ block content
     - const editing = d.editing || false
     - const restaurantId = d.restaurantId
     - const categoryId = d.categoryId
+    - const dietTags = d.dietTags || []
     - const formAction = editing ? `/restaurants/${restaurantId}/menu/items/${d.id}/edit` : `/restaurants/${restaurantId}/menu/categories/${categoryId}/items/new`
 
     form.row.gy-3(action=formAction method="post")
         +csrf
-        //── Name ────────────────────────────────────────
+
         .col-md-6
             label.form-label.mb-1(for="name")
                 i.bi.bi-cup-hot.me-1
@@ -37,7 +38,6 @@ block content
                 placeholder="Item name"
                 required)
 
-        //── Description ────────────────────────────────
         .col-md-6
             label.form-label.mb-1(for="description")
                 i.bi.bi-card-text.me-1
@@ -49,7 +49,17 @@ block content
                 value=(d.description || '')
                 placeholder="Brief description")
 
-        //── Price ───────────────────────────────────────
+        .col-12
+            label.form-label.mb-1(for="allergens")
+                i.bi.bi-exclamation-triangle.me-1
+                | Allergens
+            textarea#allergens.form-control.text-bg-dark(
+                name="allergens"
+                rows="2"
+                maxlength="2000"
+                placeholder="e.g. gluten, milk, nuts (comma or newline separated)"
+            )= d.allergens || ''
+
         .col-md-4
             label.form-label.mb-1(for="price")
                 i.bi.bi-currency-dollar.me-1
@@ -62,7 +72,6 @@ block content
                 value=(d.price != null ? d.price : '')
                 placeholder="0.00")
 
-        //── Currency ───────────────────────────────────
         .col-md-4
             label.form-label.mb-1(for="currency")
                 i.bi.bi-cash.me-1
@@ -74,7 +83,6 @@ block content
                 value=(d.currency || '')
                 placeholder="EUR")
 
-        //── Sort Order ─────────────────────────────────
         .col-md-4
             label.form-label.mb-1(for="sortOrder")
                 i.bi.bi-sort-numeric-down.me-1
@@ -85,7 +93,6 @@ block content
                 value=(d.sortOrder != null ? d.sortOrder : 0)
                 placeholder="0")
 
-        //── Active ────────────────────────────────────
         if editing
             .col-12
                 .form-check
@@ -95,7 +102,33 @@ block content
                         checked=d.isActive)
                     label.form-check-label(for="isActive") Active
 
-        //── Buttons ──────────────────────────────────
+        if dietTags.length > 0
+            .col-12
+                .card.text-bg-dark.border-secondary
+                    .card-header.py-2.px-3
+                        i.bi.bi-heart-pulse.me-1
+                        | Diet Override (Per Item)
+                    .card-body.py-2.px-3
+                        p.text-white-50.small.mb-2
+                            | Choose "Auto" to keep heuristic detection, or set explicit support for this item.
+                        .table-responsive
+                            table.table.table-dark.table-sm.align-middle.mb-0
+                                thead
+                                    tr
+                                        th Diet Tag
+                                        th(style="width: 220px;") Support
+                                tbody
+                                    each tag in dietTags
+                                        tr
+                                            td
+                                                strong #{tag.label}
+                                                span.text-white-50.ms-2.small #{tag.key}
+                                            td
+                                                select.form-select.form-select-sm.text-bg-dark(name=`dietOverride[${tag.id}]`)
+                                                    option(value="auto" selected=tag.selected === 'auto') Auto
+                                                    option(value="true" selected=tag.selected === 'true') Supported
+                                                    option(value="false" selected=tag.selected === 'false') Not Supported
+
         .col-12.d-flex.gap-2.mt-2
             button.btn.btn-success(type="submit")
                 i.bi.bi-check-lg.me-1

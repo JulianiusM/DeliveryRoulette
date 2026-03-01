@@ -1,9 +1,14 @@
 import * as menuService from "../modules/database/services/MenuService";
 import * as restaurantService from "../modules/database/services/RestaurantService";
+import * as dietTagService from "../modules/database/services/DietTagService";
+import * as menuItemDietOverrideService from "../modules/database/services/MenuItemDietOverrideService";
+import * as dietInferenceService from "../modules/database/services/DietInferenceService";
+import * as cuisineInferenceService from "../modules/database/services/CuisineInferenceService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {MenuCategory} from "../modules/database/entities/menu/MenuCategory";
 import {MenuItem} from "../modules/database/entities/menu/MenuItem";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
+import {DietTag} from "../modules/database/entities/diet/DietTag";
 
 const CATEGORY_FORM_TEMPLATE = 'restaurants/menu/categoryForm';
 const ITEM_FORM_TEMPLATE = 'restaurants/menu/itemForm';
@@ -32,6 +37,63 @@ async function requireItem(id: string): Promise<MenuItem> {
         throw new ExpectedError('Item not found', 'error', 404);
     }
     return item;
+}
+
+interface ItemDietTagOption {
+    id: string;
+    key: string;
+    label: string;
+    selected: 'auto' | 'true' | 'false';
+}
+
+function parseAllergensInput(raw: unknown): string | null {
+    if (typeof raw !== 'string') return null;
+    const parts = raw
+        .split(/[\n,]/g)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    if (parts.length === 0) return null;
+    return [...new Set(parts)].join(', ');
+}
+
+function parseItemDietOverrideInputs(
+    body: any,
+    dietTags: DietTag[],
+): Array<{dietTagId: string; supported: boolean}> {
+    const raw = body?.dietOverride;
+    if (!raw || typeof raw !== 'object') {
+        return [];
+    }
+
+    const byTagId = raw as Record<string, unknown>;
+    return dietTags.flatMap((tag) => {
+        const value = byTagId[tag.id];
+        if (value !== 'true' && value !== 'false') {
+            return [];
+        }
+        return [{
+            dietTagId: tag.id,
+            supported: value === 'true',
+        }];
+    });
+}
+
+function buildItemDietTagOptions(
+    dietTags: DietTag[],
+    selectedByTagId: Map<string, boolean> = new Map(),
+): ItemDietTagOption[] {
+    return dietTags.map((tag) => {
+        const selected = selectedByTagId.has(tag.id)
+            ? (selectedByTagId.get(tag.id) ? 'true' : 'false')
+            : 'auto';
+
+        return {
+            id: tag.id,
+            key: tag.key,
+            label: tag.label,
+            selected,
+        };
+    });
 }
 
 // ── Category form data ──────────────────────────────────────
@@ -97,16 +159,24 @@ export async function updateCategory(restaurantId: string, categoryId: string, b
 export async function getItemFormData(restaurantId: string, categoryId: string): Promise<object> {
     const restaurant = await requireRestaurant(restaurantId);
     const category = await requireCategory(categoryId);
+    const dietTags = await dietTagService.listDietTags();
     return {
         editing: false,
         restaurantId: restaurant.id,
         categoryId: category.id,
+        allergens: '',
+        dietTags: buildItemDietTagOptions(dietTags),
     };
 }
 
 export async function getItemEditData(restaurantId: string, itemId: string): Promise<object> {
     const restaurant = await requireRestaurant(restaurantId);
     const item = await requireItem(itemId);
+    const [dietTags, overrides] = await Promise.all([
+        dietTagService.listDietTags(),
+        menuItemDietOverrideService.listByItem(item.id),
+    ]);
+    const selectedByTagId = new Map(overrides.map((override) => [override.dietTagId, !!override.supported]));
     return {
         editing: true,
         restaurantId: restaurant.id,
@@ -114,10 +184,12 @@ export async function getItemEditData(restaurantId: string, itemId: string): Pro
         id: item.id,
         name: item.name,
         description: item.description,
+        allergens: item.allergens,
         price: item.price,
         currency: item.currency,
         sortOrder: item.sortOrder,
         isActive: item.isActive,
+        dietTags: buildItemDietTagOptions(dietTags, selectedByTagId),
     };
 }
 
@@ -126,8 +198,19 @@ export async function getItemEditData(restaurantId: string, itemId: string): Pro
 export async function createItem(restaurantId: string, categoryId: string, body: any): Promise<MenuItem> {
     await requireRestaurant(restaurantId);
     const category = await requireCategory(categoryId);
-    const {name, description, price, currency} = body;
-    const returnInfo = {categoryId: category.id, name, description, price, currency};
+    const {name, description, allergens, price, currency} = body;
+    const dietTags = await dietTagService.listDietTags();
+    const selectedOverrides = parseItemDietOverrideInputs(body, dietTags);
+    const selectedByTagId = new Map(selectedOverrides.map((entry) => [entry.dietTagId, entry.supported]));
+    const returnInfo = {
+        categoryId: category.id,
+        name,
+        description,
+        allergens,
+        price,
+        currency,
+        dietTags: buildItemDietTagOptions(dietTags, selectedByTagId),
+    };
 
     if (!name || !name.trim()) {
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Item name is required.', returnInfo);
@@ -142,19 +225,51 @@ export async function createItem(restaurantId: string, categoryId: string, body:
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Currency code must be at most 3 characters.', returnInfo);
     }
 
-    return await menuService.createItem({
+    if (allergens && String(allergens).length > 2000) {
+        throw new ValidationError(ITEM_FORM_TEMPLATE, 'Allergens text must be at most 2000 characters.', returnInfo);
+    }
+
+    const item = await menuService.createItem({
         name: name.trim(),
         description: description?.trim() || null,
+        allergens: parseAllergensInput(allergens),
         price: parsedPrice,
         currency: currency?.trim() || null,
         categoryId: category.id,
     });
+
+    await menuItemDietOverrideService.replaceForItem(item.id, selectedOverrides);
+    await dietInferenceService.recomputeAfterMenuChange(restaurantId);
+    await cuisineInferenceService.recomputeForRestaurant(restaurantId);
+
+    return item;
 }
 
 export async function updateItem(restaurantId: string, itemId: string, body: any): Promise<MenuItem> {
     await requireRestaurant(restaurantId);
-    const {name, description, price, currency, sortOrder, isActive} = body;
-    const returnInfo = {id: itemId, name, description, price, currency, sortOrder, isActive};
+    const {name, description, allergens, price, currency, sortOrder, isActive} = body;
+    const [dietTags, existingOverrides] = await Promise.all([
+        dietTagService.listDietTags(),
+        menuItemDietOverrideService.listByItem(itemId),
+    ]);
+    const existingByTagId = new Map(existingOverrides.map((override) => [override.dietTagId, !!override.supported]));
+    const submittedOverrides = parseItemDietOverrideInputs(body, dietTags);
+    const submittedByTagId = new Map(submittedOverrides.map((entry) => [entry.dietTagId, entry.supported]));
+    const hasSubmittedDietOverrideObject = Boolean(body?.dietOverride && typeof body.dietOverride === 'object');
+    const returnInfo = {
+        id: itemId,
+        name,
+        description,
+        allergens,
+        price,
+        currency,
+        sortOrder,
+        isActive,
+        dietTags: buildItemDietTagOptions(
+            dietTags,
+            hasSubmittedDietOverrideObject ? submittedByTagId : existingByTagId,
+        ),
+    };
 
     if (!name || !name.trim()) {
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Item name is required.', returnInfo);
@@ -167,11 +282,16 @@ export async function updateItem(restaurantId: string, itemId: string, body: any
 
     if (currency && currency.trim().length > 3) {
         throw new ValidationError(ITEM_FORM_TEMPLATE, 'Currency code must be at most 3 characters.', returnInfo);
+    }
+
+    if (allergens && String(allergens).length > 2000) {
+        throw new ValidationError(ITEM_FORM_TEMPLATE, 'Allergens text must be at most 2000 characters.', returnInfo);
     }
 
     const item = await menuService.updateItem(itemId, {
         name: name.trim(),
         description: description?.trim() || null,
+        allergens: parseAllergensInput(allergens),
         price: parsedPrice,
         currency: currency?.trim() || null,
         sortOrder: sortOrder ? parseInt(sortOrder, 10) || 0 : 0,
@@ -180,5 +300,10 @@ export async function updateItem(restaurantId: string, itemId: string, body: any
     if (!item) {
         throw new ExpectedError('Item not found', 'error', 404);
     }
+
+    await menuItemDietOverrideService.replaceForItem(item.id, submittedOverrides);
+    await dietInferenceService.recomputeAfterMenuChange(restaurantId);
+    await cuisineInferenceService.recomputeForRestaurant(restaurantId);
+
     return item;
 }

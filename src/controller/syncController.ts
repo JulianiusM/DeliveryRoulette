@@ -1,15 +1,21 @@
 import {ProviderKey} from '../providers/ProviderKey';
 import * as ConnectorRegistry from '../providers/ConnectorRegistry';
-import {runSync, SyncResult} from '../modules/sync/ProviderSyncService';
+import {
+    getSyncJobById,
+    listSyncJobs,
+    queueSync,
+    QueuedSyncJob,
+    SyncJobListOptions,
+} from '../modules/sync/ProviderSyncService';
 import {ExpectedError} from '../modules/lib/errors';
 
 /**
  * Trigger a sync run for a single provider or all registered providers.
  *
  * @param providerKey - Optional provider key. When omitted all providers sync.
- * @returns The {@link SyncResult} summarising the completed job.
+ * @returns The queued job handle.
  */
-export async function triggerSync(providerKey?: string): Promise<SyncResult> {
+export async function triggerSync(providerKey?: string): Promise<QueuedSyncJob> {
     let key: ProviderKey | undefined;
 
     if (providerKey) {
@@ -27,5 +33,17 @@ export async function triggerSync(providerKey?: string): Promise<SyncResult> {
         key = providerKey as ProviderKey;
     }
 
-    return await runSync({providerKey: key});
+    return await queueSync({providerKey: key});
+}
+
+export async function getSyncJobs(options: SyncJobListOptions = {}) {
+    return await listSyncJobs(options);
+}
+
+export async function getSyncJob(id: string) {
+    const job = await getSyncJobById(id);
+    if (!job) {
+        throw new ExpectedError('Sync job not found', 'error', 404);
+    }
+    return job;
 }

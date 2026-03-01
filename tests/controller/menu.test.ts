@@ -24,6 +24,22 @@ import * as menuService from '../../src/modules/database/services/MenuService';
 jest.mock('../../src/modules/database/services/RestaurantService');
 import * as restaurantService from '../../src/modules/database/services/RestaurantService';
 
+// Mock DietTagService
+jest.mock('../../src/modules/database/services/DietTagService');
+import * as dietTagService from '../../src/modules/database/services/DietTagService';
+
+// Mock MenuItemDietOverrideService
+jest.mock('../../src/modules/database/services/MenuItemDietOverrideService');
+import * as menuItemDietOverrideService from '../../src/modules/database/services/MenuItemDietOverrideService';
+
+// Mock DietInferenceService
+jest.mock('../../src/modules/database/services/DietInferenceService');
+import * as dietInferenceService from '../../src/modules/database/services/DietInferenceService';
+
+// Mock CuisineInferenceService
+jest.mock('../../src/modules/database/services/CuisineInferenceService');
+import * as cuisineInferenceService from '../../src/modules/database/services/CuisineInferenceService';
+
 const mockCreateCategory = menuService.createCategory as jest.Mock;
 const mockUpdateCategory = menuService.updateCategory as jest.Mock;
 const mockCreateItem = menuService.createItem as jest.Mock;
@@ -31,6 +47,11 @@ const mockUpdateItem = menuService.updateItem as jest.Mock;
 const mockGetCategoryById = menuService.getCategoryById as jest.Mock;
 const mockGetItemById = menuService.getItemById as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
+const mockListDietTags = dietTagService.listDietTags as jest.Mock;
+const mockListByItem = menuItemDietOverrideService.listByItem as jest.Mock;
+const mockReplaceForItem = menuItemDietOverrideService.replaceForItem as jest.Mock;
+const mockRecomputeAfterMenuChange = dietInferenceService.recomputeAfterMenuChange as jest.Mock;
+const mockRecomputeCuisine = cuisineInferenceService.recomputeForRestaurant as jest.Mock;
 
 // Import controller after mocking
 import * as menuController from '../../src/controller/menuController';
@@ -44,6 +65,11 @@ describe('MenuController', () => {
         jest.clearAllMocks();
         // Default: restaurant exists
         mockGetRestaurantById.mockResolvedValue(sampleRestaurant);
+        mockListDietTags.mockResolvedValue([]);
+        mockListByItem.mockResolvedValue([]);
+        mockReplaceForItem.mockResolvedValue([]);
+        mockRecomputeAfterMenuChange.mockResolvedValue([]);
+        mockRecomputeCuisine.mockResolvedValue(null);
     });
 
     describe('getCategoryFormData', () => {
@@ -224,6 +250,29 @@ describe('MenuController', () => {
 
             await expect(menuController.createItem('rest-uuid', 'bad-id', {name: 'Test'})).rejects.toThrow(ExpectedError);
         });
+
+        test('stores submitted item-level diet overrides and recomputes inference', async () => {
+            mockListDietTags.mockResolvedValue([
+                {id: 'tag-vegan', key: 'VEGAN', label: 'Vegan'},
+                {id: 'tag-halal', key: 'HALAL', label: 'Halal'},
+            ]);
+            setupMock(mockCreateItem, {id: 'item-uuid', name: 'Veggie Wrap'});
+
+            await menuController.createItem('rest-uuid', 'cat-uuid', {
+                name: 'Veggie Wrap',
+                dietOverride: {
+                    'tag-vegan': 'true',
+                    'tag-halal': 'false',
+                },
+            });
+
+            expect(mockReplaceForItem).toHaveBeenCalledWith('item-uuid', [
+                {dietTagId: 'tag-vegan', supported: true},
+                {dietTagId: 'tag-halal', supported: false},
+            ]);
+            expect(mockRecomputeAfterMenuChange).toHaveBeenCalledWith('rest-uuid');
+            expect(mockRecomputeCuisine).toHaveBeenCalledWith('rest-uuid');
+        });
     });
 
     describe('updateItem', () => {
@@ -264,6 +313,26 @@ describe('MenuController', () => {
             await expect(
                 menuController.updateItem('bad-id', 'item-uuid', {name: 'Valid'})
             ).rejects.toThrow(ExpectedError);
+        });
+
+        test('stores submitted item-level diet overrides and recomputes inference on update', async () => {
+            mockListDietTags.mockResolvedValue([
+                {id: 'tag-vegan', key: 'VEGAN', label: 'Vegan'},
+            ]);
+            setupMock(mockUpdateItem, {id: 'item-uuid', name: 'Updated Salad'});
+
+            await menuController.updateItem('rest-uuid', 'item-uuid', {
+                name: 'Updated Salad',
+                dietOverride: {
+                    'tag-vegan': 'false',
+                },
+            });
+
+            expect(mockReplaceForItem).toHaveBeenCalledWith('item-uuid', [
+                {dietTagId: 'tag-vegan', supported: false},
+            ]);
+            expect(mockRecomputeAfterMenuChange).toHaveBeenCalledWith('rest-uuid');
+            expect(mockRecomputeCuisine).toHaveBeenCalledWith('rest-uuid');
         });
     });
 });

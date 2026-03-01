@@ -92,6 +92,7 @@ export const createItemValidData = [
         expected: {
             name: 'Caesar Salad',
             description: 'Fresh romaine lettuce with caesar dressing',
+            allergens: null,
             price: 12.99,
             currency: 'EUR',
         },
@@ -102,6 +103,7 @@ export const createItemValidData = [
         expected: {
             name: 'Water',
             description: null,
+            allergens: null,
             price: null,
             currency: null,
         },
@@ -117,6 +119,7 @@ export const createItemValidData = [
         expected: {
             name: 'Pasta',
             description: 'Homemade',
+            allergens: null,
             price: 9.50,
             currency: 'USD',
         },
@@ -165,6 +168,7 @@ export const updateItemValidData = [
         expected: {
             name: 'Updated Salad',
             description: 'Updated description',
+            allergens: null,
             price: 15.99,
             currency: 'USD',
             sortOrder: 1,
@@ -177,6 +181,7 @@ export const updateItemValidData = [
         expected: {
             name: 'Inactive Item',
             description: null,
+            allergens: null,
             price: null,
             currency: null,
             sortOrder: 0,

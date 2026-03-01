@@ -9,6 +9,19 @@ export async function listByRestaurant(restaurantId: string): Promise<Restaurant
     });
 }
 
+export async function getById(id: string): Promise<RestaurantProviderRef | null> {
+    const repo = AppDataSource.getRepository(RestaurantProviderRef);
+    return await repo.findOne({where: {id}});
+}
+
+export async function getByIdForRestaurant(
+    id: string,
+    restaurantId: string,
+): Promise<RestaurantProviderRef | null> {
+    const repo = AppDataSource.getRepository(RestaurantProviderRef);
+    return await repo.findOne({where: {id, restaurantId}});
+}
+
 export async function addProviderRef(data: {
     restaurantId: string;
     providerKey: string;

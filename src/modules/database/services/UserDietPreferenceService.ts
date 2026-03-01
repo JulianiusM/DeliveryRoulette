@@ -2,6 +2,7 @@ import {AppDataSource} from '../dataSource';
 import {UserDietPreference} from '../entities/user/UserDietPreference';
 import {DietTag} from '../entities/diet/DietTag';
 import {In} from 'typeorm';
+import {ensureDefaultDietTags} from './DietTagService';
 
 /**
  * Get all diet tag preferences for a user.
@@ -20,6 +21,7 @@ export async function getByUserId(userId: number): Promise<UserDietPreference[]>
  * Get all available diet tags.
  */
 export async function getAllDietTags(): Promise<DietTag[]> {
+    await ensureDefaultDietTags();
     const repo = AppDataSource.getRepository(DietTag);
     return await repo.find({order: {key: 'ASC'}});
 }

@@ -140,6 +140,24 @@ app.post('/settings', validateSettings, handleValidationError, asyncHandler(asyn
     res.redirect('/users/settings');
 }));
 
+// Global diet heuristic configuration
+app.get('/settings/diets', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    const data = await settingsController.getDietHeuristicSettings(req.session.user.id);
+    renderer.renderWithData(res, 'users/diet-settings', data);
+}));
+
+app.post('/settings/diets', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    await settingsController.saveDietHeuristicSettings(req.session.user.id, req.body);
+    req.flash('success', 'Diet heuristic settings saved');
+    res.redirect('/users/settings/diets');
+}));
+
 app.get('/oidc/login', asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.oidcEnabled) throw new ExpectedError('OIDC provider is not enabled!', 'error', 500);
     const redirect = await userController.loginUserWithOidc(req.session);

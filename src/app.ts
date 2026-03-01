@@ -16,6 +16,7 @@ import suggestRouter from './routes/suggest';
 import importRouter from './routes/import';
 import syncRouter from './routes/sync';
 import syncAlertsRouter from './routes/syncAlerts';
+import syncJobsRouter from './routes/syncJobs';
 import providersRouter from './routes/providers';
 import healthRouter from './routes/health';
 import settings from './modules/settings';
@@ -149,6 +150,7 @@ app.use('/suggest', suggestRouter);
 app.use('/import', importRouter);
 app.use('/api/sync', syncRouter);
 app.use('/sync/alerts', syncAlertsRouter);
+app.use('/sync/jobs', syncJobsRouter);
 app.use('/providers', providersRouter);
 
 app.use('/health', healthRouter);

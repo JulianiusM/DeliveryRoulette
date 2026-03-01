@@ -66,6 +66,20 @@ app.post('/:id/providers/:refId/delete', asyncHandler(async (req: Request, res: 
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
+// POST /restaurants/:id/providers/:refId/sync-menu - Queue menu-only sync for this provider ref
+app.post('/:id/providers/:refId/sync-menu', asyncHandler(async (req: Request, res: Response) => {
+    const result = await restaurantController.queueProviderRefMenuSync(req.params.id, req.params.refId);
+    req.flash('info', `Menu sync job queued (${result.jobId}). Track progress on Sync Jobs.`);
+    res.redirect('/sync/jobs');
+}));
+
+// POST /restaurants/:id/diet/recompute - Run diet heuristics immediately
+app.post('/:id/diet/recompute', asyncHandler(async (req: Request, res: Response) => {
+    const count = await restaurantController.runDietInference(req.params.id);
+    req.flash('info', `Diet analysis rerun completed (${count} tag results updated).`);
+    res.redirect(`/restaurants/${req.params.id}`);
+}));
+
 // ── Diet Override routes ────────────────────────────────────
 
 // POST /restaurants/:id/diet-overrides - Add/update diet override

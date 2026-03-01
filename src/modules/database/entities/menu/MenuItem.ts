@@ -12,6 +12,12 @@ export class MenuItem {
     @Column("varchar", {name: "description", length: 500, nullable: true})
     description?: string | null;
 
+    @Column("text", {name: "diet_context", nullable: true})
+    dietContext?: string | null;
+
+    @Column("text", {name: "allergens", nullable: true})
+    allergens?: string | null;
+
     @Column("decimal", {name: "price", precision: 10, scale: 2, nullable: true})
     price?: number | null;
 

@@ -23,6 +23,18 @@ export class Restaurant {
     @Column("varchar", {name: "country", length: 100, default: ""})
     country!: string;
 
+    @Column("text", {name: "opening_hours", nullable: true})
+    openingHours?: string | null;
+
+    @Column("varchar", {name: "opening_days", length: 255, nullable: true})
+    openingDays?: string | null;
+
+    @Column("text", {name: "provider_cuisines_json", nullable: true})
+    providerCuisinesJson?: string | null;
+
+    @Column("text", {name: "cuisine_inference_json", nullable: true})
+    cuisineInferenceJson?: string | null;
+
     @Column("tinyint", {
         name: "is_active",
         width: 1,

@@ -36,12 +36,21 @@ import * as dietOverrideService from '../../src/modules/database/services/DietOv
 jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
 import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
 
+// Mock MenuItemDietOverrideService (used for item chips in detail page)
+jest.mock('../../src/modules/database/services/MenuItemDietOverrideService');
+import * as menuItemDietOverrideService from '../../src/modules/database/services/MenuItemDietOverrideService';
+
+// Mock ProviderSyncService (manual provider-ref menu sync)
+jest.mock('../../src/modules/sync/ProviderSyncService');
+import * as providerSyncService from '../../src/modules/sync/ProviderSyncService';
+
 const mockCreateRestaurant = restaurantService.createRestaurant as jest.Mock;
 const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
 const mockListRestaurants = restaurantService.listRestaurants as jest.Mock;
 const mockListCategoriesByRestaurant = menuService.listCategoriesByRestaurant as jest.Mock;
 const mockListByRestaurant = providerRefService.listByRestaurant as jest.Mock;
+const mockGetByIdForRestaurant = providerRefService.getByIdForRestaurant as jest.Mock;
 const mockAddProviderRef = providerRefService.addProviderRef as jest.Mock;
 const mockRemoveProviderRef = providerRefService.removeProviderRef as jest.Mock;
 const mockComputeEffectiveSuitability = dietOverrideService.computeEffectiveSuitability as jest.Mock;
@@ -49,6 +58,8 @@ const mockAddOverride = dietOverrideService.addOverride as jest.Mock;
 const mockRemoveOverride = dietOverrideService.removeOverride as jest.Mock;
 const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
 const mockGetByUserAndRestaurant = userRestaurantPrefService.getByUserAndRestaurant as jest.Mock;
+const mockListItemOverridesByItemIds = menuItemDietOverrideService.listByItemIds as jest.Mock;
+const mockQueueMenuSyncByProviderRef = providerSyncService.queueMenuSyncByProviderRef as jest.Mock;
 
 // Import controller after mocking
 import * as restaurantController from '../../src/controller/restaurantController';
@@ -71,6 +82,7 @@ describe('RestaurantController', () => {
         jest.clearAllMocks();
         mockGetFavoriteRestaurantIds.mockResolvedValue([]);
         mockGetByUserAndRestaurant.mockResolvedValue(null);
+        mockListItemOverridesByItemIds.mockResolvedValue([]);
     });
 
     describe('listRestaurants', () => {
@@ -139,6 +151,7 @@ describe('RestaurantController', () => {
             expect(result.categories).toEqual([]);
             expect(result.providerRefs).toEqual([]);
             expect(result.dietSuitability).toEqual([]);
+            expect(result.isOpenNow).toBeNull();
         });
 
         test('throws ExpectedError when restaurant not found', async () => {
@@ -289,6 +302,38 @@ describe('RestaurantController', () => {
 
             await expect(
                 restaurantController.removeProviderRef('bad-id', 'ref-uuid')
+            ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('queueProviderRefMenuSync', () => {
+        test('queues a menu sync for an existing provider reference', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockGetByIdForRestaurant, {
+                id: 'ref-uuid',
+                restaurantId: 'test-uuid',
+                providerKey: 'lieferando',
+            });
+            setupMock(mockQueueMenuSyncByProviderRef, {
+                jobId: 'job-uuid',
+                status: 'pending',
+                providerKey: 'lieferando',
+                syncQuery: 'menu-ref:test-uuid:ref-uuid',
+                createdAt: new Date(),
+            });
+
+            const result = await restaurantController.queueProviderRefMenuSync('test-uuid', 'ref-uuid');
+
+            expect(mockQueueMenuSyncByProviderRef).toHaveBeenCalledWith('test-uuid', 'ref-uuid');
+            expect(result).toMatchObject({jobId: 'job-uuid', status: 'pending'});
+        });
+
+        test('throws when provider reference does not exist for restaurant', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockGetByIdForRestaurant, null);
+
+            await expect(
+                restaurantController.queueProviderRefMenuSync('test-uuid', 'missing-ref')
             ).rejects.toThrow(ExpectedError);
         });
     });

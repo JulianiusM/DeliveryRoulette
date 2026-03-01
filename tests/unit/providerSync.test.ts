@@ -8,6 +8,7 @@ import {ProviderKey} from '../../src/providers/ProviderKey';
 import {
     sampleProviderMenu,
     emptyProviderMenu,
+    duplicateCategoryProviderMenu,
     importPayloadWithMenu,
     importPayloadNoMenu,
     importPayloadMultiple,
@@ -58,6 +59,7 @@ jest.mock('../../src/modules/database/services/RestaurantService');
 import * as restaurantService from '../../src/modules/database/services/RestaurantService';
 const mockUpsertFromProvider = restaurantService.upsertFromProvider as jest.Mock;
 const mockGetRestaurantById = restaurantService.getRestaurantById as jest.Mock;
+const mockUpdateRestaurant = restaurantService.updateRestaurant as jest.Mock;
 
 jest.mock('../../src/modules/database/services/MenuService');
 import * as menuService from '../../src/modules/database/services/MenuService';
@@ -67,11 +69,16 @@ const mockUpsertItems = menuService.upsertItems as jest.Mock;
 jest.mock('../../src/modules/database/services/RestaurantProviderRefService');
 import * as providerRefService from '../../src/modules/database/services/RestaurantProviderRefService';
 const mockEnsureProviderRef = providerRefService.ensureProviderRef as jest.Mock;
+const mockGetProviderRefByIdForRestaurant = providerRefService.getByIdForRestaurant as jest.Mock;
 
 jest.mock('../../src/modules/database/services/DietInferenceService');
 import * as dietInference from '../../src/modules/database/services/DietInferenceService';
 const mockRecompute = dietInference.recomputeAfterMenuChange as jest.Mock;
 const mockGetResults = dietInference.getResultsByRestaurant as jest.Mock;
+
+jest.mock('../../src/modules/database/services/CuisineInferenceService');
+import * as cuisineInference from '../../src/modules/database/services/CuisineInferenceService';
+const mockRecomputeCuisine = cuisineInference.recomputeForRestaurant as jest.Mock;
 
 jest.mock('../../src/modules/database/services/SyncAlertService');
 import * as syncAlertService from '../../src/modules/database/services/SyncAlertService';
@@ -101,9 +108,11 @@ describe('ProviderSyncService', () => {
         // Defaults for service mocks
         mockRegisteredKeys.mockReturnValue([]);
         mockGetResults.mockResolvedValue([]);
+        mockRecomputeCuisine.mockResolvedValue(null);
         mockHasActiveAlert.mockResolvedValue(false);
         mockCreateAlert.mockResolvedValue({id: 'alert-1'});
         mockGetRestaurantById.mockResolvedValue(null);
+        mockUpdateRestaurant.mockResolvedValue(null);
     });
 
     describe('isLocked', () => {
@@ -141,11 +150,12 @@ describe('ProviderSyncService', () => {
             mockResolve.mockReturnValue(connector);
             mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
 
-            mockUpsertFromProvider.mockResolvedValue('rest-1');
-            mockEnsureProviderRef.mockResolvedValue(undefined);
-            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
-            mockUpsertItems.mockResolvedValue([]);
-            mockRecompute.mockResolvedValue([]);
+        mockUpsertFromProvider.mockResolvedValue('rest-1');
+        mockEnsureProviderRef.mockResolvedValue(undefined);
+        mockGetProviderRefByIdForRestaurant.mockResolvedValue(null);
+        mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+        mockUpsertItems.mockResolvedValue([]);
+        mockRecompute.mockResolvedValue([]);
 
             const result = await runSync({providerKey: ProviderKey.UBER_EATS});
 
@@ -183,8 +193,83 @@ describe('ProviderSyncService', () => {
             mockRecompute.mockResolvedValue([]);
             const result = await runSync({providerKey: ProviderKey.UBER_EATS});
             expect(result.status).toBe('completed');
-            expect(result.restaurantsSynced).toBe(1);
+            expect(result.restaurantsSynced).toBe(0);
+            expect(result.restaurants[0].success).toBe(false);
+            expect(result.restaurants[0].error).toMatch(/no categories\/items/i);
             expect(mockUpsertItems).not.toHaveBeenCalled();
+        });
+
+        test('merges duplicate provider categories before upserting items', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Dedup Place', url: 'https://example.com/2'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(duplicateCategoryProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockUpsertFromProvider.mockResolvedValue('rest-2');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-burger', name: 'Burger'}]);
+            mockRecompute.mockResolvedValue([]);
+
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            expect(mockUpsertCategories).toHaveBeenCalledWith('rest-2', [{name: 'Burger', sortOrder: 0}]);
+            expect(mockUpsertItems).toHaveBeenCalledTimes(1);
+            expect(mockUpsertItems).toHaveBeenCalledWith('cat-burger', [
+                {
+                    name: 'Classic Burger',
+                    description: 'Beef',
+                    dietContext: null,
+                    allergens: null,
+                    price: 8.9,
+                    currency: 'EUR',
+                    sortOrder: 0,
+                },
+            ]);
+        });
+
+        test('applies restaurant details returned from menu fetch', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {externalId: 'ext-1', name: 'Details Place', url: 'https://example.com/2'},
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue({
+                categories: [
+                    {
+                        name: 'Snacks',
+                        items: [
+                            {externalId: 'snack-1', name: 'Fries', description: null, price: 3.5, currency: 'EUR'},
+                        ],
+                    },
+                ],
+                restaurantDetails: {
+                    address: 'Sample Street 9',
+                    city: 'Neutraubling',
+                    postalCode: '93073',
+                    country: 'DE',
+                    openingHours: 'delivery: Monday 11:00-22:00',
+                    openingDays: 'Monday',
+                },
+            });
+            mockResolve.mockReturnValue(connector);
+            mockUpsertFromProvider.mockResolvedValue('rest-2');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Snacks'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+
+            const result = await runSync({providerKey: ProviderKey.UBER_EATS});
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            expect(mockUpdateRestaurant).toHaveBeenCalledWith('rest-2', expect.objectContaining({
+                addressLine1: 'Sample Street 9',
+                city: 'Neutraubling',
+                postalCode: '93073',
+                country: 'DE',
+                openingHours: 'delivery: Monday 11:00-22:00',
+                openingDays: 'Monday',
+            }));
         });
 
         test('isolates per-restaurant failure when fetchMenu throws', async () => {
@@ -209,6 +294,66 @@ describe('ProviderSyncService', () => {
             expect(result.restaurants[0].success).toBe(true);
             expect(result.restaurants[1].success).toBe(false);
             expect(result.restaurants[1].error).toBe('Menu fetch failed');
+        });
+
+        test('import-url job fails when menu fetch returns no categories/items', async () => {
+            const menuUrl = 'https://www.lieferando.de/en/menu/no-items';
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(emptyProviderMenu);
+            mockResolve.mockReturnValue(connector);
+
+            const result = await runSync({
+                providerKey: ProviderKey.UBER_EATS,
+                query: `import-url:${encodeURIComponent(menuUrl)}`,
+            });
+
+            expect(result.status).toBe('failed');
+            expect(result.errorMessage).toMatch(/no categories\/items/i);
+            expect(mockUpsertFromProvider).not.toHaveBeenCalled();
+        });
+
+        test('import-url job reuses prefetched menu and succeeds', async () => {
+            const menuUrl = 'https://www.lieferando.de/en/menu/bella-bollywood';
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
+            mockResolve.mockReturnValue(connector);
+
+            mockUpsertFromProvider.mockResolvedValue('rest-import');
+            mockEnsureProviderRef.mockResolvedValue(undefined);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+
+            const result = await runSync({
+                providerKey: ProviderKey.UBER_EATS,
+                query: `import-url:${encodeURIComponent(menuUrl)}`,
+            });
+
+            expect(result.status).toBe('completed');
+            expect(result.restaurantsSynced).toBe(1);
+            expect(connector.fetchMenu).toHaveBeenCalledTimes(1);
+            expect(connector.fetchMenu).toHaveBeenCalledWith(menuUrl);
+        });
+
+        test('menu-ref job fails when referenced menu fetch returns no categories/items', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(emptyProviderMenu);
+            mockResolve.mockReturnValue(connector);
+            mockGetProviderRefByIdForRestaurant.mockResolvedValue({
+                id: 'ref-1',
+                restaurantId: 'rest-1',
+                providerKey: ProviderKey.UBER_EATS,
+                externalId: 'ext-ref-1',
+                url: 'https://www.lieferando.de/en/menu/no-items',
+            });
+
+            const result = await runSync({
+                providerKey: ProviderKey.UBER_EATS,
+                query: 'menu-ref:rest-1:ref-1',
+            });
+
+            expect(result.status).toBe('failed');
+            expect(result.errorMessage).toMatch(/no categories\/items/i);
         });
     });
 
@@ -332,12 +477,13 @@ describe('ProviderSyncService', () => {
             (connector.listRestaurants as jest.Mock).mockResolvedValue([
                 {externalId: 'ext-1', name: 'Still Here', url: 'https://example.com/1'},
             ]);
-            (connector.fetchMenu as jest.Mock).mockResolvedValue(emptyProviderMenu);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
             mockResolve.mockReturnValue(connector);
             mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
             mockUpsertFromProvider.mockResolvedValue('rest-1');
             mockEnsureProviderRef.mockResolvedValue(undefined);
-            mockUpsertCategories.mockResolvedValue([]);
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
             mockRecompute.mockResolvedValue([]);
             mockFindRef.mockResolvedValue([
                 {restaurantId: 'rest-1', providerKey: ProviderKey.UBER_EATS, status: 'active', updatedAt: new Date()},

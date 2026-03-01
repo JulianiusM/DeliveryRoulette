@@ -11,6 +11,12 @@ export class DietTag {
     @Column("varchar", {name: "label", length: 100})
     label!: string;
 
+    @Column("text", {name: "keyword_whitelist_json", nullable: true})
+    keywordWhitelistJson?: string | null;
+
+    @Column("text", {name: "dish_whitelist_json", nullable: true})
+    dishWhitelistJson?: string | null;
+
     @Column("timestamp", {
         name: "created_at",
         default: () => "CURRENT_TIMESTAMP",

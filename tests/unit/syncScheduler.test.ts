@@ -14,8 +14,8 @@ import settings from '../../src/modules/settings';
 
 // Mock ProviderSyncService
 jest.mock('../../src/modules/sync/ProviderSyncService');
-import {runSync} from '../../src/modules/sync/ProviderSyncService';
-const mockRunSync = runSync as jest.Mock;
+import {queueSync} from '../../src/modules/sync/ProviderSyncService';
+const mockQueueSync = queueSync as jest.Mock;
 
 import {startScheduler, stopScheduler} from '../../src/modules/sync/SyncScheduler';
 
@@ -31,45 +31,45 @@ describe('SyncScheduler', () => {
         startScheduler();
 
         jest.advanceTimersByTime(60_000);
-        expect(mockRunSync).not.toHaveBeenCalled();
+        expect(mockQueueSync).not.toHaveBeenCalled();
     });
 
     test('schedules sync at configured interval', () => {
         (settings as any).value.syncIntervalMs = 10_000;
-        mockRunSync.mockResolvedValue({status: 'completed', restaurantsSynced: 0});
+        mockQueueSync.mockResolvedValue({jobId: 'job-1', status: 'pending'});
 
         startScheduler();
 
-        expect(mockRunSync).not.toHaveBeenCalled();
+        expect(mockQueueSync).not.toHaveBeenCalled();
 
         jest.advanceTimersByTime(10_000);
-        expect(mockRunSync).toHaveBeenCalledTimes(1);
+        expect(mockQueueSync).toHaveBeenCalledTimes(1);
 
         jest.advanceTimersByTime(10_000);
-        expect(mockRunSync).toHaveBeenCalledTimes(2);
+        expect(mockQueueSync).toHaveBeenCalledTimes(2);
     });
 
     test('stopScheduler prevents further ticks', () => {
         (settings as any).value.syncIntervalMs = 5_000;
-        mockRunSync.mockResolvedValue({status: 'completed', restaurantsSynced: 0});
+        mockQueueSync.mockResolvedValue({jobId: 'job-1', status: 'pending'});
 
         startScheduler();
         jest.advanceTimersByTime(5_000);
-        expect(mockRunSync).toHaveBeenCalledTimes(1);
+        expect(mockQueueSync).toHaveBeenCalledTimes(1);
 
         stopScheduler();
         jest.advanceTimersByTime(15_000);
-        expect(mockRunSync).toHaveBeenCalledTimes(1); // no more calls
+        expect(mockQueueSync).toHaveBeenCalledTimes(1); // no more calls
     });
 
     test('calling startScheduler twice is a no-op', () => {
         (settings as any).value.syncIntervalMs = 5_000;
-        mockRunSync.mockResolvedValue({status: 'completed', restaurantsSynced: 0});
+        mockQueueSync.mockResolvedValue({jobId: 'job-1', status: 'pending'});
 
         startScheduler();
         startScheduler(); // second call should be ignored
 
         jest.advanceTimersByTime(5_000);
-        expect(mockRunSync).toHaveBeenCalledTimes(1); // only 1 timer running
+        expect(mockQueueSync).toHaveBeenCalledTimes(1); // only 1 timer running
     });
 });

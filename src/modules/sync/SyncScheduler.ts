@@ -1,26 +1,24 @@
 import settings from '../settings';
-import {runSync} from './ProviderSyncService';
+import {queueSync} from './ProviderSyncService';
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Start the scheduled sync loop if `syncIntervalMs` > 0.
- * Safe to call multiple times – subsequent calls are no-ops.
+ * Safe to call multiple times - subsequent calls are no-ops.
  */
 export function startScheduler(): void {
     if (timer) return;
     const intervalMs = settings.value.syncIntervalMs;
     if (!intervalMs || intervalMs <= 0) return;
 
-    console.log(`🔄 Sync scheduler started (interval: ${intervalMs} ms)`);
+    console.log(`Sync scheduler started (interval: ${intervalMs} ms)`);
     timer = setInterval(async () => {
         try {
-            const result = await runSync();
-            console.log(
-                `🔄 Scheduled sync ${result.status}: ${result.restaurantsSynced} restaurant(s) synced`,
-            );
+            const result = await queueSync();
+            console.log(`Scheduled sync queued: ${result.jobId}`);
         } catch (err) {
-            console.error('🔄 Scheduled sync error:', err);
+            console.error('Scheduled sync error:', err);
         }
     }, intervalMs);
 }

@@ -1,0 +1,64 @@
+//- views/users/diet-settings.pug - Global Diet Heuristic Settings
+extends ../layout
+
+block meta
+    title Diet Heuristic Settings | DeliveryRoulette
+
+block title
+    h1.card-header.text-center
+        i.bi.bi-sliders.me-2
+        | Diet Heuristic Settings
+
+block content
+    - const d = data || {}
+    - const configs = d.configs || []
+
+    .alert.alert-info.py-2
+        i.bi.bi-info-circle.me-1
+        | These settings are global and affect heuristic scoring for all users.
+
+    form(action="/users/settings/diets" method="post")
+        +csrf
+
+        if configs.length === 0
+            p.text-white-50 No diet tags are configured.
+        else
+            each cfg in configs
+                .card.text-bg-dark.border-secondary.mb-3
+                    .card-header
+                        strong #{cfg.label}
+                        span.text-white-50.ms-2.small #{cfg.key}
+                    .card-body
+                        .row.g-3
+                            .col-md-6
+                                label.form-label(for=`kw-${cfg.id}`)
+                                    i.bi.bi-tags.me-1
+                                    | Keyword Whitelist
+                                .form-text.text-white-50.mb-1
+                                    | One entry per line (English/German/other languages supported).
+                                textarea.form-control.text-bg-dark(
+                                    id=`kw-${cfg.id}`
+                                    name=`dietConfig[${cfg.id}][keywordWhitelist]`
+                                    rows="6"
+                                    maxlength="6000"
+                                )= cfg.keywordWhitelist || ''
+                            .col-md-6
+                                label.form-label(for=`dish-${cfg.id}`)
+                                    i.bi.bi-list-stars.me-1
+                                    | Common Dish Whitelist
+                                .form-text.text-white-50.mb-1
+                                    | One dish per line.
+                                textarea.form-control.text-bg-dark(
+                                    id=`dish-${cfg.id}`
+                                    name=`dietConfig[${cfg.id}][dishWhitelist]`
+                                    rows="6"
+                                    maxlength="6000"
+                                )= cfg.dishWhitelist || ''
+
+        .d-flex.gap-2.mt-2
+            button.btn.btn-success(type="submit")
+                i.bi.bi-check-lg.me-1
+                | Save Diet Heuristics
+            a.btn.btn-outline-light(href="/users/settings")
+                i.bi.bi-arrow-left.me-1
+                | Back To Settings

@@ -20,7 +20,7 @@ const mockResolve = ConnectorRegistry.resolve as jest.Mock;
 // Mock ProviderSyncService
 jest.mock('../../src/modules/sync/ProviderSyncService');
 import * as syncService from '../../src/modules/sync/ProviderSyncService';
-const mockRunSync = syncService.runSync as jest.Mock;
+const mockQueueSync = syncService.queueSync as jest.Mock;
 
 // Import controller after mocking
 import * as syncController from '../../src/controller/syncController';
@@ -28,24 +28,25 @@ import * as syncController from '../../src/controller/syncController';
 describe('syncController', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockRunSync.mockResolvedValue({
+        mockQueueSync.mockResolvedValue({
             jobId: 'job-1',
-            status: 'completed',
-            restaurantsSynced: 1,
-            errorMessage: null,
+            status: 'pending',
+            providerKey: null,
+            syncQuery: null,
+            createdAt: new Date('2026-01-01T12:00:00Z'),
         });
     });
 
     describe('triggerSync – valid', () => {
-        test.each(triggerSyncValidData)('$description', async ({providerKey, expectedRunSyncArg}) => {
+        test.each(triggerSyncValidData)('$description', async ({providerKey, expectedQueueSyncArg}) => {
             if (providerKey) {
                 mockResolve.mockReturnValue(stubConnector(providerKey as ProviderKey, 'Test'));
             }
 
             const result = await syncController.triggerSync(providerKey);
 
-            expect(mockRunSync).toHaveBeenCalledWith(expectedRunSyncArg);
-            expect(result.status).toBe('completed');
+            expect(mockQueueSync).toHaveBeenCalledWith(expectedQueueSyncArg);
+            expect(result.status).toBe('pending');
         });
     });
 
@@ -55,7 +56,7 @@ describe('syncController', () => {
             await expect(syncController.triggerSync(providerKey)).rejects.toMatchObject({
                 message: expectedError,
             });
-            expect(mockRunSync).not.toHaveBeenCalled();
+            expect(mockQueueSync).not.toHaveBeenCalled();
         });
     });
 
@@ -67,7 +68,7 @@ describe('syncController', () => {
             await expect(syncController.triggerSync(providerKey)).rejects.toMatchObject({
                 message: expectedError,
             });
-            expect(mockRunSync).not.toHaveBeenCalled();
+            expect(mockQueueSync).not.toHaveBeenCalled();
         });
     });
 });

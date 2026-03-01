@@ -148,30 +148,50 @@ describe('SuggestionService', () => {
             expect(mockQb.andWhere).not.toHaveBeenCalled();
         });
 
-        test('adds cuisine include filter', async () => {
-            const mockQb = createMockQueryBuilder([sampleRestaurants[0]]);
+        test('applies cuisine include filter in-memory', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
             (AppDataSource.getRepository as jest.Mock).mockReturnValue({
                 createQueryBuilder: jest.fn().mockReturnValue(mockQb),
             });
 
-            await suggestionService.findActiveRestaurants({cuisineIncludes: ['Vegan']});
-            expect(mockQb.andWhere).toHaveBeenCalledWith(
-                expect.stringContaining('r.name LIKE :ci0'),
-                expect.objectContaining({ci0: '%Vegan%'}),
-            );
+            const result = await suggestionService.findActiveRestaurants({cuisineIncludes: ['Vegan']});
+            expect(result).toHaveLength(1);
+            expect(result[0].id).toBe('r1');
         });
 
-        test('adds cuisine exclude filter', async () => {
-            const mockQb = createMockQueryBuilder([sampleRestaurants[1]]);
+        test('applies cuisine exclude filter in-memory', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
             (AppDataSource.getRepository as jest.Mock).mockReturnValue({
                 createQueryBuilder: jest.fn().mockReturnValue(mockQb),
             });
 
-            await suggestionService.findActiveRestaurants({cuisineExcludes: ['Burger']});
-            expect(mockQb.andWhere).toHaveBeenCalledWith(
-                'r.name NOT LIKE :ce0',
-                {ce0: '%Burger%'},
-            );
+            const result = await suggestionService.findActiveRestaurants({cuisineExcludes: ['Burger']});
+            expect(result.map((entry) => entry.id)).toEqual(['r1', 'r2']);
+        });
+
+        test('matches foreign cuisine aliases from inferred cuisine profile', async () => {
+            const withCuisineProfile = [
+                {
+                    ...sampleRestaurants[0],
+                    cuisineInferenceJson: JSON.stringify({
+                        engineVersion: '1.0.0',
+                        inferredAt: new Date().toISOString(),
+                        providerCuisines: [],
+                        cuisines: [
+                            {key: 'INDIAN', label: 'Indian', score: 92, confidence: 'HIGH', source: 'heuristic'},
+                        ],
+                    }),
+                },
+                sampleRestaurants[1],
+            ];
+            const mockQb = createMockQueryBuilder(withCuisineProfile);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            const result = await suggestionService.findActiveRestaurants({cuisineIncludes: ['indisch']});
+            expect(result).toHaveLength(1);
+            expect(result[0].id).toBe('r1');
         });
     });
 

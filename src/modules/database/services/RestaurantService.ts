@@ -14,6 +14,10 @@ export async function createRestaurant(data: {
     city: string;
     postalCode: string;
     country?: string;
+    openingHours?: string | null;
+    openingDays?: string | null;
+    providerCuisinesJson?: string | null;
+    cuisineInferenceJson?: string | null;
 }): Promise<Restaurant> {
     const repo = AppDataSource.getRepository(Restaurant);
     const restaurant = repo.create({
@@ -30,6 +34,10 @@ export async function updateRestaurant(id: string, data: {
     city?: string;
     postalCode?: string;
     country?: string;
+    openingHours?: string | null;
+    openingDays?: string | null;
+    providerCuisinesJson?: string | null;
+    cuisineInferenceJson?: string | null;
     isActive?: boolean;
 }): Promise<Restaurant | null> {
     const repo = AppDataSource.getRepository(Restaurant);
@@ -81,6 +89,7 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
         const existing = all.find(
             (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
         );
+        const providerCuisinesJson = normalizeCuisineJson(incoming.cuisines);
 
         if (existing) {
             Object.assign(existing, {
@@ -89,6 +98,9 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
                 city: incoming.city ?? '',
                 postalCode: incoming.postalCode ?? '',
                 country: incoming.country ?? '',
+                openingHours: incoming.openingHours ?? existing.openingHours ?? null,
+                openingDays: incoming.openingDays ?? existing.openingDays ?? null,
+                providerCuisinesJson: providerCuisinesJson ?? existing.providerCuisinesJson ?? null,
                 isActive: true,
             });
             existing.updatedAt = new Date();
@@ -103,9 +115,22 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
             city: incoming.city ?? '',
             postalCode: incoming.postalCode ?? '',
             country: incoming.country ?? '',
+            openingHours: incoming.openingHours ?? null,
+            openingDays: incoming.openingDays ?? null,
+            providerCuisinesJson,
             isActive: true,
         });
         const saved = await repo.save(created);
         return saved.id;
     });
+}
+
+function normalizeCuisineJson(cuisines?: string[] | null): string | null {
+    if (!cuisines || cuisines.length === 0) return null;
+    const normalized = cuisines
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    if (normalized.length === 0) return null;
+    const deduped = [...new Set(normalized)];
+    return JSON.stringify(deduped);
 }

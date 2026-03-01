@@ -12,6 +12,15 @@ import {
     menuRealHtml,
     expectedListingRestaurants,
     expectedRealListingRestaurants,
+    listingRestaurantPathHtml,
+    expectedRestaurantPathListingRestaurants,
+    listingEmbeddedJsonHtml,
+    expectedEmbeddedJsonListingRestaurants,
+    listingNextDataHtml,
+    expectedNextDataListingRestaurants,
+    menuNextDataDetailsHtml,
+    menuNextDataCategoriesHtml,
+    expectedNextDataMenuCategories,
     expectedMenuCategories,
     expectedRealMenuCategories,
     expectedRawTextContents,
@@ -122,6 +131,55 @@ describe('parseListingHtml (real Lieferando structure)', () => {
     });
 });
 
+describe('parseListingHtml (restaurant-path links)', () => {
+    it('returns 2 restaurants from restaurant-path listing fixture', () => {
+        const result = parseListingHtml(listingRestaurantPathHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        expect(result).toHaveLength(2);
+    });
+
+    it.each(expectedRestaurantPathListingRestaurants)('$description', (expected) => {
+        const result = parseListingHtml(listingRestaurantPathHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        const restaurant = result.find(r => r.name === expected.name);
+        expect(restaurant).toBeDefined();
+        expect(restaurant!.menuUrl).toContain(expected.menuUrlSuffix);
+        if (expected.cuisines) {
+            expect(restaurant!.cuisines).toBe(expected.cuisines);
+        }
+    });
+});
+
+describe('parseListingHtml (embedded JSON fallback)', () => {
+    it('returns 2 restaurants from embedded JSON when links are not in the DOM', () => {
+        const result = parseListingHtml(listingEmbeddedJsonHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        expect(result).toHaveLength(2);
+    });
+
+    it.each(expectedEmbeddedJsonListingRestaurants)('$description', (expected) => {
+        const result = parseListingHtml(listingEmbeddedJsonHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        const restaurant = result.find(r => r.name === expected.name);
+        expect(restaurant).toBeDefined();
+        expect(restaurant!.menuUrl).toContain(expected.menuUrlSuffix);
+    });
+});
+
+describe('parseListingHtml (Next.js preloaded state)', () => {
+    it('returns all restaurants from preloaded state instead of only visible cards', () => {
+        const result = parseListingHtml(listingNextDataHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        expect(result).toHaveLength(3);
+    });
+
+    it.each(expectedNextDataListingRestaurants)('$description', (expected) => {
+        const result = parseListingHtml(listingNextDataHtml, 'https://www.lieferando.de/en/delivery/food/neutraubling-93073');
+        const restaurant = result.find(r => r.name === expected.name);
+        expect(restaurant).toBeDefined();
+        expect(restaurant!.menuUrl).toContain(expected.menuUrlSuffix);
+        expect(restaurant!.address).toBe(expected.address);
+        expect(restaurant!.city).toBe(expected.city);
+        expect(restaurant!.postalCode).toBe(expected.postalCode);
+        expect(restaurant!.cuisines).toBe(expected.cuisines);
+    });
+});
+
 // ── Real-world menu page parsing ──────────────────────────────
 
 describe('parseMenuHtml (real Lieferando structure)', () => {
@@ -170,5 +228,33 @@ describe('parseMenuHtml (real Lieferando structure)', () => {
         const salads = result.categories.find(c => c.name === 'Salads');
         expect(salads).toBeDefined();
         expect(salads!.items[0].price).toBeCloseTo(8.80, 2);
+    });
+
+    it('extracts opening details and address from __NEXT_DATA__', () => {
+        const result = parseMenuHtml(menuNextDataDetailsHtml);
+        expect(result.restaurantDetails).toBeDefined();
+        expect(result.restaurantDetails!.address).toBe('Sample Street 9');
+        expect(result.restaurantDetails!.city).toBe('Neutraubling');
+        expect(result.restaurantDetails!.postalCode).toBe('93073');
+        expect(result.restaurantDetails!.openingDays).toContain('Monday');
+        expect(result.restaurantDetails!.openingHours).toContain('delivery:');
+    });
+
+    it('extracts complete menu categories and items from __NEXT_DATA__', () => {
+        const result = parseMenuHtml(menuNextDataCategoriesHtml);
+        expect(result.parseOk).toBe(true);
+        expect(result.categories).toHaveLength(2);
+        expect(result.categories.map((c) => c.name)).toEqual(['Burgers', 'Sides']);
+    });
+
+    it.each(expectedNextDataMenuCategories)('$description', (expected) => {
+        const result = parseMenuHtml(menuNextDataCategoriesHtml);
+        const category = result.categories.find((c) => c.name === expected.name);
+        expect(category).toBeDefined();
+        expect(category!.items).toHaveLength(expected.itemCount);
+        expect(category!.items[0].name).toBe(expected.firstItem.name);
+        expect(category!.items[0].description).toBe(expected.firstItem.description);
+        expect(category!.items[0].price).toBeCloseTo(expected.firstItem.price, 2);
+        expect(category!.items[0].currency).toBe(expected.firstItem.currency);
     });
 });

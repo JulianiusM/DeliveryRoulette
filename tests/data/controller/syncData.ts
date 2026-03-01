@@ -7,12 +7,12 @@ export const triggerSyncValidData = [
     {
         description: 'triggers sync for all providers when no key given',
         providerKey: undefined,
-        expectedRunSyncArg: {providerKey: undefined},
+        expectedQueueSyncArg: {providerKey: undefined},
     },
     {
         description: 'triggers sync for a specific provider',
         providerKey: ProviderKey.UBER_EATS,
-        expectedRunSyncArg: {providerKey: ProviderKey.UBER_EATS},
+        expectedQueueSyncArg: {providerKey: ProviderKey.UBER_EATS},
     },
 ];
 

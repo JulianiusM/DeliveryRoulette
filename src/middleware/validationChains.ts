@@ -78,6 +78,7 @@ export const validateMenuItem = [
     body('name').trim().notEmpty().withMessage('Item name is required')
         .isLength({max: 255}).withMessage('Name must be at most 255 characters'),
     body('description').optional().trim(),
+    body('allergens').optional().trim().isLength({max: 2000}).withMessage('Allergens must be at most 2000 characters'),
     body('price').optional().isFloat({min: 0}).withMessage('Price must be a positive number'),
     body('currency').optional().trim().isLength({max: 10}).withMessage('Currency must be at most 10 characters'),
 ];

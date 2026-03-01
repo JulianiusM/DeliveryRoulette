@@ -9,6 +9,11 @@ import {RestaurantProviderRef} from "../modules/database/entities/restaurant/Res
 import {MenuCategory} from "../modules/database/entities/menu/MenuCategory";
 import {DietManualOverride} from "../modules/database/entities/diet/DietManualOverride";
 import {EffectiveSuitability} from "../modules/database/services/DietOverrideService";
+import {computeIsOpenNowFromOpeningHours, resolveRestaurantTimeZone} from "../modules/lib/openingHours";
+import {queueMenuSyncByProviderRef, QueuedSyncJob} from "../modules/sync/ProviderSyncService";
+import * as menuItemDietOverrideService from "../modules/database/services/MenuItemDietOverrideService";
+import * as dietInferenceService from "../modules/database/services/DietInferenceService";
+import * as cuisineInferenceService from "../modules/database/services/CuisineInferenceService";
 
 const LIST_TEMPLATE = 'restaurants/index';
 const FORM_TEMPLATE = 'restaurants/form';
@@ -53,11 +58,14 @@ export async function listRestaurants(options: {
     return {restaurants: filtered, search: options.search, active: options.activeFilter, favoritesOnly: options.favoritesOnly, favoriteIds};
 }
 
-export async function getRestaurantDetail(id: string, userId?: number): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]; isFavorite: boolean; doNotSuggest: boolean}> {
+export async function getRestaurantDetail(id: string, userId?: number): Promise<{restaurant: Restaurant; categories: MenuCategory[]; providerRefs: RestaurantProviderRef[]; dietSuitability: EffectiveSuitability[]; itemDietChips: Record<string, Array<{dietTagId: string; label: string; source: 'heuristic' | 'manual'}>>; cuisineProfile: ReturnType<typeof cuisineInferenceService.parseCuisineInference>; providerCuisines: string[]; isFavorite: boolean; doNotSuggest: boolean; isOpenNow: boolean | null}> {
     const restaurant = await requireRestaurant(id);
     const categories = await menuService.listCategoriesByRestaurant(restaurant.id);
     const providerRefs = await providerRefService.listByRestaurant(restaurant.id);
     const dietSuitability = await dietOverrideService.computeEffectiveSuitability(restaurant.id);
+    const itemDietChips = await buildItemDietChips(categories, dietSuitability);
+    const cuisineProfile = cuisineInferenceService.parseCuisineInference(restaurant.cuisineInferenceJson);
+    const providerCuisines = cuisineInferenceService.parseProviderCuisineList(restaurant.providerCuisinesJson);
 
     let isFavorite = false;
     let doNotSuggest = false;
@@ -69,7 +77,12 @@ export async function getRestaurantDetail(id: string, userId?: number): Promise<
         }
     }
 
-    return {restaurant, categories, providerRefs, dietSuitability, isFavorite, doNotSuggest};
+    const isOpenNow = computeIsOpenNowFromOpeningHours(restaurant.openingHours, {
+        timeZone: resolveRestaurantTimeZone(restaurant.country),
+        preferredService: 'delivery',
+    });
+
+    return {restaurant, categories, providerRefs, dietSuitability, itemDietChips, cuisineProfile, providerCuisines, isFavorite, doNotSuggest, isOpenNow};
 }
 
 export async function getRestaurantEditData(id: string): Promise<object> {
@@ -177,6 +190,93 @@ export async function removeProviderRef(restaurantId: string, refId: string): Pr
     if (!removed) {
         throw new ExpectedError('Provider reference not found.', 'error', 404);
     }
+}
+
+export async function queueProviderRefMenuSync(
+    restaurantId: string,
+    refId: string,
+): Promise<QueuedSyncJob> {
+    await requireRestaurant(restaurantId);
+    const ref = await providerRefService.getByIdForRestaurant(refId, restaurantId);
+    if (!ref) {
+        throw new ExpectedError('Provider reference not found.', 'error', 404);
+    }
+
+    return await queueMenuSyncByProviderRef(restaurantId, refId);
+}
+
+export async function runDietInference(restaurantId: string): Promise<number> {
+    await requireRestaurant(restaurantId);
+    const results = await dietInferenceService.computeForRestaurant(restaurantId);
+    await cuisineInferenceService.recomputeForRestaurant(restaurantId);
+    return results.length;
+}
+
+async function buildItemDietChips(
+    categories: MenuCategory[],
+    dietSuitability: EffectiveSuitability[],
+): Promise<Record<string, Array<{dietTagId: string; label: string; source: 'heuristic' | 'manual'}>>> {
+    const itemIds = categories.flatMap((category) => (category.items ?? []).map((item) => item.id));
+    if (itemIds.length === 0) {
+        return {};
+    }
+
+    const overrides = await menuItemDietOverrideService.listByItemIds(itemIds);
+    const explicitTrue = new Set<string>();
+    const explicitFalse = new Set<string>();
+    const chipMap = new Map<string, Map<string, {dietTagId: string; label: string; source: 'heuristic' | 'manual'}>>();
+
+    for (const override of overrides) {
+        const key = `${override.menuItemId}|${override.dietTagId}`;
+        if (override.supported) {
+            explicitTrue.add(key);
+        } else {
+            explicitFalse.add(key);
+        }
+    }
+
+    for (const suitability of dietSuitability) {
+        const reasons = suitability.inference?.reasons;
+        const matchedItems = reasons?.matchedItems ?? [];
+        for (const matchedItem of matchedItems) {
+            const key = `${matchedItem.itemId}|${suitability.dietTagId}`;
+            if (explicitFalse.has(key)) {
+                continue;
+            }
+
+            const byTag = chipMap.get(matchedItem.itemId) ?? new Map<string, {dietTagId: string; label: string; source: 'heuristic' | 'manual'}>();
+            byTag.set(suitability.dietTagId, {
+                dietTagId: suitability.dietTagId,
+                label: suitability.dietTagLabel,
+                source: 'heuristic',
+            });
+            chipMap.set(matchedItem.itemId, byTag);
+        }
+    }
+
+    for (const override of overrides) {
+        if (!override.supported) {
+            continue;
+        }
+        const tag = dietSuitability.find((suitability) => suitability.dietTagId === override.dietTagId);
+        if (!tag) {
+            continue;
+        }
+
+        const byTag = chipMap.get(override.menuItemId) ?? new Map<string, {dietTagId: string; label: string; source: 'heuristic' | 'manual'}>();
+        byTag.set(tag.dietTagId, {
+            dietTagId: tag.dietTagId,
+            label: tag.dietTagLabel,
+            source: 'manual',
+        });
+        chipMap.set(override.menuItemId, byTag);
+    }
+
+    const output: Record<string, Array<{dietTagId: string; label: string; source: 'heuristic' | 'manual'}>> = {};
+    for (const [itemId, byTag] of chipMap.entries()) {
+        output[itemId] = [...byTag.values()].sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return output;
 }
 
 // ── Diet Manual Overrides ───────────────────────────────────

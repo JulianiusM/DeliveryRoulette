@@ -1,5 +1,6 @@
 import * as userPreferenceService from "../modules/database/services/UserPreferenceService";
 import * as userDietPreferenceService from "../modules/database/services/UserDietPreferenceService";
+import * as dietTagService from "../modules/database/services/DietTagService";
 import {ValidationError} from "../modules/lib/errors";
 import {requireAuthenticatedUser} from "../middleware/authMiddleware";
 
@@ -17,6 +18,25 @@ export interface SettingsFormData {
     cuisineIncludes: string;
     cuisineExcludes: string;
     dietTags: DietTagOption[];
+}
+
+export interface DietHeuristicSettingsFormData {
+    scope: 'global';
+    configs: Array<{
+        id: string;
+        key: string;
+        label: string;
+        keywordWhitelist: string;
+        dishWhitelist: string;
+    }>;
+}
+
+function parseWhitelistInput(raw: unknown): string[] {
+    if (typeof raw !== 'string') return [];
+    return raw
+        .split(/[\n,]/g)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
 }
 
 export async function getSettings(userId?: number): Promise<SettingsFormData> {
@@ -91,4 +111,53 @@ export async function saveSettings(userId: number | undefined, body: any): Promi
             selected: selectedIds.has(tag.id),
         })),
     };
+}
+
+export async function getDietHeuristicSettings(userId?: number): Promise<DietHeuristicSettingsFormData> {
+    requireAuthenticatedUser(userId);
+
+    const configs = await dietTagService.listDietTagConfigs();
+    return {
+        scope: 'global',
+        configs: configs.map((config) => ({
+            id: config.id,
+            key: config.key,
+            label: config.label,
+            keywordWhitelist: config.keywordWhitelist.join('\n'),
+            dishWhitelist: config.dishWhitelist.join('\n'),
+        })),
+    };
+}
+
+export async function saveDietHeuristicSettings(userId: number | undefined, body: any): Promise<DietHeuristicSettingsFormData> {
+    requireAuthenticatedUser(userId);
+
+    const configs = await dietTagService.listDietTagConfigs();
+    const rawConfig = body?.dietConfig && typeof body.dietConfig === 'object'
+        ? body.dietConfig as Record<string, any>
+        : {};
+
+    for (const config of configs) {
+        const submitted = rawConfig[config.id];
+        if (!submitted || typeof submitted !== 'object') {
+            continue;
+        }
+
+        const keywordWhitelist = parseWhitelistInput(submitted.keywordWhitelist);
+        const dishWhitelist = parseWhitelistInput(submitted.dishWhitelist);
+
+        if (keywordWhitelist.length > 200) {
+            throw new ValidationError('users/diet-settings', `${config.label}: keyword whitelist is too large.`, {});
+        }
+        if (dishWhitelist.length > 200) {
+            throw new ValidationError('users/diet-settings', `${config.label}: dish whitelist is too large.`, {});
+        }
+
+        await dietTagService.updateDietTagConfig(config.id, {
+            keywordWhitelist,
+            dishWhitelist,
+        });
+    }
+
+    return await getDietHeuristicSettings(userId);
 }

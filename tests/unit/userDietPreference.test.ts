@@ -27,6 +27,7 @@ function createMockRepo(findData: any[] = []) {
     return {
         find: jest.fn().mockResolvedValue(findData),
         findOne: jest.fn(),
+        upsert: jest.fn().mockResolvedValue({identifiers: [], generatedMaps: [], raw: []}),
         create: jest.fn((data: any) => data),
         save: jest.fn((data: any) => Promise.resolve(data)),
         delete: jest.fn().mockResolvedValue({affected: 1}),
@@ -71,7 +72,9 @@ describe('UserDietPreferenceService', () => {
             const result = await userDietPreferenceService.getAllDietTags();
 
             expect(result).toEqual(sampleDietTags);
-            expect(repo.find).toHaveBeenCalledWith({order: {key: 'ASC'}});
+            expect(repo.find).toHaveBeenNthCalledWith(1, {select: ['key']});
+            expect(repo.upsert).toHaveBeenCalled();
+            expect(repo.find).toHaveBeenNthCalledWith(2, {order: {key: 'ASC'}});
         });
     });
 

@@ -25,6 +25,22 @@ export const sampleProviderMenu: ProviderMenu = {
 /** An empty menu (no categories). */
 export const emptyProviderMenu: ProviderMenu = {categories: []};
 
+/** Menu payload with duplicate category names from mixed parser sources. */
+export const duplicateCategoryProviderMenu: ProviderMenu = {
+    categories: [
+        {
+            name: 'Burger',
+            items: [],
+        },
+        {
+            name: 'Burger',
+            items: [
+                {externalId: 'ext-b1', name: 'Classic Burger', description: 'Beef', price: 8.9, currency: 'EUR'},
+            ],
+        },
+    ],
+};
+
 /** Import payload with menu for sync tests. */
 export const importPayloadWithMenu = {
     version: 1 as const,

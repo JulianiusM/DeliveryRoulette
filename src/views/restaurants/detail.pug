@@ -1,4 +1,4 @@
-//- views/restaurants/detail.pug – Restaurant Detail
+//- views/restaurants/detail.pug - Restaurant Detail
 extends ../layout
 
 block meta
@@ -13,6 +13,11 @@ block content
     - const r = data.restaurant
     - const categories = data.categories || []
     - const dietSuitability = data.dietSuitability || []
+    - const itemDietChips = data.itemDietChips || {}
+    - const cuisineProfile = data.cuisineProfile || null
+    - const providerCuisines = data.providerCuisines || []
+    - const openingDayList = (r.openingDays || '').split(',').map((d) => d.trim()).filter(Boolean)
+    - const openingHourLines = (r.openingHours || '').split('\n').map((l) => l.trim()).filter(Boolean)
 
     .row.g-4
         .col-md-8
@@ -27,6 +32,25 @@ block content
                     p.mb-0 #{r.postalCode} #{r.city}
                     if r.country
                         p.mb-0 #{r.country}
+                    if openingDayList.length > 0
+                        hr.border-secondary
+                        p.mb-2
+                            strong Opening Days
+                        .d-flex.flex-wrap.gap-1.mb-2
+                            each dayName in openingDayList
+                                span.badge.text-bg-secondary #{dayName}
+                    if openingHourLines.length > 0
+                        p.mb-2.mt-3
+                            strong Opening Hours
+                        ul.list-group.list-group-flush
+                            each line in openingHourLines
+                                - const separatorIndex = line.indexOf(':')
+                                li.list-group-item.bg-dark.text-light.border-secondary.small.py-2.px-2
+                                    if separatorIndex > 0
+                                        strong.me-2 #{line.slice(0, separatorIndex)}:
+                                        span.text-white-50 #{line.slice(separatorIndex + 1).trim()}
+                                    else
+                                        span.text-white-50 #{line}
 
         .col-md-4
             .card.text-bg-dark.border-secondary
@@ -35,17 +59,28 @@ block content
                     | Info
                 .card-body
                     p.mb-2
-                        | Status:&nbsp;
+                        | Listing:&nbsp;
                         if r.isActive
-                            span.badge.text-bg-success Active
+                            span.badge.text-bg-success Enabled
                         else
-                            span.badge.text-bg-secondary Inactive
+                            span.badge.text-bg-secondary Disabled
+                    p.mb-2
+                        | Open now:&nbsp;
+                        if data.isOpenNow === true
+                            span.badge.text-bg-success Open
+                        else if data.isOpenNow === false
+                            span.badge.text-bg-danger Closed
+                        else
+                            span.badge.text-bg-secondary Unknown
+                    p.text-white-50.small.mb-2
+                        | "Listing" controls whether this restaurant is available in the app.
+                        br
+                        | "Open now" is computed from stored opening hours and current local time.
                     p.text-white-50.mb-1
                         small Created: #{new Date(r.createdAt).toLocaleDateString()}
                     p.text-white-50.mb-0
                         small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
 
-            //── User Preference Toggles ──────────────────────────
             - const isFavorite = data.isFavorite || false
             - const doNotSuggest = data.doNotSuggest || false
             .card.text-bg-dark.border-secondary.mt-3
@@ -65,10 +100,30 @@ block content
                                 i.bi.me-1(class=doNotSuggest ? 'bi-x-circle-fill' : 'bi-x-circle')
                                 | #{doNotSuggest ? 'Allow Suggestions' : 'Do Not Suggest'}
 
-    //── Diet Suitability Section ─────────────────────────────
+            .card.text-bg-dark.border-secondary.mt-3
+                .card-header
+                    i.bi.bi-globe-asia-australia.me-2
+                    | Cuisines
+                .card-body
+                    if providerCuisines.length > 0
+                        p.text-white-50.small.mb-1 Provider Cuisines
+                        .d-flex.flex-wrap.gap-1.mb-2
+                            each cuisine in providerCuisines
+                                span.badge.text-bg-info.text-dark #{cuisine}
+                    else
+                        p.text-white-50.small.mb-2 No provider cuisines saved.
+
+                    if cuisineProfile && cuisineProfile.cuisines && cuisineProfile.cuisines.length > 0
+                        p.text-white-50.small.mb-1 Heuristic Cuisines
+                        .d-flex.flex-wrap.gap-1
+                            each cuisine in cuisineProfile.cuisines
+                                span.badge(class=cuisine.source === 'provider' ? 'text-bg-info text-dark' : 'text-bg-dark border border-secondary')
+                                    | #{cuisine.label} (#{cuisine.score}% #{cuisine.confidence})
+                    else
+                        p.text-white-50.small.mb-0 No inferred cuisines yet.
+
     include _diet_suitability
 
-    //── Provider References Section ──────────────────────────
     - const providerRefs = data.providerRefs || []
     .card.text-bg-dark.border-secondary.mt-4
         .card-header.d-flex.justify-content-between.align-items-center
@@ -112,18 +167,22 @@ block content
                             each ref in providerRefs
                                 tr
                                     td #{ref.providerKey}
-                                    td.text-white-50 #{ref.externalId || '—'}
+                                    td.text-white-50 #{ref.externalId || '-'}
                                     td
                                         a.text-info(href=ref.url target="_blank" rel="noopener noreferrer") #{ref.url}
                                     td
                                         span.badge(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
                                     td
-                                        form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
-                                            +csrf
-                                            button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove")
-                                                i.bi.bi-trash
+                                        .d-flex.gap-1
+                                            form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/sync-menu`)
+                                                +csrf
+                                                button.btn.btn-sm.btn-outline-info(type="submit" title="Sync menu from this provider reference")
+                                                    i.bi.bi-arrow-repeat
+                                            form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
+                                                +csrf
+                                                button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove")
+                                                    i.bi.bi-trash
 
-    //── Menu Section ─────────────────────────────────────
     .card.text-bg-dark.border-secondary.mt-4
         .card-header.d-flex.justify-content-between.align-items-center
             span
@@ -162,20 +221,32 @@ block content
                                             tr
                                                 th Name
                                                 th Description
+                                                th Allergens
                                                 th Price
                                                 th Actions
                                         tbody
                                             each item in items
-                                                tr
-                                                    td #{item.name}
-                                                    td.text-white-50 #{item.description || '—'}
+                                                - const chips = itemDietChips[item.id] || []
+                                                tr(id=`menu-item-${item.id}`)
+                                                    td
+                                                        a.text-decoration-none.text-light(href=`#menu-item-${item.id}`) #{item.name}
+                                                        if chips.length > 0
+                                                            .d-flex.flex-wrap.gap-1.mt-1
+                                                                each chip in chips
+                                                                    span.badge(class=chip.source === 'manual' ? 'text-bg-warning text-dark' : 'text-bg-success') #{chip.label}
+                                                    td.text-white-50 #{item.description || '-'}
+                                                    td
+                                                        if item.allergens
+                                                            span.text-warning.small #{item.allergens}
+                                                        else
+                                                            span.text-white-50 -
                                                     td
                                                         if item.price != null
                                                             | #{parseFloat(item.price).toFixed(2)}
                                                             if item.currency
                                                                 |  #{item.currency}
                                                         else
-                                                            span.text-white-50 —
+                                                            span.text-white-50 -
                                                     td
                                                         a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit` title="Edit Item")
                                                             i.bi.bi-pencil
