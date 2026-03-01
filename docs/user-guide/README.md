@@ -120,10 +120,19 @@ DeliveryRoulette automatically analyzes menu items to infer which diets a restau
    - *Vegetarian*: "vegetarisch", "veggie", "ohne Fleisch", etc.
    - *Vegan*: "vegan", "pflanzlich", etc.
    - *Gluten-free*: "glutenfrei", "gluten-free", etc.
-2. **Confidence scoring** — Each match produces a confidence score
-3. **Aggregation** — If enough items match a diet tag, the restaurant is marked as supporting that diet
+2. **Allergen-based exclusions** — If a menu item has allergen data (e.g., from Lieferando import), conflicting allergens automatically disqualify items from certain diets:
+   - Eggs → excludes from *Vegan*
+   - Milk/Dairy → excludes from *Vegan* and *Lactose-free*
+   - Gluten/Wheat → excludes from *Gluten-free*
+   - Pork → excludes from *Halal*
+   - Fish/Shellfish → excludes from *Vegan* and *Vegetarian*
+3. **Negative keyword detection** — Words that contradict a diet (e.g., "beef" in a vegan check) cause exclusion
+4. **Confidence scoring** — Each match produces a confidence score (LOW, MEDIUM, HIGH)
+5. **Aggregation** — If enough items match a diet tag, the restaurant is marked as supporting that diet
 
-**Important:** This is a best-effort heuristic. It works well for clearly labeled menus but may miss items without diet keywords or produce false positives for ambiguous names.
+**Important:** This is a best-effort heuristic. It works well for clearly labeled menus but may miss items without diet keywords or produce false positives for ambiguous names. The allergen-based exclusion significantly reduces false positives when allergen data is available.
+
+> **Reliability note**: False negatives (missing a valid diet match) are preferred over false positives (incorrectly marking something as diet-compatible). This design choice prioritizes safety for users with dietary restrictions.
 
 ### Manual Diet Overrides
 
@@ -165,13 +174,15 @@ Your preferences are used when generating suggestions — only restaurants that 
 
 The suggestion engine filters restaurants by:
 1. **Active status** — only active restaurants are considered
-2. **Diet compatibility** — restaurants must support diets of all selected users/tags
-3. **Cuisine filters** — optional include/exclude lists
-4. **Favorites and exclusions** — respects "Do Not Suggest" preferences
+2. **Open now** — optionally filters to only restaurants currently open for delivery (based on imported opening hours)
+3. **Diet compatibility** — restaurants must support diets of all selected users/tags
+4. **Cuisine filters** — optional include/exclude lists
+5. **Favorites and exclusions** — respects "Do Not Suggest" preferences
 
 ### Advanced Filters
 
 Expand the **Advanced Filters** section to:
+- **Only open restaurants** — toggle to restrict suggestions to restaurants that are currently open
 - **Diet Requirements** — check specific diet tags for group dining (e.g., if one person is vegan, check "Vegan")
 - **Cuisine Include** — only suggest restaurants with these cuisines
 - **Cuisine Exclude** — never suggest restaurants with these cuisines
@@ -204,7 +215,9 @@ Provider connectors sync restaurant data from external delivery platforms. Curre
 ### What Gets Imported
 
 - Restaurant name and address
+- Opening hours (used for "open now" filtering in suggestions)
 - Menu categories and items with prices
+- **Allergen information** (used by the diet inference engine to improve accuracy)
 - Provider reference (link back to Lieferando page)
 - Diet suitability is automatically inferred from the imported menu
 

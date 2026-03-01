@@ -241,13 +241,15 @@ SyncJob ─── SyncAlert
 - Menu items with name, description, price, currency
 
 #### Diet System
-- Diet tags (vegetarian, vegan, gluten-free, etc.)
-- Diet inference results (auto-detected from menu items)
+- Diet tags (vegetarian, vegan, gluten-free, lactose-free, halal)
+- Diet inference results (auto-detected from menu items using keyword matching and allergen exclusion)
+- Allergen-based exclusion rules (e.g., egg allergen → not vegan, milk allergen → not lactose-free)
 - Manual overrides for incorrect detections
 - User diet preferences for suggestion filtering
 
 #### Suggestions
 - Random restaurant suggestion engine
+- Opening hours filtering (only suggest restaurants that are currently open)
 - Suggestion history tracking
 
 #### Provider Integration

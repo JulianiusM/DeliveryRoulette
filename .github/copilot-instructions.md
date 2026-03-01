@@ -189,10 +189,10 @@ ProviderSyncService → ConnectorRegistry.get(providerKey)
 
 ### Key Entities
 
-- **Restaurant**: Name, address, city, active status
-- **MenuCategory / MenuItem**: Menu structure with prices
-- **DietTag**: Diet types (vegetarian, vegan, gluten-free, etc.)
-- **DietInferenceResult**: Auto-detected diet suitability per restaurant
+- **Restaurant**: Name, address, city, opening hours, active status
+- **MenuCategory / MenuItem**: Menu structure with prices, allergens, and diet context
+- **DietTag**: Diet types (vegetarian, vegan, gluten-free, lactose-free, halal)
+- **DietInferenceResult**: Auto-detected diet suitability per restaurant (using keyword matching + allergen exclusion)
 - **DietManualOverride**: User corrections to diet detection
 - **UserDietPreference**: Per-user diet tag selections
 - **UserRestaurantPreference**: Favorites and exclusions
@@ -202,5 +202,28 @@ ProviderSyncService → ConnectorRegistry.get(providerKey)
 - **ProviderSourceConfig**: Provider sync source configuration
 - **ProviderFetchCache**: Cached provider HTTP responses
 - **SyncJob / SyncAlert**: Sync tracking and alert management
+
+### Diet Inference Engine
+
+The diet inference engine (`DietInferenceService`) uses a multi-signal heuristic approach:
+
+1. **Positive keyword matching**: Scans item names/descriptions for diet-related keywords
+2. **Dish whitelist**: Recognizes known diet-compatible dishes (e.g., "falafel" → vegan)
+3. **Allergen-based exclusion**: Uses item allergen data to disqualify items (e.g., eggs → not vegan). Defined in `ALLERGEN_DIET_EXCLUSIONS`.
+4. **Negative keyword filtering**: Detects contradicting ingredients (e.g., "beef" → not vegetarian)
+5. **Context-aware false positive detection**: Filters out misleading matches (e.g., "vegan mayo" on a beef burger)
+6. **Confidence scoring**: Rates results as LOW/MEDIUM/HIGH based on evidence strength
+7. **Subdiet inheritance**: VEGAN matches inherit VEGETARIAN evidence
+
+The engine version (`ENGINE_VERSION`) is bumped when rules change, triggering recomputation.
+
+### Suggestion Engine
+
+The suggestion service (`SuggestionService`) filters restaurants by:
+1. Active status
+2. Opening hours (optional "open now" filter using `computeIsOpenNowFromOpeningHours`)
+3. Diet compatibility (all required diet tags must be supported)
+4. Cuisine filters (include/exclude)
+5. User preferences (favorites boosted, do-not-suggest excluded)
 
 ## Additional Resources
