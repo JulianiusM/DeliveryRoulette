@@ -109,15 +109,21 @@ export class LieferandoConnector implements DeliveryProviderConnector {
             throwOnFailure: false,
         });
         let parsedFromHtml: ParsedMenu | null = null;
+        let restaurantNumericId: string | null = null;
+
         if (html && !looksLikeBotProtectionPage(html) && hasTrustedMenuSignals(html)) {
             parsedFromHtml = parseMenuHtml(html);
+            restaurantNumericId = parsedFromHtml.restaurantNumericId ?? null;
             if (hasMenuItems(parsedFromHtml.categories)) {
+                await this.enrichWithAllergens(parsedFromHtml.categories, restaurantNumericId);
                 return toProviderMenu(parsedFromHtml, externalId);
             }
         }
 
         const parsedFromCdn = await this.fetchMenuFromCdn(menuUrl, html);
         if (parsedFromCdn && hasMenuItems(parsedFromCdn.categories)) {
+            restaurantNumericId = restaurantNumericId ?? parsedFromCdn.restaurantNumericId ?? null;
+            await this.enrichWithAllergens(parsedFromCdn.categories, restaurantNumericId);
             return toProviderMenu(parsedFromCdn, externalId);
         }
 
@@ -353,6 +359,66 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         return null;
     }
 
+    /**
+     * Enrich parsed menu items with allergen data from the Lieferando product information API.
+     *
+     * For each item that has a sourceId (variation/product UUID), fetches allergen info from:
+     * `rest.api.eu-central-1.production.jet-external.com/restaurants/{country}/{restaurantId}/products/{productId}/information`
+     *
+     * Uses the Lieferando allergen type taxonomy (glutenCereal, milkLactose, etc.)
+     * and maps them to human-readable allergen names.
+     */
+    private async enrichWithAllergens(categories: ParsedMenuCategory[], restaurantNumericId: string | null): Promise<void> {
+        if (!restaurantNumericId) return;
+
+        const productIds: Array<{categoryIdx: number; itemIdx: number; productId: string}> = [];
+        for (let ci = 0; ci < categories.length; ci++) {
+            for (let ii = 0; ii < categories[ci].items.length; ii++) {
+                const item = categories[ci].items[ii];
+                if (item.sourceId && !item.allergens?.length) {
+                    productIds.push({categoryIdx: ci, itemIdx: ii, productId: item.sourceId});
+                }
+            }
+        }
+
+        if (productIds.length === 0) return;
+
+        // Fetch allergens in parallel batches to avoid overwhelming the API
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+            const batch = productIds.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+                batch.map(async ({productId}) => {
+                    const allergens = await this.fetchProductAllergens(restaurantNumericId, productId);
+                    return {productId, allergens};
+                }),
+            );
+
+            for (let j = 0; j < batch.length; j++) {
+                const result = results[j];
+                if (result.status === 'fulfilled' && result.value.allergens.length > 0) {
+                    const {categoryIdx, itemIdx} = batch[j];
+                    categories[categoryIdx].items[itemIdx].allergens = result.value.allergens;
+                }
+            }
+        }
+    }
+
+    /**
+     * Fetch allergens for a single product/variation from the Lieferando REST API.
+     */
+    private async fetchProductAllergens(restaurantId: string, productId: string): Promise<string[]> {
+        const url = `https://rest.api.eu-central-1.production.jet-external.com/restaurants/${COUNTRY_CODE}/${restaurantId}/products/${productId}/information`;
+
+        try {
+            const data = await this.fetchJson(url) as Record<string, unknown> | null;
+            if (!data) return [];
+            return parseAllergenResponse(data);
+        } catch {
+            return [];
+        }
+    }
+
     private async fetchJson(url: string): Promise<unknown | null> {
         try {
             const controller = new AbortController();
@@ -546,6 +612,7 @@ function parseCdnMenuPayload(
 
     return {
         restaurantName: parseCdnRestaurantName(manifest),
+        restaurantNumericId: parseCdnRestaurantNumericId(manifest),
         restaurantDetails: parseCdnRestaurantDetails(manifest),
         categories,
         rawText: categoriesToRawText(categories),
@@ -804,6 +871,28 @@ function parseCdnRestaurantDetails(manifest: Record<string, unknown>): ParsedMen
     };
 }
 
+function parseCdnRestaurantNumericId(manifest: Record<string, unknown>): string | null {
+    // CDN manifest may contain RestaurantId at top level or in RestaurantInfo
+    const candidates = [
+        manifest.RestaurantId,
+        manifest.restaurantId,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.Id,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.id,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.RestaurantId,
+    ];
+
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && /^\d+$/.test(candidate.trim())) {
+            return candidate.trim();
+        }
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+            return String(candidate);
+        }
+    }
+
+    return null;
+}
+
 function categoriesToRawText(categories: ParsedMenuCategory[]): string {
     const parts: string[] = [];
     for (const category of categories) {
@@ -1013,4 +1102,77 @@ function parseCuisineList(value: string | null | undefined): string[] | null {
         .filter((entry) => entry.length > 0);
     if (normalized.length === 0) return null;
     return [...new Set(normalized)];
+}
+
+// ── Allergen type mapping ────────────────────────────────────────
+// Maps Lieferando allergen API types to human-readable names.
+// Based on the Lieferando product information API response format:
+//   { "allergenSets": [{ "level": "contains", "type": "glutenCereal", "subTypes": ["wheat"] }] }
+
+const ALLERGEN_TYPE_MAP: Record<string, string> = {
+    glutenCereal: 'Gluten',
+    milkLactose: 'Milk',
+    egg: 'Eggs',
+    fish: 'Fish',
+    crustaceans: 'Crustaceans',
+    molluscs: 'Molluscs',
+    peanuts: 'Peanuts',
+    treeNuts: 'Tree Nuts',
+    soy: 'Soy',
+    sesame: 'Sesame',
+    celery: 'Celery',
+    mustard: 'Mustard',
+    lupin: 'Lupin',
+    sulphites: 'Sulphites',
+};
+
+/**
+ * Parse the Lieferando product information API response to extract human-readable allergen names.
+ *
+ * Response format:
+ * ```json
+ * { "allergens": { "provided": true, "allergenSets": [
+ *   { "level": "contains", "type": "glutenCereal", "subTypes": ["wheat"] },
+ *   { "level": "contains", "type": "milkLactose", "subTypes": [] }
+ * ]}}
+ * ```
+ */
+function parseAllergenResponse(data: Record<string, unknown>): string[] {
+    const allergens = data.allergens as Record<string, unknown> | undefined;
+    if (!allergens || allergens.provided !== true) return [];
+
+    const allergenSets = allergens.allergenSets;
+    if (!Array.isArray(allergenSets)) return [];
+
+    const result: string[] = [];
+    for (const set of allergenSets) {
+        if (!set || typeof set !== 'object') continue;
+        const allergenSet = set as Record<string, unknown>;
+
+        // Only include "contains" level (skip "mayContain" for conservative approach)
+        if (allergenSet.level !== 'contains') continue;
+
+        const type = typeof allergenSet.type === 'string' ? allergenSet.type : '';
+        const label = ALLERGEN_TYPE_MAP[type] ?? type;
+        if (!label) continue;
+
+        const subTypes = Array.isArray(allergenSet.subTypes)
+            ? allergenSet.subTypes.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+            : [];
+
+        if (subTypes.length > 0) {
+            // Include both the main type and sub-types for comprehensive matching
+            result.push(label);
+            for (const sub of subTypes) {
+                const subLabel = sub.charAt(0).toUpperCase() + sub.slice(1);
+                if (subLabel.toLowerCase() !== label.toLowerCase()) {
+                    result.push(subLabel);
+                }
+            }
+        } else {
+            result.push(label);
+        }
+    }
+
+    return [...new Set(result)];
 }
