@@ -226,7 +226,7 @@ The engine version (`ENGINE_VERSION`) is bumped when rules change, triggering re
 
 The suggestion service (`SuggestionService`) filters restaurants by:
 1. Active status
-2. Opening hours (optional "open now" filter using `computeIsOpenNowFromOpeningHours`, enabled by default in the UI)
+2. Opening hours (optional "open now" filter using `computeIsOpenNowFromOpeningHours`, enabled by default in the UI). Restaurants with unknown opening hours (`null`) are included; only restaurants explicitly closed (`false`) are filtered out.
 3. Diet compatibility (all required diet tags must be supported; user's saved preferences are pre-selected)
 4. Allergen exclusion (`excludeAllergens` filter — keeps restaurants with at least one allergen-free item)
 5. Cuisine filters (include/exclude)

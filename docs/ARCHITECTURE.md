@@ -260,10 +260,12 @@ SyncJob ─── SyncAlert
 
 #### Suggestions
 - Random restaurant suggestion engine
-- Opening hours filtering (only suggest open restaurants; enabled by default)
-- Allergen exclusion filter (restaurants with at least one allergen-free item)
-- Diet compatibility filter (all required diet tags must be supported)
-- Suggestion history tracking
+- Opening hours filtering (only suggest open restaurants; enabled by default). Restaurants with no opening hours data are included (benefit of the doubt); only restaurants explicitly known to be closed are filtered out.
+- Allergen exclusion filter (`excludeAllergens` — restaurants where all menu items contain excluded allergens are removed; keeps restaurants with at least one allergen-free item)
+- Diet compatibility filter (all required diet tags must be supported; user's saved preferences are pre-selected)
+- Cuisine include/exclude filters
+- User preference filters (favorites boosted, do-not-suggest excluded)
+- Suggestion history tracking (recently suggested excluded to promote variety)
 
 #### Provider Integration
 - Provider credentials (encrypted)

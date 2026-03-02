@@ -114,21 +114,42 @@ Click a restaurant to see its full details:
 
 ### How Diet Detection Works (Heuristics)
 
-DeliveryRoulette automatically analyzes menu items to infer which diets a restaurant supports:
+DeliveryRoulette automatically analyzes menu items to infer which diets a restaurant supports. The engine is **fully data-driven and tag-agnostic** — all rules (keywords, allergen exclusions, negative patterns) are stored in the database and configurable without code changes. It supports **multiple languages** (currently English and German) simultaneously, even within the same restaurant menu.
 
-1. **Keyword matching** — Menu item names and descriptions are scanned for diet-related keywords
-   - *Vegetarian*: "vegetarisch", "veggie", "ohne Fleisch", etc.
-   - *Vegan*: "vegan", "pflanzlich", etc.
-   - *Gluten-free*: "glutenfrei", "gluten-free", etc.
-2. **Allergen-based exclusions** — If a menu item has allergen data (e.g., from Lieferando import), conflicting allergens automatically disqualify items from certain diets:
+The detection pipeline uses multiple signals:
+
+1. **Positive keyword matching** — Menu item names, descriptions, and diet context are scanned for diet-indicating keywords (e.g., "vegan", "pflanzlich", "plant-based", "vegetarisch"). Keywords are matched using word boundaries to avoid false matches.
+2. **Dish whitelist** — Known diet-compatible dishes are recognized by name tokens (e.g., "margherita" in "Pizza Margherita" matches the vegetarian whitelist, "falafel" matches vegan).
+3. **Allergen-based exclusions** — If a menu item has allergen data (e.g., from Lieferando import), conflicting allergens automatically disqualify items from certain diets:
    - Eggs → excludes from *Vegan*
    - Milk/Dairy → excludes from *Vegan* and *Lactose-free*
    - Gluten/Wheat → excludes from *Gluten-free*
    - Pork → excludes from *Halal*
    - Fish/Shellfish → excludes from *Vegan* and *Vegetarian*
-3. **Negative keyword detection** — Words that contradict a diet (e.g., "beef" in a vegan check) cause exclusion
-4. **Confidence scoring** — Each match produces a confidence score (LOW, MEDIUM, HIGH)
-5. **Aggregation** — If enough items match a diet tag, the restaurant is marked as supporting that diet
+   - Both "contains" and "may contain" allergens are included by default (configurable)
+4. **Negative keyword detection** — Words that contradict a diet (e.g., "Rindfleisch" / "beef" in a vegan check, "Schweinefleisch" / "pork" in a halal check) cause exclusion. Supports German and English.
+5. **Strong name signals** — Menu item names that are strong diet indicators (e.g., "Vegan Bowl", "Vegetarische Platte") receive extra weight in scoring.
+6. **Context-aware false positive detection** — Prevents counting items like "vegan mayo on beef burger" as vegan evidence by detecting when a diet keyword appears only as a modifier for a non-compatible dish.
+7. **Item customization options** — When providers supply diet-related customization options (e.g., "vegan zubereitet" / "make plant-based"), these are parsed and fed into the scoring as positive signals.
+8. **Confidence scoring** — Each match produces a confidence score (LOW, MEDIUM, HIGH) based on evidence strength and menu size.
+9. **Subdiet inheritance** — VEGAN matches automatically count as VEGETARIAN evidence (configurable parent-child relationships).
+
+#### Multi-Language Support
+
+All keywords, negative keywords, dish names, and detection patterns support **both German and English** out of the box. Text normalization handles umlauts automatically (Käse → kase for matching), so German menu items are correctly analyzed regardless of character encoding.
+
+#### Configurable Rules
+
+All detection rules are stored as database records and can be modified through the application:
+- **Keywords** — words that indicate diet compatibility
+- **Dish whitelist** — known diet-compatible dish names
+- **Allergen exclusions** — which allergens disqualify which diets
+- **Negative keywords** — words that contradict a diet
+- **Strong signals** — extra-weighted diet indicators
+- **Contradiction patterns** — regex patterns that detect conflicting evidence
+- **Qualified exceptions** — exceptions to negative keywords (e.g., "chicken" is negative for vegan, but "chicken-free" is not)
+
+Numeric thresholds and scoring weights (19 parameters) are configurable via environment variables.
 
 **Important:** This is a best-effort heuristic. It works well for clearly labeled menus but may miss items without diet keywords or produce false positives for ambiguous names. The allergen-based exclusion significantly reduces false positives when allergen data is available.
 
@@ -174,18 +195,23 @@ Your preferences are used when generating suggestions — only restaurants that 
 
 The suggestion engine filters restaurants by:
 1. **Active status** — only active restaurants are considered
-2. **Open now** — optionally filters to only restaurants currently open for delivery (based on imported opening hours)
-3. **Diet compatibility** — restaurants must support diets of all selected users/tags
-4. **Cuisine filters** — optional include/exclude lists
-5. **Favorites and exclusions** — respects "Do Not Suggest" preferences
+2. **Open now** — optionally filters to only restaurants currently open for delivery (based on imported opening hours). Restaurants with no opening hours data are included by default (benefit of the doubt).
+3. **Diet compatibility** — restaurants must support all selected diet tags (based on inference scores or manual overrides). Your saved diet preferences are pre-selected automatically.
+4. **Allergen exclusion** — restaurants where *all* menu items contain any of the excluded allergens are filtered out. Restaurants with at least one allergen-free item are kept.
+5. **Cuisine filters** — optional include/exclude lists (comma-separated)
+6. **User preferences** — favorites receive a selection boost, "Do Not Suggest" restaurants are hard-excluded
+7. **Recent history** — recently suggested restaurants are excluded to promote variety
 
 ### Advanced Filters
 
 Expand the **Advanced Filters** section to:
-- **Only open restaurants** — toggle to restrict suggestions to restaurants that are currently open
-- **Diet Requirements** — check specific diet tags for group dining (e.g., if one person is vegan, check "Vegan")
-- **Cuisine Include** — only suggest restaurants with these cuisines
-- **Cuisine Exclude** — never suggest restaurants with these cuisines
+- **Only open restaurants** — toggle to restrict suggestions to restaurants that are currently open (enabled by default). Restaurants without opening hours data are always included.
+- **Diet Requirements** — check specific diet tags for group dining (e.g., if one person is vegan, check "Vegan"). Your personal diet preferences are pre-selected.
+- **Cuisine Include** — only suggest restaurants with these cuisines (comma-separated)
+- **Cuisine Exclude** — never suggest restaurants with these cuisines (comma-separated)
+- **Allergen Exclusion** — comma-separated list of allergens to avoid (e.g., "Gluten, Eggs, Milk"). Restaurants where every menu item contains at least one of these allergens will be excluded. This works alongside diet filters for comprehensive dietary safety.
+
+> **Diet vs. Allergen overlap**: Diet tags like "Gluten-Free" and "Lactose-Free" use heuristic scoring at the restaurant level, while allergen exclusion performs direct item-level allergen matching. Both mechanisms complement each other — use diet tags for general dietary preference filtering and allergen exclusion for specific allergen avoidance.
 
 ### Rerolling
 
@@ -217,9 +243,10 @@ Provider connectors sync restaurant data from external delivery platforms. Curre
 - Restaurant name and address
 - Opening hours (used for "open now" filtering in suggestions)
 - Menu categories and items with prices
-- **Allergen information** (used by the diet inference engine to improve accuracy)
+- **Allergen information** per menu item — fetched from Lieferando's product information API. Includes both "contains" and "may contain" levels by default (configurable). Allergen types include: Gluten, Milk, Eggs, Fish, Peanuts, Soybeans, Nuts, Celery, Mustard, Sesame, Sulphites, Lupin, Molluscs, and Crustaceans.
+- **Diet customization options** — if items offer diet-related preparation options (e.g., "vegan zubereitet", "make plant-based"), these are parsed from the provider's CDN data and factored into diet inference scoring.
 - Provider reference (link back to Lieferando page)
-- Diet suitability is automatically inferred from the imported menu
+- Diet suitability is automatically inferred from the imported menu, allergen data, and customization options
 
 ---
 
