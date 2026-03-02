@@ -416,6 +416,47 @@ export const inferForTagData = [
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-4'],
     },
+    // ── Allergen-based exclusion test cases ─────────────────────
+    {
+        description: 'allergen exclusion: tofu noodles with egg allergen excluded from vegan',
+        tag: {id: 'tag-vegan', key: 'VEGAN', allergenExclusions: [{value: 'egg'},{value: 'eggs'},{value: 'ei'},{value: 'eier'},{value: 'milk'},{value: 'milch'},{value: 'dairy'},{value: 'fish'},{value: 'fisch'},{value: 'shellfish'},{value: 'crustaceans'}]},
+        items: [
+            {id: 'item-1', name: 'Asian Noodles with Tofu', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
+            {id: 'item-2', name: 'Vegan Pad Thai', description: 'Rice noodles', allergens: 'Soy, Peanuts'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-2'],
+    },
+    {
+        description: 'allergen exclusion: milk allergen excludes from lactose-free',
+        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE', allergenExclusions: [{value: 'milk'},{value: 'milch'},{value: 'dairy'},{value: 'lactose'},{value: 'laktose'}]},
+        items: [
+            {id: 'item-1', name: 'Oat Milk Latte', description: 'Dairy-free latte', allergens: null},
+            {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'allergen exclusion: gluten allergen excludes from gluten-free',
+        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE', allergenExclusions: [{value: 'gluten'},{value: 'wheat'},{value: 'weizen'},{value: 'barley'},{value: 'gerste'},{value: 'rye'},{value: 'roggen'}]},
+        items: [
+            {id: 'item-1', name: 'Gluten-Free Pizza', description: 'Rice flour base', allergens: null},
+            {id: 'item-2', name: 'GF Bread', description: 'Our gf option', allergens: 'Wheat'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'allergen exclusion: no allergens means no exclusion',
+        tag: {id: 'tag-vegan', key: 'VEGAN', allergenExclusions: [{value: 'egg'},{value: 'eggs'},{value: 'milk'},{value: 'dairy'}]},
+        items: [
+            {id: 'item-1', name: 'Tofu Curry', description: 'With coconut sauce', allergens: null},
+            {id: 'item-2', name: 'Tempeh Bowl', description: 'Fresh greens'},
+        ],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
+    },
 ];
 
 // ── German keyword rules expected data ─────────────────────
@@ -431,6 +472,6 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '3.0.0',
+    expectedCurrent: '4.0.0',
 };
 

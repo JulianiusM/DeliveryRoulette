@@ -1,8 +1,25 @@
 /**
- * Test data for DietTag seed tests
+ * Canonical default diet-tag seed data.
+ *
+ * This file is a **data definition only** — no DBAL or service logic.
+ * It is consumed by DietTagService to seed/upsert the diet_tags table
+ * and its associated child tables.
  */
 
-export const EXPECTED_DIET_TAGS = [
+export interface DefaultDietTag {
+    key: string;
+    label: string;
+    keywordWhitelist: string[];
+    dishWhitelist: string[];
+    /**
+     * Allergen tokens that disqualify a menu item from this diet.
+     * Each token is matched case-insensitively against the item's allergen list.
+     * E.g., "egg" in a VEGAN tag means items with egg allergens are not vegan.
+     */
+    allergenExclusions: string[];
+}
+
+export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
     {
         key: 'VEGAN',
         label: 'Vegan',
@@ -123,29 +140,5 @@ export const EXPECTED_DIET_TAGS = [
         allergenExclusions: [
             'pork', 'schwein',
         ],
-    },
-];
-
-export const dietTagSeedData = [
-    {
-        description: 'seeds all tags into empty repository',
-        existing: [],
-        expectedInserted: 5,
-    },
-    {
-        description: 'skips already-existing tags (idempotent)',
-        existing: [{key: 'VEGAN', label: 'Vegan'}],
-        expectedInserted: 4,
-    },
-    {
-        description: 'inserts nothing when all tags exist',
-        existing: [
-            {key: 'VEGAN', label: 'Vegan'},
-            {key: 'VEGETARIAN', label: 'Vegetarian'},
-            {key: 'GLUTEN_FREE', label: 'Gluten-free'},
-            {key: 'LACTOSE_FREE', label: 'Lactose-free'},
-            {key: 'HALAL', label: 'Halal'},
-        ],
-        expectedInserted: 0,
     },
 ];

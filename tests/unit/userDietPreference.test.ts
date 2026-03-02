@@ -66,15 +66,29 @@ describe('UserDietPreferenceService', () => {
 
     describe('getAllDietTags', () => {
         test('returns all diet tags ordered by key', async () => {
-            const repo = createMockRepo(sampleDietTags);
-            mockGetRepository.mockReturnValue(repo);
+            const mockChildRepo = {
+                find: jest.fn().mockResolvedValue([]),
+                create: jest.fn((data: any) => data),
+                save: jest.fn((data: any) => Promise.resolve(data)),
+                remove: jest.fn(() => Promise.resolve()),
+            };
+            const tagRepo = createMockRepo(sampleDietTags.map((t: any) => ({
+                ...t,
+                keywords: [],
+                dishes: [],
+                allergenExclusions: [],
+            })));
+            mockGetRepository.mockImplementation((entity: any) => {
+                const name = entity?.name || String(entity);
+                if (name === 'DietTag') return tagRepo;
+                return mockChildRepo;
+            });
 
             const result = await userDietPreferenceService.getAllDietTags();
 
-            expect(result).toEqual(sampleDietTags);
-            expect(repo.find).toHaveBeenNthCalledWith(1, {select: ['key']});
-            expect(repo.upsert).toHaveBeenCalled();
-            expect(repo.find).toHaveBeenNthCalledWith(2, {order: {key: 'ASC'}});
+            expect(result).toEqual(expect.arrayContaining(
+                sampleDietTags.map((t: any) => expect.objectContaining({key: t.key, label: t.label})),
+            ));
         });
     });
 

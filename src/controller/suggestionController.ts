@@ -93,6 +93,7 @@ export async function processSuggestion(body: {
     dietTagIds?: string | string[];
     cuisineIncludes?: string;
     cuisineExcludes?: string;
+    openOnly?: boolean | string;
 }, userId?: number | null): Promise<SuggestionResultData> {
     // Normalize dietTagIds to array
     let dietTagIds: string[] = [];
@@ -121,6 +122,7 @@ export async function processSuggestion(body: {
         excludeRestaurantIds,
         doNotSuggestIds,
         favoriteIds,
+        openOnly: body.openOnly === true || body.openOnly === 'true',
     };
 
     const result = await suggestionService.suggest(filters);

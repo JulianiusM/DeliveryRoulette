@@ -17,6 +17,9 @@ import {
     ENGINE_VERSION,
     DIET_KEYWORD_RULES,
 } from '../../src/modules/database/services/DietInferenceService';
+import {
+    DEFAULT_DIET_TAGS,
+} from '../../src/modules/database/services/DietTagService';
 
 describe('DietInferenceService', () => {
     describe('ENGINE_VERSION', () => {
@@ -87,6 +90,45 @@ describe('DietInferenceService', () => {
             );
             expect(score).toBe(testCase.expectedScore);
             expect(confidence).toBe(testCase.expectedConfidence);
+        });
+    });
+
+    describe('Allergen exclusions (data-driven from DEFAULT_DIET_TAGS)', () => {
+        const veganTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'VEGAN')!;
+        const lactoseFreeTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'LACTOSE_FREE')!;
+        const glutenFreeTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'GLUTEN_FREE')!;
+        const halalTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'HALAL')!;
+
+        test('VEGAN tag has egg allergen exclusions', () => {
+            expect(veganTag.allergenExclusions).toContain('egg');
+            expect(veganTag.allergenExclusions).toContain('eggs');
+        });
+
+        test('VEGAN tag has milk/dairy allergen exclusions', () => {
+            expect(veganTag.allergenExclusions).toContain('milk');
+            expect(veganTag.allergenExclusions).toContain('dairy');
+        });
+
+        test('LACTOSE_FREE tag has milk/lactose allergen exclusions', () => {
+            expect(lactoseFreeTag.allergenExclusions).toContain('milk');
+            expect(lactoseFreeTag.allergenExclusions).toContain('lactose');
+        });
+
+        test('GLUTEN_FREE tag has gluten/wheat allergen exclusions', () => {
+            expect(glutenFreeTag.allergenExclusions).toContain('gluten');
+            expect(glutenFreeTag.allergenExclusions).toContain('wheat');
+        });
+
+        test('HALAL tag has pork allergen exclusions', () => {
+            expect(halalTag.allergenExclusions).toContain('pork');
+        });
+
+        test('all exclusion tokens are lowercase', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                for (const exclusion of (tag.allergenExclusions ?? [])) {
+                    expect(exclusion).toBe(exclusion.toLowerCase());
+                }
+            }
         });
     });
 

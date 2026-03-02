@@ -77,6 +77,19 @@ block content
                 | Advanced Filters
 
         #advancedFilters.collapse.mt-3
+            //── Open Now Filter ───────────────────────
+            .mb-3
+                .form-check.form-switch.d-flex.justify-content-center
+                    input#openOnly.form-check-input(
+                        type="checkbox"
+                        name="openOnly"
+                        role="switch"
+                        checked
+                    )
+                    label.form-check-label.ms-2(for="openOnly")
+                        i.bi.bi-clock.me-1
+                        | Only open restaurants
+
             .row.g-4
                 //── Diet Filters ──────────────────────────
                 .col-md-6

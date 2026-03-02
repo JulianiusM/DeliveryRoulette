@@ -3,10 +3,8 @@
  * Tests idempotent seeding logic with mocked repository
  */
 
-import {dietTagSeedData, EXPECTED_DIET_TAGS} from '../data/unit/dietTagData';
+import {EXPECTED_DIET_TAGS} from '../data/unit/dietTagData';
 import {DEFAULT_DIET_TAGS, seedDietTags} from '../../scripts/seedDietTags';
-import {DataSource, Repository} from 'typeorm';
-import {DietTag} from '../../src/modules/database/entities/diet/DietTag';
 
 describe('DietTag seed', () => {
     describe('DEFAULT_DIET_TAGS', () => {
@@ -27,49 +25,84 @@ describe('DietTag seed', () => {
     });
 
     describe('seedDietTags', () => {
-        function buildMockDataSource(existingTags: { key: string; label: string }[]) {
-            const store = [...existingTags];
-            const mockRepo = {
-                find: jest.fn(() => Promise.resolve(store.map((t) => ({key: t.key})))),
-                upsert: jest.fn((entities: { key: string; label: string }[]) => {
-                    const values = Array.isArray(entities) ? entities : [entities];
-                    for (const value of values) {
-                        const existingIndex = store.findIndex((item) => item.key === value.key);
-                        if (existingIndex >= 0) {
-                            store[existingIndex] = {...store[existingIndex], label: value.label};
-                        } else {
-                            store.push({...value});
-                        }
-                    }
-                    return Promise.resolve({identifiers: [], generatedMaps: [], raw: []});
+        let idCounter = 0;
+
+        function buildMockDataSource(existingTags: Array<{key: string; label: string}>) {
+            const tagStore: any[] = existingTags.map((t) => ({
+                ...t,
+                id: `tag-${t.key}`,
+                keywords: [],
+                dishes: [],
+                allergenExclusions: [],
+            }));
+            const childStores = new Map<string, any[]>();
+
+            const createMockChildRepo = () => ({
+                find: jest.fn((opts: any) => Promise.resolve(childStores.get(opts?.where?.dietTagId) ?? [])),
+                create: jest.fn((data: any) => ({...data, id: `child-${++idCounter}`})),
+                save: jest.fn((data: any) => {
+                    const key = data.dietTagId;
+                    const store = childStores.get(key) ?? [];
+                    store.push(data);
+                    childStores.set(key, store);
+                    return Promise.resolve(data);
                 }),
-            } as unknown as Repository<DietTag>;
+                remove: jest.fn(() => Promise.resolve()),
+            });
+
+            const mockTagRepo = {
+                find: jest.fn(() => Promise.resolve(tagStore)),
+                create: jest.fn((data: any) => ({...data, id: `tag-${data.key}`, keywords: [], dishes: [], allergenExclusions: []})),
+                save: jest.fn((data: any) => {
+                    const idx = tagStore.findIndex((t: any) => t.key === data.key);
+                    if (idx >= 0) {
+                        tagStore[idx] = {...tagStore[idx], ...data};
+                    } else {
+                        tagStore.push(data);
+                    }
+                    return Promise.resolve(data);
+                }),
+            };
 
             const mockDataSource = {
-                getRepository: jest.fn().mockReturnValue(mockRepo),
-            } as unknown as DataSource;
+                getRepository: jest.fn((entity: any) => {
+                    const name = entity?.name || String(entity);
+                    if (name === 'DietTag') return mockTagRepo;
+                    return createMockChildRepo();
+                }),
+            };
 
-            return {mockDataSource, mockRepo, store};
+            return {mockDataSource: mockDataSource as any, tagStore};
         }
 
-        test.each(dietTagSeedData)('$description', async (testCase) => {
-            const {mockDataSource} = buildMockDataSource(testCase.existing);
-
+        test('seeds all tags into empty repository', async () => {
+            const {mockDataSource, tagStore} = buildMockDataSource([]);
             const inserted = await seedDietTags(mockDataSource);
+            expect(inserted).toBe(5);
+            expect(tagStore.length).toBe(5);
+        });
 
-            expect(inserted).toBe(testCase.expectedInserted);
+        test('skips already-existing tags (idempotent)', async () => {
+            const {mockDataSource} = buildMockDataSource([{key: 'VEGAN', label: 'Vegan'}]);
+            const inserted = await seedDietTags(mockDataSource);
+            expect(inserted).toBe(4);
+        });
+
+        test('inserts nothing when all tags exist', async () => {
+            const existing = DEFAULT_DIET_TAGS.map((t) => ({key: t.key, label: t.label}));
+            const {mockDataSource} = buildMockDataSource([...existing]);
+            const inserted = await seedDietTags(mockDataSource);
+            expect(inserted).toBe(0);
         });
 
         test('never duplicates rows on repeated runs', async () => {
-            const {mockDataSource, store} = buildMockDataSource([]);
-
+            const {mockDataSource, tagStore} = buildMockDataSource([]);
             await seedDietTags(mockDataSource);
-            expect(store.length).toBe(5);
+            expect(tagStore.length).toBe(5);
 
-            // Run a second time – should add nothing
             const secondInserted = await seedDietTags(mockDataSource);
             expect(secondInserted).toBe(0);
-            expect(store.length).toBe(5);
+            expect(tagStore.length).toBe(5);
         });
     });
 });

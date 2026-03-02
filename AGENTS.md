@@ -14,11 +14,11 @@ DeliveryRoulette is a TypeScript-based restaurant management and delivery sugges
 
 ### Core Features
 
-- **Restaurants**: Restaurant management with cuisine types, dietary tags, and delivery options
-- **Menus**: Menu management with categories and items
-- **Suggestions**: Random restaurant suggestion engine
-- **Diet Preferences**: Tag-based dietary preference system
-- **Provider Integration**: External delivery provider connectors
+- **Restaurants**: Restaurant management with cuisine types, dietary tags, opening hours, and delivery options
+- **Menus**: Menu management with categories, items, allergens, and diet context
+- **Suggestions**: Random restaurant suggestion engine with diet compatibility and open-hours filtering
+- **Diet Preferences**: Tag-based dietary preference system with heuristic inference and allergen-based exclusion
+- **Provider Integration**: External delivery provider connectors (Lieferando)
 
 ## Quick Start for AI Agents
 

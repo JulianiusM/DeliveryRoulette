@@ -1,18 +1,21 @@
 import {MigrationInterface, QueryRunner} from 'typeorm';
+import {v4 as uuidv4} from 'uuid';
 import {DEFAULT_DIET_TAGS} from '../modules/database/services/DietTagService';
 
 export class SeedDefaultDietTags1742000000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         for (const tag of DEFAULT_DIET_TAGS) {
+            // Use ON DUPLICATE KEY UPDATE so re-running is safe even with random UUIDs
+            const id = uuidv4();
             await queryRunner.query(
                 `
-                    INSERT INTO diet_tags (\`key\`, label)
-                    VALUES (?, ?)
+                    INSERT INTO diet_tags (id, \`key\`, label)
+                    VALUES (?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         label = VALUES(label),
                         updated_at = CURRENT_TIMESTAMP
                 `,
-                [tag.key, tag.label],
+                [id, tag.key, tag.label],
             );
         }
     }
