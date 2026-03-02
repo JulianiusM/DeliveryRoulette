@@ -88,7 +88,9 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
     if (filters.openOnly) {
         filtered = filtered.filter((restaurant) => {
             const isOpen = computeIsOpenNowFromOpeningHours(restaurant.openingHours);
-            return isOpen === true;
+            // Include restaurants that are open (true) or have unknown hours (null).
+            // Only exclude restaurants that are explicitly closed (false).
+            return isOpen !== false;
         });
     }
 

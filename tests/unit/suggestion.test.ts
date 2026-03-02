@@ -213,8 +213,10 @@ describe('SuggestionService', () => {
                 .mockReturnValueOnce(null);
 
             const result = await suggestionService.findActiveRestaurants({openOnly: true});
-            expect(result).toHaveLength(1);
+            // Restaurants that are open (true) or unknown (null) are kept; closed (false) is excluded
+            expect(result).toHaveLength(2);
             expect(result[0].id).toBe('r1');
+            expect(result[1].id).toBe('r3');
         });
 
         test('does not filter by open status when openOnly is false', async () => {
