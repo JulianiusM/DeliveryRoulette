@@ -270,6 +270,9 @@ export const userRestaurantPrefDuplicateData = [
 export const expectedMigrationTables = [
     'diet_inference_results',
     'diet_manual_overrides',
+    'diet_tag_allergen_exclusions',
+    'diet_tag_dishes',
+    'diet_tag_keywords',
     'diet_tags',
     'menu_categories',
     'menu_item_diet_overrides',
@@ -277,6 +280,7 @@ export const expectedMigrationTables = [
     'provider_credentials',
     'provider_fetch_cache',
     'provider_source_configs',
+    'restaurant_cuisines',
     'restaurant_provider_refs',
     'restaurants',
     'suggestion_history',

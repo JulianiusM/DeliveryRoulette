@@ -6,7 +6,6 @@ import {
     getRestaurantCuisineTokens,
     matchesCuisineFilter,
     parseCuisineInference,
-    parseProviderCuisineList,
 } from './CuisineInferenceService';
 import {normalizeText} from './DietInferenceService';
 import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
@@ -63,6 +62,7 @@ export interface SuggestionResult {
 export async function findActiveRestaurants(filters: SuggestionFilters): Promise<Restaurant[]> {
     const repo = AppDataSource.getRepository(Restaurant);
     const qb = repo.createQueryBuilder('r')
+        .leftJoinAndSelect('r.providerCuisines', 'rc')
         .where('r.is_active = :active', {active: 1});
 
     qb.orderBy('r.name', 'ASC');
@@ -259,7 +259,7 @@ function extractMatchedCuisines(restaurant: Restaurant): Array<{
         }));
     }
 
-    const providerCuisines = parseProviderCuisineList(restaurant.providerCuisinesJson);
+    const providerCuisines = (restaurant.providerCuisines ?? []).map((c) => c.value);
     return providerCuisines.slice(0, 8).map((label) => ({
         key: normalizeText(label).replace(/\s+/g, '_').toUpperCase(),
         label,

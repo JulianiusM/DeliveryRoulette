@@ -1,4 +1,7 @@
-import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, OneToMany, PrimaryGeneratedColumn} from "typeorm";
+import {DietTagKeyword} from "./DietTagKeyword";
+import {DietTagDish} from "./DietTagDish";
+import {DietTagAllergenExclusion} from "./DietTagAllergenExclusion";
 
 @Entity("diet_tags")
 export class DietTag {
@@ -11,14 +14,14 @@ export class DietTag {
     @Column("varchar", {name: "label", length: 100})
     label!: string;
 
-    @Column("text", {name: "keyword_whitelist_json", nullable: true})
-    keywordWhitelistJson?: string | null;
+    @OneToMany(() => DietTagKeyword, (kw) => kw.dietTag, {cascade: true, eager: true})
+    keywords!: DietTagKeyword[];
 
-    @Column("text", {name: "dish_whitelist_json", nullable: true})
-    dishWhitelistJson?: string | null;
+    @OneToMany(() => DietTagDish, (dish) => dish.dietTag, {cascade: true, eager: true})
+    dishes!: DietTagDish[];
 
-    @Column("text", {name: "allergen_exclusions_json", nullable: true})
-    allergenExclusionsJson?: string | null;
+    @OneToMany(() => DietTagAllergenExclusion, (ae) => ae.dietTag, {cascade: true, eager: true})
+    allergenExclusions!: DietTagAllergenExclusion[];
 
     @Column("timestamp", {
         name: "created_at",

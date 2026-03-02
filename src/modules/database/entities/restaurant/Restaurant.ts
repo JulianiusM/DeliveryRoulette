@@ -1,4 +1,5 @@
-import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, OneToMany, PrimaryGeneratedColumn} from "typeorm";
+import {RestaurantCuisine} from "./RestaurantCuisine";
 
 @Entity("restaurants")
 export class Restaurant {
@@ -29,8 +30,8 @@ export class Restaurant {
     @Column("varchar", {name: "opening_days", length: 255, nullable: true})
     openingDays?: string | null;
 
-    @Column("text", {name: "provider_cuisines_json", nullable: true})
-    providerCuisinesJson?: string | null;
+    @OneToMany(() => RestaurantCuisine, (rc) => rc.restaurant, {cascade: true})
+    providerCuisines!: RestaurantCuisine[];
 
     @Column("text", {name: "cuisine_inference_json", nullable: true})
     cuisineInferenceJson?: string | null;

@@ -443,20 +443,6 @@ export function computeScoreAndConfidence(
     };
 }
 
-function parseJsonArray(raw: unknown): string[] {
-    if (typeof raw !== 'string' || !raw.trim()) return [];
-    try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-            .filter((entry): entry is string => typeof entry === 'string')
-            .map((entry) => normalizeText(entry))
-            .filter((entry) => entry.length > 0);
-    } catch {
-        return [];
-    }
-}
-
 function findDishHits(nameText: string, contextText: string, dishWhitelist: string[]): string[] {
     if (dishWhitelist.length === 0) return [];
     const text = `${nameText} ${contextText}`.trim();
@@ -468,13 +454,13 @@ function findDishHits(nameText: string, contextText: string, dishWhitelist: stri
  * Supports item-level manual overrides and context-aware false-positive filtering.
  */
 export function inferForTag(
-    dietTag: {id: string; key: string; keywordWhitelistJson?: string | null; dishWhitelistJson?: string | null; allergenExclusionsJson?: string | null},
+    dietTag: {id: string; key: string; keywords?: Array<{value: string}>; dishes?: Array<{value: string}>; allergenExclusions?: Array<{value: string}>},
     items: InferenceMenuItem[],
     options: InferTagOptions = {},
 ): InferenceOutput {
-    const tagKeywordWhitelist = parseJsonArray(dietTag.keywordWhitelistJson);
-    const tagDishWhitelist = parseJsonArray(dietTag.dishWhitelistJson);
-    const tagAllergenExclusions = parseJsonArray(dietTag.allergenExclusionsJson);
+    const tagKeywordWhitelist = (dietTag.keywords ?? []).map((kw) => kw.value);
+    const tagDishWhitelist = (dietTag.dishes ?? []).map((d) => d.value);
+    const tagAllergenExclusions = (dietTag.allergenExclusions ?? []).map((ae) => ae.value);
     const optionKeywordWhitelist = (options.keywordWhitelist ?? []).map((entry) => normalizeText(entry));
     const optionDishWhitelist = (options.dishWhitelist ?? []).map((entry) => normalizeText(entry));
     const optionAllergenExclusions = (options.allergenExclusions ?? []).map((entry) => normalizeText(entry));

@@ -40,9 +40,9 @@ describe('Migrations', () => {
         // The users table is required as a FK target but has no migration
         await createUsersTable(ds);
 
-        // Run all 24 migrations
+        // Run all 26 migrations
         const executed = await ds.runMigrations();
-        expect(executed.length).toBe(24);
+        expect(executed.length).toBe(26);
 
         // Verify every expected table now exists
         const tables = await listTableNames(ds);
@@ -54,8 +54,8 @@ describe('Migrations', () => {
     });
 
     test('all migrations revert DOWN successfully', async () => {
-        // Revert all 24 migrations in reverse order
-        for (let i = 0; i < 24; i++) {
+        // Revert all 26 migrations in reverse order
+        for (let i = 0; i < 26; i++) {
             await ds.undoLastMigration();
         }
 
@@ -68,7 +68,7 @@ describe('Migrations', () => {
 
     test('migrations are idempotent – re-running UP after DOWN succeeds', async () => {
         const executed = await ds.runMigrations();
-        expect(executed.length).toBe(24);
+        expect(executed.length).toBe(26);
 
         const tables = await listTableNames(ds);
         for (const expected of expectedMigrationTables) {
