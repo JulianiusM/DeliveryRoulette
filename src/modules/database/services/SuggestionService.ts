@@ -1,13 +1,12 @@
 import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
 import * as dietOverrideService from './DietOverrideService';
-import {EffectiveSuitability} from './DietOverrideService';
 import {
     getRestaurantCuisineTokens,
     matchesCuisineFilter,
     parseCuisineInference,
 } from './CuisineInferenceService';
-import {normalizeText} from './DietInferenceService';
+import {normalizeText, getActiveMenuItems} from './DietInferenceService';
 import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
 
 // ── Types ───────────────────────────────────────────────────
@@ -15,6 +14,8 @@ import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
 export interface SuggestionFilters {
     /** Diet tag IDs the restaurant must support */
     dietTagIds?: string[];
+    /** Allergen tokens to exclude — restaurants with items containing these allergens are deprioritized */
+    excludeAllergens?: string[];
     /** Cuisine keywords to match against restaurant name (include) */
     cuisineIncludes?: string[];
     /** Cuisine keywords to match against restaurant name (exclude) */
@@ -89,6 +90,30 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
             const isOpen = computeIsOpenNowFromOpeningHours(restaurant.openingHours);
             return isOpen === true;
         });
+    }
+
+    // Allergen exclusion filter: exclude restaurants where ALL menu items contain excluded allergens
+    const excludeAllergens = filters.excludeAllergens ?? [];
+    if (excludeAllergens.length > 0) {
+        const allergenTokens = new Set(excludeAllergens.map((a) => a.toLowerCase().trim()).filter(Boolean));
+        const results: Restaurant[] = [];
+        for (const restaurant of filtered) {
+            const items = await getActiveMenuItems(restaurant.id);
+            if (items.length === 0) {
+                // No menu data — include by default (can't determine)
+                results.push(restaurant);
+                continue;
+            }
+            const hasSafeItem = items.some((item) => {
+                if (!item.allergens) return true; // No allergen data — assume safe
+                const itemAllergens = item.allergens.toLowerCase().split(/[,|;]+/).flatMap((p) => p.trim().split(/\s+/));
+                return !itemAllergens.some((token) => allergenTokens.has(token));
+            });
+            if (hasSafeItem) {
+                results.push(restaurant);
+            }
+        }
+        filtered = results;
     }
 
     return filtered;
