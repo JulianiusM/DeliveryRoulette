@@ -213,10 +213,19 @@ User ───┬─── UserPreference
         ├─── UserRestaurantPreference ─── Restaurant
         └─── SuggestionHistory ─── Restaurant
 
-Restaurant ───┬─── MenuCategory ─── MenuItem
+Restaurant ───┬─── RestaurantCuisine
+              ├─── MenuCategory ─── MenuItem
               ├─── RestaurantProviderRef
               ├─── DietInferenceResult ─── DietTag
               └─── DietManualOverride ─── DietTag
+
+DietTag ───┬─── DietTagKeyword
+           ├─── DietTagDish
+           ├─── DietTagAllergenExclusion
+           ├─── DietTagNegativeKeyword
+           ├─── DietTagStrongSignal
+           ├─── DietTagContradictionPattern
+           └─── DietTagQualifiedNegException
 
 ProviderCredential
 ProviderSourceConfig
@@ -241,15 +250,19 @@ SyncJob ─── SyncAlert
 - Menu items with name, description, price, currency
 
 #### Diet System
-- Diet tags (vegetarian, vegan, gluten-free, lactose-free, halal)
-- Diet inference results (auto-detected from menu items using keyword matching and allergen exclusion)
-- Allergen-based exclusion rules (e.g., egg allergen → not vegan, milk allergen → not lactose-free)
+- Diet tags (vegetarian, vegan, gluten-free, lactose-free, halal) with fully configurable rules in normalized child tables
+- 7 child tables per DietTag: keywords, dishes, allergen exclusions, negative keywords, strong signals, contradiction patterns, qualified negative exceptions
+- All inference rules are data-driven (configurable via `updateDietTagConfig()` API) — no hardcoded logic
+- Diet inference results (auto-detected from menu items using multi-language keyword matching, allergen exclusion, and confidence scoring)
 - Manual overrides for incorrect detections
 - User diet preferences for suggestion filtering
+- Suggestion form pre-selects user's saved diet preferences by default
 
 #### Suggestions
 - Random restaurant suggestion engine
-- Opening hours filtering (only suggest restaurants that are currently open)
+- Opening hours filtering (only suggest open restaurants; enabled by default)
+- Allergen exclusion filter (restaurants with at least one allergen-free item)
+- Diet compatibility filter (all required diet tags must be supported)
 - Suggestion history tracking
 
 #### Provider Integration

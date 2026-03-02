@@ -6,6 +6,8 @@
 - Use TypeORM decorators for entity definitions
 - Include proper relationships between entities
 - Use timezone 'Z' for consistent UTC handling
+- **Never use `eager: true` on OneToMany relations with many child rows** — TypeORM generates Cartesian product JOINs that cause severe performance issues. Use explicit `relations: [...]` in `find()` calls or `loadRelationIdAndMap` instead.
+- The global DataSource is configured with `relationLoadStrategy: 'query'` to load relations via separate SELECT queries instead of JOINs, avoiding Cartesian products when using `relations` in `find()` options.
 
 ## Migrations
 

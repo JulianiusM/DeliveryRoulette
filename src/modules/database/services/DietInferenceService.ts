@@ -601,7 +601,7 @@ export async function computeForRestaurant(restaurantId: string): Promise<DietIn
         const resultRepo = manager.getRepository(DietInferenceResult);
         const itemOverrideRepo = manager.getRepository(MenuItemDietOverride);
 
-        const dietTags = await tagRepo.find();
+        const dietTags = await tagRepo.find({relations: ['keywords', 'dishes', 'allergenExclusions', 'negativeKeywords', 'strongSignals', 'contradictionPatterns', 'qualifiedNegExceptions']});
         const items = await getActiveMenuItems(restaurantId);
         const itemIds = items.map((item) => item.id);
         const itemOverrides = itemIds.length > 0

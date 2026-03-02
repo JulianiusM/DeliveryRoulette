@@ -190,8 +190,10 @@ ProviderSyncService → ConnectorRegistry.get(providerKey)
 ### Key Entities
 
 - **Restaurant**: Name, address, city, opening hours, active status
+- **RestaurantCuisine**: Normalized cuisine types for a restaurant (one-to-many child of Restaurant)
 - **MenuCategory / MenuItem**: Menu structure with prices, allergens, and diet context
-- **DietTag**: Diet types (vegetarian, vegan, gluten-free, lactose-free, halal)
+- **DietTag**: Diet types (vegetarian, vegan, gluten-free, lactose-free, halal) with fully configurable rules stored in normalized child tables (see below)
+- **DietTagKeyword / DietTagDish / DietTagAllergenExclusion / DietTagNegativeKeyword / DietTagStrongSignal / DietTagContradictionPattern / DietTagQualifiedNegException**: Normalized child tables per DietTag — all inference rules are data-driven and configurable via the `updateDietTagConfig()` API
 - **DietInferenceResult**: Auto-detected diet suitability per restaurant (using keyword matching + allergen exclusion)
 - **DietManualOverride**: User corrections to diet detection
 - **UserDietPreference**: Per-user diet tag selections
@@ -207,13 +209,16 @@ ProviderSyncService → ConnectorRegistry.get(providerKey)
 
 The diet inference engine (`DietInferenceService`) uses a multi-signal heuristic approach:
 
-1. **Positive keyword matching**: Scans item names/descriptions for diet-related keywords
-2. **Dish whitelist**: Recognizes known diet-compatible dishes (e.g., "falafel" → vegan)
-3. **Allergen-based exclusion**: Uses item allergen data to disqualify items (e.g., eggs → not vegan). Exclusion rules are stored per diet tag in `allergenExclusionsJson` on the `DietTag` entity, making them data-driven and configurable.
-4. **Negative keyword filtering**: Detects contradicting ingredients (e.g., "beef" → not vegetarian)
+1. **Positive keyword matching**: Scans item names/descriptions for diet-related keywords (stored in `DietTagKeyword`)
+2. **Dish whitelist**: Recognizes known diet-compatible dishes (e.g., "falafel" → vegan) (stored in `DietTagDish`)
+3. **Allergen-based exclusion**: Uses item allergen data to disqualify items (e.g., eggs → not vegan). Exclusion rules are stored per diet tag in the `DietTagAllergenExclusion` child table, making them data-driven, configurable, and extendable without code changes.
+4. **Negative keyword filtering**: Detects contradicting ingredients (e.g., "beef" → not vegetarian) (stored in `DietTagNegativeKeyword`)
 5. **Context-aware false positive detection**: Filters out misleading matches (e.g., "vegan mayo" on a beef burger)
 6. **Confidence scoring**: Rates results as LOW/MEDIUM/HIGH based on evidence strength
-7. **Subdiet inheritance**: VEGAN matches inherit VEGETARIAN evidence
+7. **Subdiet inheritance**: VEGAN matches inherit VEGETARIAN evidence (configured via `parentTagKey` on DietTag)
+8. **Multi-language support**: All keywords, patterns, and rules support German and English; `normalizeText()` strips diacritics for umlaut-insensitive matching
+
+All inference rules are fully data-driven via DietTag child tables. The engine is tag-agnostic — new diet types can be added without code changes. Numeric thresholds and weights are configurable via the settings module (19 `inference*` settings). Complex rule data is editable via the `updateDietTagConfig()` API.
 
 The engine version (`ENGINE_VERSION`) is bumped when rules change, triggering recomputation.
 
@@ -221,9 +226,10 @@ The engine version (`ENGINE_VERSION`) is bumped when rules change, triggering re
 
 The suggestion service (`SuggestionService`) filters restaurants by:
 1. Active status
-2. Opening hours (optional "open now" filter using `computeIsOpenNowFromOpeningHours`)
-3. Diet compatibility (all required diet tags must be supported)
-4. Cuisine filters (include/exclude)
-5. User preferences (favorites boosted, do-not-suggest excluded)
+2. Opening hours (optional "open now" filter using `computeIsOpenNowFromOpeningHours`, enabled by default in the UI)
+3. Diet compatibility (all required diet tags must be supported; user's saved preferences are pre-selected)
+4. Allergen exclusion (`excludeAllergens` filter — keeps restaurants with at least one allergen-free item)
+5. Cuisine filters (include/exclude)
+6. User preferences (favorites boosted, do-not-suggest excluded)
 
 ## Additional Resources

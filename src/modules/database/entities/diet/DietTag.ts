@@ -22,25 +22,25 @@ export class DietTag {
     @Column("varchar", {name: "parent_tag_key", length: 50, nullable: true})
     parentTagKey!: string | null;
 
-    @OneToMany(() => DietTagKeyword, (kw) => kw.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagKeyword, (kw) => kw.dietTag, {cascade: true})
     keywords!: DietTagKeyword[];
 
-    @OneToMany(() => DietTagDish, (dish) => dish.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagDish, (dish) => dish.dietTag, {cascade: true})
     dishes!: DietTagDish[];
 
-    @OneToMany(() => DietTagAllergenExclusion, (ae) => ae.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagAllergenExclusion, (ae) => ae.dietTag, {cascade: true})
     allergenExclusions!: DietTagAllergenExclusion[];
 
-    @OneToMany(() => DietTagNegativeKeyword, (nk) => nk.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagNegativeKeyword, (nk) => nk.dietTag, {cascade: true})
     negativeKeywords!: DietTagNegativeKeyword[];
 
-    @OneToMany(() => DietTagStrongSignal, (ss) => ss.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagStrongSignal, (ss) => ss.dietTag, {cascade: true})
     strongSignals!: DietTagStrongSignal[];
 
-    @OneToMany(() => DietTagContradictionPattern, (cp) => cp.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagContradictionPattern, (cp) => cp.dietTag, {cascade: true})
     contradictionPatterns!: DietTagContradictionPattern[];
 
-    @OneToMany(() => DietTagQualifiedNegException, (qne) => qne.dietTag, {cascade: true, eager: true})
+    @OneToMany(() => DietTagQualifiedNegException, (qne) => qne.dietTag, {cascade: true})
     qualifiedNegExceptions!: DietTagQualifiedNegException[];
 
     @Column("timestamp", {
