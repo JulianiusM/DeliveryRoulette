@@ -212,6 +212,14 @@ function maxConfidence(a: Confidence, b: Confidence): Confidence {
 }
 
 /**
+ * Strip diacritics/accents from a string without altering case or whitespace.
+ * Safe to apply to regex pattern strings — only removes combining marks.
+ */
+function stripDiacritics(text: string): string {
+    return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
  * Normalize text for keyword matching.
  * Lower-cases, strips accents, collapses whitespace, and trims.
  */
@@ -315,7 +323,7 @@ export function inferForTag(
     const tagNegativeKeywords = (dietTag.negativeKeywords ?? []).map((nk) => nk.value);
     const tagStrongSignals = (dietTag.strongSignals ?? []).map((ss) => ss.value);
     const tagContradictionPatterns = (dietTag.contradictionPatterns ?? []).map((cp) => {
-        try { return new RegExp(cp.value, 'i'); } catch { return null; }
+        try { return new RegExp(stripDiacritics(cp.value), 'i'); } catch { return null; }
     }).filter((p): p is RegExp => p !== null);
     const tagQualifiedNegExceptions = new Set((dietTag.qualifiedNegExceptions ?? []).map((qne) => qne.value.toLowerCase()));
 

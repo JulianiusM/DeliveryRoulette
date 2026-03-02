@@ -69,10 +69,10 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
             'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey',
             // DE
-            'rind', 'rindfleisch', 'huhn', 'hahnchen', 'schwein', 'schweinefleisch',
+            'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
-            'garnelen', 'meeresfruchte', 'lamm', 'ente', 'pute', 'truthahn',
-            'ei', 'eier', 'kase', 'milch', 'sahne', 'butter', 'joghurt',
+            'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn',
+            'ei', 'eier', 'käse', 'milch', 'sahne', 'butter', 'joghurt',
             'honig', 'quark',
         ],
         strongSignals: [
@@ -80,7 +80,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'pflanzlich', 'pflanzenbasiert', 'rein pflanzlich',
         ],
         contradictionPatterns: [
-            '\\b(contains|enthalt) (dairy|milk|cheese|egg|eggs|milch|kase|ei|eier)\\b',
+            '\\b(contains|enthält) (dairy|milk|cheese|egg|eggs|milch|käse|ei|eier)\\b',
             '\\b(not|nicht|kein|keine) vegan\\b',
         ],
         qualifiedNegExceptions: [
@@ -89,9 +89,9 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'steak', 'nugget', 'nuggets', 'sausage', 'mince',
             'mayonnaise', 'mayo', 'cheese', 'egg', 'honey',
             // DE
-            'huhn', 'hahnchen', 'rind', 'schwein', 'fisch',
+            'huhn', 'hähnchen', 'rind', 'schwein', 'fisch',
             'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
-            'kase', 'ei', 'honig',
+            'käse', 'ei', 'honig',
         ],
     },
     {
@@ -111,7 +111,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'paneer tikka', 'egg fried rice',
             // DE
             'kartoffelpuffer', 'kaiserschmarrn',
-            'kasespatzle', 'spinatknoedel', 'gemusestrudel',
+            'käsespätzle', 'spinatknödel', 'gemüsestrudel',
         ],
         allergenExclusions: [
             'fish', 'fisch',
@@ -122,16 +122,16 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
             // DE
-            'rind', 'rindfleisch', 'huhn', 'hahnchen', 'schwein', 'schweinefleisch',
+            'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
-            'garnelen', 'meeresfruchte', 'lamm', 'ente', 'pute', 'truthahn',
+            'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn',
         ],
         strongSignals: [
             'vegetarian', 'veggie', 'meat-free', 'meat free',
             'vegetarisch', 'fleischlos', 'fleischfrei',
         ],
         contradictionPatterns: [
-            '\\b(contains|enthalt) (beef|chicken|pork|fish|seafood|rind|huhn|schwein|fisch)\\b',
+            '\\b(contains|enthält) (beef|chicken|pork|fish|seafood|rind|huhn|schwein|fisch)\\b',
             '\\b(not|nicht|kein|keine) vegetari(an|sch)\\b',
         ],
         qualifiedNegExceptions: [
@@ -139,7 +139,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
             'steak', 'nugget', 'nuggets', 'sausage', 'mince',
             // DE
-            'huhn', 'hahnchen', 'rind', 'schwein', 'fisch',
+            'huhn', 'hähnchen', 'rind', 'schwein', 'fisch',
             'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
         ],
     },
@@ -151,7 +151,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'gluten-free', 'gluten free', 'gf', 'celiac',
             'coeliac', 'no gluten', 'without gluten',
             // DE
-            'glutenfrei', 'ohne gluten', 'zoliakiefrei',
+            'glutenfrei', 'ohne gluten', 'zöliakiefrei',
         ],
         dishWhitelist: [
             // EN
@@ -169,13 +169,13 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             // (rice noodles, GF bread etc. exist — use allergen exclusion for product-level detection)
             'wheat', 'barley', 'rye', 'breaded', 'breadcrumbs',
             // DE
-            'weizen', 'gerste', 'roggen', 'paniert', 'semmelbrosel',
+            'weizen', 'gerste', 'roggen', 'paniert', 'semmelbrösel',
         ],
         strongSignals: [
             'gluten-free', 'gluten free', 'glutenfrei', 'ohne gluten',
         ],
         contradictionPatterns: [
-            '\\b(contains|enthalt) gluten\\b',
+            '\\b(contains|enthält) gluten\\b',
             '\\b(not|nicht|kein|keine) glutenfrei\\b',
             '\\bnot gluten[- ]?free\\b',
         ],
@@ -206,7 +206,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'milk', 'dairy', 'cheese', 'cream', 'butter', 'yoghurt', 'yogurt',
             'whey', 'casein',
             // DE
-            'milch', 'kase', 'sahne', 'butter', 'joghurt',
+            'milch', 'käse', 'sahne', 'butter', 'joghurt',
             'quark', 'molke',
         ],
         strongSignals: [
@@ -214,7 +214,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'laktosefrei', 'milchfrei', 'ohne laktose',
         ],
         contradictionPatterns: [
-            '\\b(contains|enthalt) (dairy|milk|cheese|cream|lactose|milch|kase|sahne|laktose)\\b',
+            '\\b(contains|enthält) (dairy|milk|cheese|cream|lactose|milch|käse|sahne|laktose)\\b',
             '\\b(not|nicht|kein|keine) laktosefrei\\b',
             '\\bnot lactose[- ]?free\\b',
         ],
