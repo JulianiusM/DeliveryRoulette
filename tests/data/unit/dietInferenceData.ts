@@ -419,7 +419,7 @@ export const inferForTagData = [
     // ── Allergen-based exclusion test cases ─────────────────────
     {
         description: 'allergen exclusion: tofu noodles with egg allergen excluded from vegan',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: {id: 'tag-vegan', key: 'VEGAN', allergenExclusionsJson: '["egg","eggs","ei","eier","milk","milch","dairy","fish","fisch","shellfish","crustaceans"]'},
         items: [
             {id: 'item-1', name: 'Asian Noodles with Tofu', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
             {id: 'item-2', name: 'Vegan Pad Thai', description: 'Rice noodles', allergens: 'Soy, Peanuts'},
@@ -429,7 +429,7 @@ export const inferForTagData = [
     },
     {
         description: 'allergen exclusion: milk allergen excludes from lactose-free',
-        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE', allergenExclusionsJson: '["milk","milch","dairy","lactose","laktose"]'},
         items: [
             {id: 'item-1', name: 'Oat Milk Latte', description: 'Dairy-free latte', allergens: null},
             {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
@@ -439,7 +439,7 @@ export const inferForTagData = [
     },
     {
         description: 'allergen exclusion: gluten allergen excludes from gluten-free',
-        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE', allergenExclusionsJson: '["gluten","wheat","weizen","barley","gerste","rye","roggen"]'},
         items: [
             {id: 'item-1', name: 'Gluten-Free Pizza', description: 'Rice flour base', allergens: null},
             {id: 'item-2', name: 'GF Bread', description: 'Our gf option', allergens: 'Wheat'},
@@ -449,7 +449,7 @@ export const inferForTagData = [
     },
     {
         description: 'allergen exclusion: no allergens means no exclusion',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: {id: 'tag-vegan', key: 'VEGAN', allergenExclusionsJson: '["egg","eggs","milk","dairy"]'},
         items: [
             {id: 'item-1', name: 'Tofu Curry', description: 'With coconut sauce', allergens: null},
             {id: 'item-2', name: 'Tempeh Bowl', description: 'Fresh greens'},

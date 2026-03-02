@@ -50,6 +50,8 @@ export interface InferTagOptions {
     manualOverridesByItemId?: Map<string, boolean>;
     keywordWhitelist?: string[];
     dishWhitelist?: string[];
+    /** Allergen tokens that disqualify items from this diet tag. */
+    allergenExclusions?: string[];
 }
 
 export interface InferenceMenuItem {
@@ -214,47 +216,6 @@ const CONTRADICTION_PATTERNS: Record<string, RegExp[]> = {
 };
 
 /**
- * Map of normalized allergen tokens to the diet tags they disqualify.
- * When an item's allergen list contains a matching token, the item is excluded
- * for the corresponding diet tags. This provides a strong signal that overrides
- * positive keyword matches, reducing false positives from items like
- * "Asian Noodles with Tofu" that contain eggs despite having vegan keywords.
- *
- * Keys are lowercase tokens matched via word-boundary regex against the
- * normalized allergen string. Values are arrays of diet-tag keys the allergen
- * disqualifies.
- */
-export const ALLERGEN_DIET_EXCLUSIONS: Record<string, string[]> = {
-    // Egg allergens → exclude VEGAN
-    egg: ['VEGAN'],
-    eggs: ['VEGAN'],
-    ei: ['VEGAN'],
-    eier: ['VEGAN'],
-    // Milk/dairy allergens → exclude VEGAN, LACTOSE_FREE
-    milk: ['VEGAN', 'LACTOSE_FREE'],
-    milch: ['VEGAN', 'LACTOSE_FREE'],
-    dairy: ['VEGAN', 'LACTOSE_FREE'],
-    lactose: ['LACTOSE_FREE'],
-    laktose: ['LACTOSE_FREE'],
-    // Gluten allergens → exclude GLUTEN_FREE
-    gluten: ['GLUTEN_FREE'],
-    wheat: ['GLUTEN_FREE'],
-    weizen: ['GLUTEN_FREE'],
-    barley: ['GLUTEN_FREE'],
-    gerste: ['GLUTEN_FREE'],
-    rye: ['GLUTEN_FREE'],
-    roggen: ['GLUTEN_FREE'],
-    // Pork allergens → exclude HALAL
-    pork: ['HALAL'],
-    schwein: ['HALAL'],
-    // Fish/shellfish (informational) → exclude VEGAN, VEGETARIAN
-    fish: ['VEGAN', 'VEGETARIAN'],
-    fisch: ['VEGAN', 'VEGETARIAN'],
-    shellfish: ['VEGAN', 'VEGETARIAN'],
-    crustaceans: ['VEGAN', 'VEGETARIAN'],
-};
-
-/**
  * Parse a comma-separated allergen string into normalized tokens.
  */
 function parseAllergenTokens(allergens?: string | null): string[] {
@@ -267,15 +228,16 @@ function parseAllergenTokens(allergens?: string | null): string[] {
 
 /**
  * Check if an item's allergens disqualify it for a specific diet tag.
+ * Uses the allergen exclusion list configured on the diet tag (data-driven).
  * Returns the list of allergen tokens that triggered the exclusion.
  */
-function findAllergenExclusions(allergens: string | null | undefined, dietTagKey: string): string[] {
+function findAllergenExclusions(allergens: string | null | undefined, exclusionList: string[]): string[] {
     const tokens = parseAllergenTokens(allergens);
-    if (tokens.length === 0) return [];
+    if (tokens.length === 0 || exclusionList.length === 0) return [];
+    const exclusionSet = new Set(exclusionList.map((e) => e.toLowerCase()));
     const exclusions: string[] = [];
     for (const token of tokens) {
-        const excludedDiets = ALLERGEN_DIET_EXCLUSIONS[token];
-        if (excludedDiets && excludedDiets.includes(dietTagKey)) {
+        if (exclusionSet.has(token)) {
             exclusions.push(token);
         }
     }
@@ -506,14 +468,16 @@ function findDishHits(nameText: string, contextText: string, dishWhitelist: stri
  * Supports item-level manual overrides and context-aware false-positive filtering.
  */
 export function inferForTag(
-    dietTag: {id: string; key: string; keywordWhitelistJson?: string | null; dishWhitelistJson?: string | null},
+    dietTag: {id: string; key: string; keywordWhitelistJson?: string | null; dishWhitelistJson?: string | null; allergenExclusionsJson?: string | null},
     items: InferenceMenuItem[],
     options: InferTagOptions = {},
 ): InferenceOutput {
     const tagKeywordWhitelist = parseJsonArray(dietTag.keywordWhitelistJson);
     const tagDishWhitelist = parseJsonArray(dietTag.dishWhitelistJson);
+    const tagAllergenExclusions = parseJsonArray(dietTag.allergenExclusionsJson);
     const optionKeywordWhitelist = (options.keywordWhitelist ?? []).map((entry) => normalizeText(entry));
     const optionDishWhitelist = (options.dishWhitelist ?? []).map((entry) => normalizeText(entry));
+    const optionAllergenExclusions = (options.allergenExclusions ?? []).map((entry) => normalizeText(entry));
 
     const keywords = mergeUnique([
         ...(DIET_KEYWORD_RULES[dietTag.key] ?? []),
@@ -524,6 +488,10 @@ export function inferForTag(
         ...(DEFAULT_DISH_WHITELIST[dietTag.key] ?? []),
         ...tagDishWhitelist,
         ...optionDishWhitelist,
+    ]);
+    const allergenExclusions = mergeUnique([
+        ...tagAllergenExclusions,
+        ...optionAllergenExclusions,
     ]);
     const negativeKeywords = NEGATIVE_KEYWORD_RULES[dietTag.key] ?? [];
     const manualOverridesByItemId = options.manualOverridesByItemId ?? new Map<string, boolean>();
@@ -617,7 +585,7 @@ export function inferForTag(
         const contradiction = hasContradiction(dietTag.key, text);
         const contextFalsePositive = hasContextFalsePositive(dietTag.key, text, nameText);
         const crossContamination = hasCrossContamination(text);
-        const allergenExclusions = findAllergenExclusions(item.allergens, dietTag.key);
+        const itemAllergenExclusions = findAllergenExclusions(item.allergens, allergenExclusions);
 
         if (contradiction) {
             penalties.push('contradiction');
@@ -627,8 +595,8 @@ export function inferForTag(
             penalties.push('context-false-positive');
         }
 
-        if (allergenExclusions.length > 0) {
-            penalties.push(`allergen:${allergenExclusions.join(',')}`);
+        if (itemAllergenExclusions.length > 0) {
+            penalties.push(`allergen:${itemAllergenExclusions.join(',')}`);
         }
 
         if (negativeHits.length > 0 && !crossContamination) {

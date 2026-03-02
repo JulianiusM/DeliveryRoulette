@@ -7,6 +7,12 @@ export interface DefaultDietTag {
     label: string;
     keywordWhitelist?: string[];
     dishWhitelist?: string[];
+    /**
+     * Allergen tokens that disqualify a menu item from this diet.
+     * Each token is matched case-insensitively against the item's allergen list.
+     * E.g., "egg" in a VEGAN tag means items with egg allergens are not vegan.
+     */
+    allergenExclusions?: string[];
 }
 
 /**
@@ -34,6 +40,12 @@ export const DEFAULT_DIET_TAGS: DefaultDietTag[] = [
             'veggie sushi roll',
             'vegetable ramen',
         ],
+        allergenExclusions: [
+            'egg', 'eggs', 'ei', 'eier',
+            'milk', 'milch', 'dairy',
+            'fish', 'fisch',
+            'shellfish', 'crustaceans',
+        ],
     },
     {
         key: 'VEGETARIAN',
@@ -55,6 +67,10 @@ export const DEFAULT_DIET_TAGS: DefaultDietTag[] = [
             'egg fried rice',
             'miso soup',
         ],
+        allergenExclusions: [
+            'fish', 'fisch',
+            'shellfish', 'crustaceans',
+        ],
     },
     {
         key: 'GLUTEN_FREE',
@@ -73,6 +89,11 @@ export const DEFAULT_DIET_TAGS: DefaultDietTag[] = [
             'sashimi',
             'dal chawal',
             'quinoa salad',
+        ],
+        allergenExclusions: [
+            'gluten', 'wheat', 'weizen',
+            'barley', 'gerste',
+            'rye', 'roggen',
         ],
     },
     {
@@ -93,6 +114,10 @@ export const DEFAULT_DIET_TAGS: DefaultDietTag[] = [
             'avocado salad',
             'oat milk latte',
         ],
+        allergenExclusions: [
+            'milk', 'milch', 'dairy',
+            'lactose', 'laktose',
+        ],
     },
     {
         key: 'HALAL',
@@ -111,6 +136,9 @@ export const DEFAULT_DIET_TAGS: DefaultDietTag[] = [
             'lamb tagine',
             'beef kofta',
         ],
+        allergenExclusions: [
+            'pork', 'schwein',
+        ],
     },
 ];
 
@@ -120,6 +148,7 @@ export interface DietHeuristicConfig {
     label: string;
     keywordWhitelist: string[];
     dishWhitelist: string[];
+    allergenExclusions: string[];
 }
 
 export async function listDietTags(dataSource: DataSource = AppDataSource): Promise<DietTag[]> {
@@ -148,6 +177,7 @@ export async function ensureDefaultDietTags(dataSource: DataSource = AppDataSour
             label: tag.label,
             keywordWhitelistJson: toJsonArray(tag.keywordWhitelist ?? []),
             dishWhitelistJson: toJsonArray(tag.dishWhitelist ?? []),
+            allergenExclusionsJson: toJsonArray(tag.allergenExclusions ?? []),
         })),
         ['key'],
     );
@@ -163,6 +193,7 @@ export async function listDietTagConfigs(dataSource: DataSource = AppDataSource)
         label: tag.label,
         keywordWhitelist: parseJsonArray(tag.keywordWhitelistJson),
         dishWhitelist: parseJsonArray(tag.dishWhitelistJson),
+        allergenExclusions: parseJsonArray(tag.allergenExclusionsJson),
     }));
 }
 
@@ -171,6 +202,7 @@ export async function updateDietTagConfig(
     config: {
         keywordWhitelist?: string[];
         dishWhitelist?: string[];
+        allergenExclusions?: string[];
     },
     dataSource: DataSource = AppDataSource,
 ): Promise<DietTag | null> {
@@ -183,6 +215,9 @@ export async function updateDietTagConfig(
     }
     if (config.dishWhitelist !== undefined) {
         tag.dishWhitelistJson = toJsonArray(config.dishWhitelist);
+    }
+    if (config.allergenExclusions !== undefined) {
+        tag.allergenExclusionsJson = toJsonArray(config.allergenExclusions);
     }
     tag.updatedAt = new Date();
 

@@ -17,6 +17,9 @@ export class DietTag {
     @Column("text", {name: "dish_whitelist_json", nullable: true})
     dishWhitelistJson?: string | null;
 
+    @Column("text", {name: "allergen_exclusions_json", nullable: true})
+    allergenExclusionsJson?: string | null;
+
     @Column("timestamp", {
         name: "created_at",
         default: () => "CURRENT_TIMESTAMP",

@@ -6,6 +6,14 @@ import {
 import {DietTag} from '../../src/modules/database/entities/diet/DietTag';
 import {ensureDefaultDietTagsData} from '../data/unit/dietTagServiceData';
 
+function toJsonArray(values: string[]): string | null {
+    const normalized = values
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    if (normalized.length === 0) return null;
+    return JSON.stringify([...new Set(normalized)]);
+}
+
 describe('DietTagService', () => {
     describe('DEFAULT_DIET_TAGS', () => {
         test('contains expected default keys', () => {
@@ -41,7 +49,13 @@ describe('DietTagService', () => {
             expect(missing).toBe(testCase.expectedMissing);
             expect(mockRepo.find).toHaveBeenCalledWith({select: ['key']});
             expect(mockRepo.upsert).toHaveBeenCalledWith(
-                DEFAULT_DIET_TAGS.map((tag) => ({key: tag.key, label: tag.label})),
+                DEFAULT_DIET_TAGS.map((tag) => ({
+                    key: tag.key,
+                    label: tag.label,
+                    keywordWhitelistJson: toJsonArray(tag.keywordWhitelist ?? []),
+                    dishWhitelistJson: toJsonArray(tag.dishWhitelist ?? []),
+                    allergenExclusionsJson: toJsonArray(tag.allergenExclusions ?? []),
+                })),
                 ['key'],
             );
         });
