@@ -2,17 +2,10 @@ import {DataSource, Repository} from 'typeorm';
 import {
     DEFAULT_DIET_TAGS,
     ensureDefaultDietTags,
+    toJsonArray,
 } from '../../src/modules/database/services/DietTagService';
 import {DietTag} from '../../src/modules/database/entities/diet/DietTag';
 import {ensureDefaultDietTagsData} from '../data/unit/dietTagServiceData';
-
-function toJsonArray(values: string[]): string | null {
-    const normalized = values
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
-    if (normalized.length === 0) return null;
-    return JSON.stringify([...new Set(normalized)]);
-}
 
 describe('DietTagService', () => {
     describe('DEFAULT_DIET_TAGS', () => {

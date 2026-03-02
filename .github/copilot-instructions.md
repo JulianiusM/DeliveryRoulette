@@ -209,7 +209,7 @@ The diet inference engine (`DietInferenceService`) uses a multi-signal heuristic
 
 1. **Positive keyword matching**: Scans item names/descriptions for diet-related keywords
 2. **Dish whitelist**: Recognizes known diet-compatible dishes (e.g., "falafel" → vegan)
-3. **Allergen-based exclusion**: Uses item allergen data to disqualify items (e.g., eggs → not vegan). Defined in `ALLERGEN_DIET_EXCLUSIONS`.
+3. **Allergen-based exclusion**: Uses item allergen data to disqualify items (e.g., eggs → not vegan). Exclusion rules are stored per diet tag in `allergenExclusionsJson` on the `DietTag` entity, making them data-driven and configurable.
 4. **Negative keyword filtering**: Detects contradicting ingredients (e.g., "beef" → not vegetarian)
 5. **Context-aware false positive detection**: Filters out misleading matches (e.g., "vegan mayo" on a beef burger)
 6. **Confidence scoring**: Rates results as LOW/MEDIUM/HIGH based on evidence strength

@@ -5,6 +5,7 @@ import {DEFAULT_DIET_TAGS} from '../modules/database/services/DietTagService';
 export class SeedDefaultDietTags1742000000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         for (const tag of DEFAULT_DIET_TAGS) {
+            // Use ON DUPLICATE KEY UPDATE so re-running is safe even with random UUIDs
             const id = uuidv4();
             await queryRunner.query(
                 `

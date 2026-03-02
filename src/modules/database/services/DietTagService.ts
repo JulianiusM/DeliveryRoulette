@@ -238,7 +238,7 @@ function parseJsonArray(raw: string | null | undefined): string[] {
     }
 }
 
-function toJsonArray(values: string[]): string | null {
+export function toJsonArray(values: string[]): string | null {
     const normalized = values
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0);
