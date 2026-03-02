@@ -148,7 +148,7 @@ export const inferForTagData = [
         items: [
             {id: 'item-1', name: 'Vegan Burger', description: 'Plant-based patty'},
             {id: 'item-2', name: 'Caesar Salad', description: 'Fresh romaine'},
-            {id: 'item-3', name: 'Tofu Bowl', description: 'Crispy tofu'},
+            {id: 'item-3', name: 'Pflanzlich Bowl', description: 'Fresh vegetables'},
         ],
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-3'],
@@ -215,7 +215,7 @@ export const inferForTagData = [
         description: 'matches keywords in description only',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Smoothie', description: 'Made with dairy-free milk'},
+            {id: 'item-1', name: 'Smoothie', description: 'Dairy-free, made with oat beverage'},
             {id: 'item-2', name: 'Regular Latte', description: 'Whole milk'},
         ],
         expectedMatchCount: 1,
@@ -290,7 +290,7 @@ export const inferForTagData = [
         items: [
             {id: 'item-1', name: 'Vegan Bowl', description: null},
             {id: 'item-2', name: 'Pflanzlich Wrap', description: null},
-            {id: 'item-3', name: 'Seitan Steak', description: 'Pflanzenbasiert'},
+            {id: 'item-3', name: 'Plant-Based Steak', description: 'Pflanzenbasiert'},
             {id: 'item-4', name: 'Currywurst', description: null},
         ],
         expectedMatchCount: 3,
@@ -403,9 +403,9 @@ export const inferForTagData = [
         description: 'fully vegan menu: all items match VEGAN tag',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
-            {id: 'item-1', name: 'Vegan Pad Thai', description: 'Tofu and vegetables'},
-            {id: 'item-2', name: 'Tempeh Salad', description: 'Fresh greens'},
-            {id: 'item-3', name: 'Seitan Wrap', description: 'Plant-based protein'},
+            {id: 'item-1', name: 'Vegan Pad Thai', description: 'Rice noodles and vegetables'},
+            {id: 'item-2', name: 'Plant-Based Salad', description: 'Fresh greens'},
+            {id: 'item-3', name: 'Pflanzlich Wrap', description: 'No animal products'},
             {id: 'item-4', name: 'Pflanzlich Burger', description: 'Dairy-free bun'},
         ],
         expectedMatchCount: 4,
@@ -439,10 +439,10 @@ export const inferForTagData = [
     },
     // ── Allergen-based exclusion test cases ─────────────────────
     {
-        description: 'allergen exclusion: tofu noodles with egg allergen excluded from vegan',
+        description: 'allergen exclusion: vegan noodles with egg allergen excluded from vegan',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
-            {id: 'item-1', name: 'Asian Noodles with Tofu', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
+            {id: 'item-1', name: 'Vegan Noodles', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
             {id: 'item-2', name: 'Vegan Pad Thai', description: 'Rice noodles', allergens: 'Soy, Peanuts'},
         ],
         expectedMatchCount: 1,
@@ -452,7 +452,7 @@ export const inferForTagData = [
         description: 'allergen exclusion: milk allergen excludes from lactose-free',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Oat Milk Latte', description: 'Dairy-free latte', allergens: null},
+            {id: 'item-1', name: 'Dairy-Free Latte', description: 'Made with oat beverage', allergens: null},
             {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
         ],
         expectedMatchCount: 1,
@@ -472,8 +472,8 @@ export const inferForTagData = [
         description: 'allergen exclusion: no allergens means no exclusion',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
-            {id: 'item-1', name: 'Tofu Curry', description: 'With coconut sauce', allergens: null},
-            {id: 'item-2', name: 'Tempeh Bowl', description: 'Fresh greens'},
+            {id: 'item-1', name: 'Vegan Curry', description: 'With coconut sauce', allergens: null},
+            {id: 'item-2', name: 'Plant-Based Bowl', description: 'Fresh greens'},
         ],
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-2'],
@@ -493,6 +493,6 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '5.0.0',
+    expectedCurrent: '6.0.0',
 };
 

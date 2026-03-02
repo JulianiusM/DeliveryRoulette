@@ -8,6 +8,11 @@
  * All inference rules, keywords, signals, and exclusions are defined here
  * to keep the inference engine fully data-driven and agnostic to concrete
  * diet tag implementations.
+ *
+ * Multi-language: All keywords, negative keywords, dish whitelists, strong
+ * signals, contradiction patterns, and qualified negative exceptions include
+ * both English and German terms (the two main languages on lieferando.de).
+ * Additional languages can be added by extending the arrays.
  */
 
 export interface DefaultDietTag {
@@ -38,15 +43,18 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         label: 'Vegan',
         parentTagKey: 'VEGETARIAN',
         keywordWhitelist: [
-            'vegan', 'plant-based', 'plant based', 'tofu',
-            'tempeh', 'seitan', 'dairy-free', 'dairy free',
-            'without dairy', 'no dairy', 'animal-free', 'animal free',
-            'pflanzlich', 'pflanzenbasiert', 'veganes',
-            'vegano', 'vegana', 'sin ingredientes animales',
+            // EN
+            'vegan', 'plant-based', 'plant based',
+            'dairy-free', 'dairy free', 'without dairy', 'no dairy',
+            'animal-free', 'animal free',
+            // DE
+            'pflanzlich', 'pflanzenbasiert', 'veganes', 'rein pflanzlich',
         ],
         dishWhitelist: [
+            // EN
             'falafel', 'hummus', 'chana masala', 'aloo gobi',
-            'tofu bowl', 'vegan sushi', 'vegetable ramen',
+            // DE
+            'linseneintopf', 'kartoffelpuffer',
         ],
         allergenExclusions: [
             'egg', 'eggs', 'ei', 'eier',
@@ -55,70 +63,101 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'shellfish', 'crustaceans',
         ],
         negativeKeywords: [
+            // EN
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
-            'shrimp', 'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
-            'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'whopper',
-            'rind', 'huhn', 'schwein', 'speck', 'fisch', 'ei', 'eier',
-            'kase', 'milch', 'sahne', 'butter',
+            'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
+            'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
+            'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey',
+            // DE
+            'rind', 'rindfleisch', 'huhn', 'hahnchen', 'schwein', 'schweinefleisch',
+            'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
+            'garnelen', 'meeresfruchte', 'lamm', 'ente', 'pute', 'truthahn',
+            'ei', 'eier', 'kase', 'milch', 'sahne', 'butter', 'joghurt',
+            'honig', 'quark',
         ],
         strongSignals: [
-            'vegan', 'plant-based', 'plant based', 'pflanzlich', 'pflanzenbasiert',
+            'vegan', 'plant-based', 'plant based',
+            'pflanzlich', 'pflanzenbasiert', 'rein pflanzlich',
         ],
         contradictionPatterns: [
-            '\\bcontains (dairy|milk|cheese|egg|eggs)\\b',
-            '\\bnot vegan\\b',
+            '\\b(contains|enthalt) (dairy|milk|cheese|egg|eggs|milch|kase|ei|eier)\\b',
+            '\\b(not|nicht|kein|keine) vegan\\b',
         ],
         qualifiedNegExceptions: [
-            'whopper', 'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
-            'huhn', 'rind', 'schwein', 'fisch',
-            'mayonnaise', 'mayo',
+            // EN
+            'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
+            'steak', 'nugget', 'nuggets', 'sausage', 'mince',
+            'mayonnaise', 'mayo', 'cheese', 'egg', 'honey',
+            // DE
+            'huhn', 'hahnchen', 'rind', 'schwein', 'fisch',
+            'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
+            'kase', 'ei', 'honig',
         ],
     },
     {
         key: 'VEGETARIAN',
         label: 'Vegetarian',
         keywordWhitelist: [
+            // EN
             'vegetarian', 'veggie', 'vegan', 'meat-free',
             'meat free', 'meatless', 'ovo-lacto', 'ovo lacto',
+            // DE
             'vegetarisch', 'vegetarische', 'vegetarischer', 'vegetarisches',
-            'fleischlos', 'ohne fleisch', 'vegetariano', 'vegetariana', 'sin carne',
+            'fleischlos', 'ohne fleisch', 'fleischfrei',
         ],
         dishWhitelist: [
-            'margherita pizza', 'caprese', 'palak paneer',
-            'paneer tikka', 'vegetable spring rolls', 'egg fried rice',
+            // EN
+            'margherita', 'caprese', 'palak paneer',
+            'paneer tikka', 'egg fried rice',
+            // DE
+            'kartoffelpuffer', 'kaiserschmarrn',
+            'kasespatzle', 'spinatknoedel', 'gemusestrudel',
         ],
         allergenExclusions: [
             'fish', 'fisch',
             'shellfish', 'crustaceans',
         ],
         negativeKeywords: [
+            // EN
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
-            'shrimp', 'seafood', 'whopper',
-            'rind', 'huhn', 'schwein', 'speck', 'fisch', 'garnelen',
+            'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
+            // DE
+            'rind', 'rindfleisch', 'huhn', 'hahnchen', 'schwein', 'schweinefleisch',
+            'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
+            'garnelen', 'meeresfruchte', 'lamm', 'ente', 'pute', 'truthahn',
         ],
         strongSignals: [
-            'vegetarian', 'veggie', 'vegetarisch', 'fleischlos', 'meat-free', 'meat free',
+            'vegetarian', 'veggie', 'meat-free', 'meat free',
+            'vegetarisch', 'fleischlos', 'fleischfrei',
         ],
         contradictionPatterns: [
-            '\\bcontains (beef|chicken|pork|fish|seafood)\\b',
-            '\\bnot vegetarian\\b',
+            '\\b(contains|enthalt) (beef|chicken|pork|fish|seafood|rind|huhn|schwein|fisch)\\b',
+            '\\b(not|nicht|kein|keine) vegetari(an|sch)\\b',
         ],
         qualifiedNegExceptions: [
-            'whopper', 'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
-            'huhn', 'rind', 'schwein', 'fisch',
+            // EN
+            'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
+            'steak', 'nugget', 'nuggets', 'sausage', 'mince',
+            // DE
+            'huhn', 'hahnchen', 'rind', 'schwein', 'fisch',
+            'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
         ],
     },
     {
         key: 'GLUTEN_FREE',
         label: 'Gluten-free',
         keywordWhitelist: [
+            // EN
             'gluten-free', 'gluten free', 'gf', 'celiac',
-            'coeliac', 'no gluten',
-            'glutenfrei', 'ohne gluten', 'sin gluten', 'sans gluten',
+            'coeliac', 'no gluten', 'without gluten',
+            // DE
+            'glutenfrei', 'ohne gluten', 'zoliakiefrei',
         ],
         dishWhitelist: [
-            'corn tortilla tacos', 'rice bowl', 'poke bowl',
-            'sashimi', 'quinoa salad',
+            // EN
+            'rice bowl', 'poke bowl', 'sashimi', 'quinoa salad',
+            // DE
+            'reispfanne', 'kartoffelsuppe',
         ],
         allergenExclusions: [
             'gluten', 'wheat', 'weizen',
@@ -126,14 +165,18 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'rye', 'roggen',
         ],
         negativeKeywords: [
+            // EN — only specific gluten-containing grains, not derived products
+            // (rice noodles, GF bread etc. exist — use allergen exclusion for product-level detection)
             'wheat', 'barley', 'rye', 'breaded', 'breadcrumbs',
-            'weizen', 'gerste', 'roggen',
+            // DE
+            'weizen', 'gerste', 'roggen', 'paniert', 'semmelbrosel',
         ],
         strongSignals: [
             'gluten-free', 'gluten free', 'glutenfrei', 'ohne gluten',
         ],
         contradictionPatterns: [
-            '\\bcontains gluten\\b',
+            '\\b(contains|enthalt) gluten\\b',
+            '\\b(not|nicht|kein|keine) glutenfrei\\b',
             '\\bnot gluten[- ]?free\\b',
         ],
         qualifiedNegExceptions: [],
@@ -142,27 +185,37 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         key: 'LACTOSE_FREE',
         label: 'Lactose-free',
         keywordWhitelist: [
+            // EN
             'lactose-free', 'lactose free', 'dairy-free',
             'dairy free', 'no dairy', 'no lactose',
-            'laktosefrei', 'ohne laktose', 'milchfrei', 'sin lactosa', 'sans lactose',
+            // DE
+            'laktosefrei', 'ohne laktose', 'milchfrei', 'ohne milch',
         ],
         dishWhitelist: [
+            // EN
             'sorbet', 'coconut curry', 'tom yum',
-            'olive oil pasta', 'oat milk latte',
+            // DE
+            'fruchtsorbet',
         ],
         allergenExclusions: [
             'milk', 'milch', 'dairy',
             'lactose', 'laktose',
         ],
         negativeKeywords: [
+            // EN
             'milk', 'dairy', 'cheese', 'cream', 'butter', 'yoghurt', 'yogurt',
+            'whey', 'casein',
+            // DE
             'milch', 'kase', 'sahne', 'butter', 'joghurt',
+            'quark', 'molke',
         ],
         strongSignals: [
-            'lactose-free', 'lactose free', 'laktosefrei', 'milchfrei', 'dairy-free', 'dairy free',
+            'lactose-free', 'lactose free', 'dairy-free', 'dairy free',
+            'laktosefrei', 'milchfrei', 'ohne laktose',
         ],
         contradictionPatterns: [
-            '\\bcontains (dairy|milk|cheese|cream|lactose)\\b',
+            '\\b(contains|enthalt) (dairy|milk|cheese|cream|lactose|milch|kase|sahne|laktose)\\b',
+            '\\b(not|nicht|kein|keine) laktosefrei\\b',
             '\\bnot lactose[- ]?free\\b',
         ],
         qualifiedNegExceptions: [],
@@ -171,23 +224,29 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         key: 'HALAL',
         label: 'Halal',
         keywordWhitelist: [
-            'halal', 'halal certified', 'halal-zertifiziert', 'halal zertifiziert',
+            'halal', 'halal certified',
+            'halal-zertifiziert', 'halal zertifiziert',
         ],
         dishWhitelist: [
-            'chicken biryani', 'shawarma', 'halal doner', 'beef kofta',
+            // EN
+            'shawarma', 'halal doner', 'beef kofta',
+            // DE
+            'halal doner',
         ],
         allergenExclusions: [
             'pork', 'schwein',
         ],
         negativeKeywords: [
-            'pork', 'ham', 'bacon',
-            'schwein', 'speck', 'schinken',
+            // EN
+            'pork', 'ham', 'bacon', 'lard', 'gelatin',
+            // DE
+            'schwein', 'schweinefleisch', 'speck', 'schinken', 'schmalz', 'gelatine',
         ],
         strongSignals: [
             'halal',
         ],
         contradictionPatterns: [
-            '\\bnot halal\\b',
+            '\\b(not|nicht|kein|keine) halal\\b',
         ],
         qualifiedNegExceptions: [],
     },

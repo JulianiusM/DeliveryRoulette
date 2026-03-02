@@ -7,7 +7,7 @@ import {MenuCategory} from '../entities/menu/MenuCategory';
 import settings from '../../settings';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '5.0.0';
+export const ENGINE_VERSION = '6.0.0';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -132,6 +132,7 @@ function hasContradiction(text: string, patterns: RegExp[]): boolean {
  * Detect cases where a diet keyword appears only as a side-note in context
  * that does not make the whole item diet-compatible.
  * Uses strong signals from the tag data rather than hardcoded keys.
+ * Supports English and German pattern structures.
  */
 function hasContextFalsePositive(
     text: string,
@@ -145,16 +146,19 @@ function hasContextFalsePositive(
         return false;
     }
 
-    // Check for condiment/side component mention pattern
+    // Check for condiment/side component mention pattern (EN + DE)
     const signalPattern = strongSignals.map((s) => escapeRegex(s)).join('|');
-    const condimentMention = new RegExp(`\\b(${signalPattern})\\b.*\\b(mayo|mayonnaise|sauce|dressing|salad mayonnaise)\\b`, 'i').test(text);
-    const sideComponentPhrase = new RegExp(`\\b(comes with|also comes with|served with|with our)\\b.*\\b(${signalPattern})\\b`, 'i').test(text);
+    const condimentMention = new RegExp(`\\b(${signalPattern})\\b.*\\b(mayo|mayonnaise|sauce|dressing|sosse|dip)\\b`, 'i').test(text);
+    const sideComponentPhrase = new RegExp(
+        `\\b(comes with|also comes with|served with|with our|dazu|serviert mit|mit unserer|beilage)\\b.*\\b(${signalPattern})\\b`, 'i',
+    ).test(text);
 
     if (!condimentMention && !sideComponentPhrase) {
         return false;
     }
 
-    const nonDietMain = /\b(beef|chicken|pork|fish|whopper|burger|patty)\b/i.test(text);
+    // EN + DE: the main item itself is non-diet
+    const nonDietMain = /\b(beef|chicken|pork|fish|burger|patty|steak|rind|huhn|hahnchen|schwein|fisch|schnitzel)\b/i.test(text);
     return nonDietMain;
 }
 
@@ -388,9 +392,6 @@ export function inferForTag(
 
         const penalties: string[] = [];
         const dietQualifierInName = strongSignals.some((signal) => buildKeywordPattern(signal).test(nameText));
-        const hasStrongLactoseFreeSignal = strongSignals.some((signal) =>
-            ['lactose-free', 'lactose free', 'no lactose', 'laktosefrei', 'ohne laktose', 'dairy-free', 'dairy free', 'milchfrei']
-                .includes(signal.toLowerCase()) && positiveHits.includes(signal));
         const explicitCompatibilityClaim = hasExplicitCompatibilityClaim(text, strongSignals);
         const hasStrongSignal = dietQualifierInName
             || explicitCompatibilityClaim
@@ -407,15 +408,7 @@ export function inferForTag(
 
         const negativeHits = mergeUnique([...negativeNameHits, ...negativeContextHits])
             .filter((keyword) => {
-                if (!dietQualifierInName) return true;
-                return !tagQualifiedNegExceptions.has(keyword.toLowerCase());
-            })
-            .filter((keyword) => {
-                if (!hasStrongLactoseFreeSignal) return true;
-                return !['milk', 'dairy', 'milch'].includes(keyword);
-            })
-            .filter((keyword) => {
-                if (!explicitCompatibilityClaim) return true;
+                if (!dietQualifierInName && !explicitCompatibilityClaim) return true;
                 return !tagQualifiedNegExceptions.has(keyword.toLowerCase());
             });
         const contradiction = hasContradiction(text, tagContradictionPatterns);
@@ -498,16 +491,20 @@ export function inferForTag(
 
 /**
  * Check for explicit compatibility claims using strong signals.
- * E.g., "is vegan", "100% vegetarian", "fully vegan"
+ * E.g., "is vegan", "100% vegetarian", "fully vegan", "ist vegan", "komplett vegan"
  */
 function hasExplicitCompatibilityClaim(text: string, strongSignals: string[]): boolean {
     for (const signal of strongSignals) {
         const escaped = escapeRegex(signal);
         const patterns = [
+            // EN patterns
             new RegExp(`\\b(is|it's|its)\\s+${escaped}\\b`, 'i'),
             new RegExp(`\\b${escaped}\\s+too\\b`, 'i'),
             new RegExp(`\\b100%\\s+${escaped}\\b`, 'i'),
             new RegExp(`\\bfully\\s+${escaped}\\b`, 'i'),
+            // DE patterns
+            new RegExp(`\\b(ist|komplett|rein|zu 100%)\\s+${escaped}\\b`, 'i'),
+            new RegExp(`\\b${escaped}\\s+(auch|ebenfalls)\\b`, 'i'),
         ];
         if (patterns.some((p) => p.test(text))) return true;
     }

@@ -624,7 +624,8 @@ function parseCdnMenuPayload(
     const itemDetailsMap = buildCdnItemMap([
         payloads.itemDetailsPayload,
     ]);
-    const categories = parseCdnCategories(menus, itemMap, itemDetailsMap);
+    const dietModifiersByGroup = parseCdnDietModifiers(payloads.itemDetailsPayload);
+    const categories = parseCdnCategories(menus, itemMap, itemDetailsMap, dietModifiersByGroup);
 
     return {
         restaurantName: parseCdnRestaurantName(manifest),
@@ -683,10 +684,112 @@ function buildCdnItemMap(
     return map;
 }
 
+/**
+ * Diet-related keyword patterns for matching modifier names.
+ * Covers English and German terms commonly found on Lieferando.
+ */
+const DIET_MODIFIER_PATTERNS: RegExp[] = [
+    /\bvegan\b/i,
+    /\bvegetari(an|sch)\b/i,
+    /\bpflanzlich\b/i,
+    /\bplant[- ]?based\b/i,
+    /\bgluten[- ]?fr(ee|ei)\b/i,
+    /\blakto(se)?[- ]?frei\b/i,
+    /\blactose[- ]?free\b/i,
+    /\bdairy[- ]?free\b/i,
+    /\bmilchfrei\b/i,
+    /\bhalal\b/i,
+];
+
+/**
+ * Parse diet-related customization modifiers from the itemDetails CDN payload.
+ *
+ * The itemDetails payload contains:
+ * - `ModifierGroups`: groups of options, each with an ID, name, and list of modifier set IDs
+ * - `ModifierSets`: individual modifiers with ID, name, and price
+ *
+ * Items reference modifier groups via `Variations[].ModifierGroupsIds`.
+ *
+ * @returns Map from modifier group ID to array of diet-related modifier names
+ */
+function parseCdnDietModifiers(
+    payload: Record<string, unknown> | null,
+): Map<string, string[]> {
+    const result = new Map<string, string[]>();
+    if (!payload) return result;
+
+    const modifierGroups = Array.isArray(payload.ModifierGroups) ? payload.ModifierGroups : [];
+    const modifierSets = Array.isArray(payload.ModifierSets) ? payload.ModifierSets : [];
+
+    // Build a map from modifier set ID to modifier name
+    const modifierNameById = new Map<string, string>();
+    for (const ms of modifierSets) {
+        if (!ms || typeof ms !== 'object') continue;
+        const msRecord = ms as Record<string, unknown>;
+        const id = asTrimmedString(msRecord.Id);
+        const modifier = msRecord.Modifier;
+        if (!id || !modifier || typeof modifier !== 'object') continue;
+        const name = asTrimmedString((modifier as Record<string, unknown>).Name);
+        if (name) modifierNameById.set(id, name);
+    }
+
+    // For each modifier group, collect diet-related modifier names
+    for (const mg of modifierGroups) {
+        if (!mg || typeof mg !== 'object') continue;
+        const mgRecord = mg as Record<string, unknown>;
+        const groupId = asTrimmedString(mgRecord.Id);
+        if (!groupId) continue;
+
+        const modifierIds = Array.isArray(mgRecord.Modifiers) ? mgRecord.Modifiers : [];
+        const dietNames: string[] = [];
+
+        for (const modId of modifierIds) {
+            if (typeof modId !== 'string') continue;
+            const name = modifierNameById.get(modId);
+            if (!name) continue;
+            if (DIET_MODIFIER_PATTERNS.some((p) => p.test(name))) {
+                dietNames.push(name);
+            }
+        }
+
+        if (dietNames.length > 0) {
+            result.set(groupId, dietNames);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Resolve diet modifier names for an item based on its variation's ModifierGroupsIds.
+ */
+function resolveDietModifiersForItem(
+    item: Record<string, unknown>,
+    dietModifiersByGroup: Map<string, string[]>,
+): string[] {
+    if (dietModifiersByGroup.size === 0) return [];
+    const variations = Array.isArray(item.Variations) ? item.Variations : [];
+    const names: string[] = [];
+
+    for (const raw of variations) {
+        if (!raw || typeof raw !== 'object') continue;
+        const variation = raw as Record<string, unknown>;
+        const groupIds = Array.isArray(variation.ModifierGroupsIds) ? variation.ModifierGroupsIds : [];
+        for (const gid of groupIds) {
+            if (typeof gid !== 'string') continue;
+            const modNames = dietModifiersByGroup.get(gid);
+            if (modNames) names.push(...modNames);
+        }
+    }
+
+    return [...new Set(names)];
+}
+
 function parseCdnCategories(
     menus: Record<string, unknown>[],
     itemMap: Map<string, Record<string, unknown>>,
     itemDetailsMap: Map<string, Record<string, unknown>>,
+    dietModifiersByGroup: Map<string, string[]> = new Map(),
 ): ParsedMenuCategory[] {
     const categoriesByName = new Map<string, {name: string; items: ParsedMenuCategory['items']; seenItemIds: Set<string>}>();
 
@@ -720,11 +823,13 @@ function parseCdnCategories(
                 if (!item) continue;
 
                 const itemDetails = itemDetailsMap.get(itemId) ?? null;
+                const dietModifiers = resolveDietModifiersForItem(item, dietModifiersByGroup);
                 const parsedItem = parseCdnMenuItem(item, {
                     itemId,
                     itemDetails,
                     categoryName,
                     categoryDescription,
+                    dietModifiers,
                 });
                 if (!parsedItem) continue;
 
@@ -751,6 +856,7 @@ function parseCdnMenuItem(
         itemDetails: Record<string, unknown> | null;
         categoryName: string;
         categoryDescription: string | null;
+        dietModifiers?: string[];
     },
 ): ParsedMenuCategory['items'][number] | null {
     const mergedItem = context.itemDetails ? {...context.itemDetails, ...item} : item;
@@ -816,6 +922,11 @@ function parseCdnMenuItem(
     ));
     if (allergyValues.length > 0) {
         dietContextParts.push(`allergens:${allergyValues.join(' | ')}`);
+    }
+
+    const dietMods = context.dietModifiers ?? [];
+    if (dietMods.length > 0) {
+        dietContextParts.push(`diet-options:${dietMods.join(', ')}`);
     }
 
     return {
