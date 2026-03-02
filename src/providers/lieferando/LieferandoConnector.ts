@@ -362,11 +362,11 @@ export class LieferandoConnector implements DeliveryProviderConnector {
     /**
      * Enrich parsed menu items with allergen data from the Lieferando product information API.
      *
-     * For each item that has a sourceId (variation/product UUID), fetches allergen info from:
-     * `rest.api.eu-central-1.production.jet-external.com/restaurants/{country}/{restaurantId}/products/{productId}/information`
+     * For each item that has a sourceId (variation/product UUID) and no existing allergen data,
+     * fetches allergen info from the Lieferando REST API. Items that already have allergens
+     * from HTML/CDN parsing are preserved as-is.
      *
-     * Uses the Lieferando allergen type taxonomy (glutenCereal, milkLactose, etc.)
-     * and maps them to human-readable allergen names.
+     * No-op when restaurantNumericId is null (restaurant ID could not be extracted from page data).
      */
     private async enrichWithAllergens(categories: ParsedMenuCategory[], restaurantNumericId: string | null): Promise<void> {
         if (!restaurantNumericId) return;

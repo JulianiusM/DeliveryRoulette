@@ -36,6 +36,8 @@ describe('DietTagService', () => {
     });
 
     describe('ensureDefaultDietTags', () => {
+        let idCounter = 0;
+
         function buildMockDataSource(existingTags: Array<{key: string; label: string; id: string; keywords: any[]; dishes: any[]; allergenExclusions: any[]}>) {
             const tagStore: any[] = [...existingTags];
             const childStores = new Map<string, any[]>();
@@ -45,7 +47,7 @@ describe('DietTagService', () => {
                     const key = `${opts?.where?.dietTagId ?? 'all'}`;
                     return Promise.resolve(childStores.get(key) ?? []);
                 }),
-                create: jest.fn((data: any) => ({...data, id: `child-${Math.random()}`})),
+                create: jest.fn((data: any) => ({...data, id: `child-${++idCounter}`})),
                 save: jest.fn((data: any) => {
                     const key = `${data.dietTagId}`;
                     const store = childStores.get(key) ?? [];
@@ -59,7 +61,7 @@ describe('DietTagService', () => {
             const mockTagRepo = {
                 find: jest.fn(() => Promise.resolve(tagStore)),
                 findOne: jest.fn((opts: any) => Promise.resolve(tagStore.find((t: any) => t.id === opts?.where?.id) ?? null)),
-                create: jest.fn((data: any) => ({...data, id: `tag-${Math.random()}`, keywords: [], dishes: [], allergenExclusions: []})),
+                create: jest.fn((data: any) => ({...data, id: `tag-${++idCounter}`, keywords: [], dishes: [], allergenExclusions: []})),
                 save: jest.fn((data: any) => {
                     const existing = tagStore.findIndex((t: any) => t.key === data.key);
                     if (existing >= 0) {

@@ -25,6 +25,8 @@ describe('DietTag seed', () => {
     });
 
     describe('seedDietTags', () => {
+        let idCounter = 0;
+
         function buildMockDataSource(existingTags: Array<{key: string; label: string}>) {
             const tagStore: any[] = existingTags.map((t) => ({
                 ...t,
@@ -37,7 +39,7 @@ describe('DietTag seed', () => {
 
             const createMockChildRepo = () => ({
                 find: jest.fn((opts: any) => Promise.resolve(childStores.get(opts?.where?.dietTagId) ?? [])),
-                create: jest.fn((data: any) => ({...data, id: `child-${Math.random()}`})),
+                create: jest.fn((data: any) => ({...data, id: `child-${++idCounter}`})),
                 save: jest.fn((data: any) => {
                     const key = data.dietTagId;
                     const store = childStores.get(key) ?? [];
