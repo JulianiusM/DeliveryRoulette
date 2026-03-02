@@ -31,9 +31,14 @@ describe('DietTag seed', () => {
             const tagStore: any[] = existingTags.map((t) => ({
                 ...t,
                 id: `tag-${t.key}`,
+                parentTagKey: null,
                 keywords: [],
                 dishes: [],
                 allergenExclusions: [],
+                negativeKeywords: [],
+                strongSignals: [],
+                contradictionPatterns: [],
+                qualifiedNegExceptions: [],
             }));
             const childStores = new Map<string, any[]>();
 
@@ -52,7 +57,7 @@ describe('DietTag seed', () => {
 
             const mockTagRepo = {
                 find: jest.fn(() => Promise.resolve(tagStore)),
-                create: jest.fn((data: any) => ({...data, id: `tag-${data.key}`, keywords: [], dishes: [], allergenExclusions: []})),
+                create: jest.fn((data: any) => ({...data, id: `tag-${data.key}`, parentTagKey: null, keywords: [], dishes: [], allergenExclusions: [], negativeKeywords: [], strongSignals: [], contradictionPatterns: [], qualifiedNegExceptions: []})),
                 save: jest.fn((data: any) => {
                     const idx = tagStore.findIndex((t: any) => t.key === data.key);
                     if (idx >= 0) {

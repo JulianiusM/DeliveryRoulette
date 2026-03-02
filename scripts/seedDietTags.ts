@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import {DataSource} from 'typeorm';
 import {entities, migrations, subscribers} from '../src/modules/database/__index__';
 import {
-    DEFAULT_DIET_TAGS as SERVICE_DEFAULT_DIET_TAGS,
+    DEFAULT_DIET_TAGS as DATA_DEFAULT_DIET_TAGS,
+} from '../src/modules/database/data/defaultDietTags';
+import {
     ensureDefaultDietTags,
 } from '../src/modules/database/services/DietTagService';
 
@@ -10,7 +12,7 @@ import {
  * Default diet tags to seed.
  * Each entry has a unique key and a human-readable label.
  */
-export const DEFAULT_DIET_TAGS = SERVICE_DEFAULT_DIET_TAGS;
+export const DEFAULT_DIET_TAGS = DATA_DEFAULT_DIET_TAGS;
 
 /**
  * Idempotent seed: inserts only tags whose key does not already exist.

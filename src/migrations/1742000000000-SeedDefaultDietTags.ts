@@ -1,6 +1,6 @@
 import {MigrationInterface, QueryRunner} from 'typeorm';
 import {v4 as uuidv4} from 'uuid';
-import {DEFAULT_DIET_TAGS} from '../modules/database/services/DietTagService';
+import {DEFAULT_DIET_TAGS} from '../modules/database/data/defaultDietTags';
 
 export class SeedDefaultDietTags1742000000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {

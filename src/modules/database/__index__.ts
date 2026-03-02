@@ -3,8 +3,12 @@ import { DietInferenceResult } from "./entities/diet/DietInferenceResult";
 import { DietManualOverride } from "./entities/diet/DietManualOverride";
 import { DietTag } from "./entities/diet/DietTag";
 import { DietTagAllergenExclusion } from "./entities/diet/DietTagAllergenExclusion";
+import { DietTagContradictionPattern } from "./entities/diet/DietTagContradictionPattern";
 import { DietTagDish } from "./entities/diet/DietTagDish";
 import { DietTagKeyword } from "./entities/diet/DietTagKeyword";
+import { DietTagNegativeKeyword } from "./entities/diet/DietTagNegativeKeyword";
+import { DietTagQualifiedNegException } from "./entities/diet/DietTagQualifiedNegException";
+import { DietTagStrongSignal } from "./entities/diet/DietTagStrongSignal";
 import { MenuItemDietOverride } from "./entities/diet/MenuItemDietOverride";
 import { MenuCategory } from "./entities/menu/MenuCategory";
 import { MenuItem } from "./entities/menu/MenuItem";
@@ -48,9 +52,10 @@ import { AddHeuristicAndCuisineFields1742400000000 } from "../../migrations/1742
 import { AddDietTagAllergenExclusions1742500000000 } from "../../migrations/1742500000000-AddDietTagAllergenExclusions";
 import { NormalizeDietTagJsonColumns1742600000000 } from "../../migrations/1742600000000-NormalizeDietTagJsonColumns";
 import { NormalizeRestaurantCuisines1742700000000 } from "../../migrations/1742700000000-NormalizeRestaurantCuisines";
+import { AddDietTagInferenceChildTables1742800000000 } from "../../migrations/1742800000000-AddDietTagInferenceChildTables";
 
-export const entities = [DietInferenceResult, DietManualOverride, DietTag, DietTagAllergenExclusion, DietTagDish, DietTagKeyword, MenuItemDietOverride, MenuCategory, MenuItem, ProviderCredential, ProviderFetchCache, ProviderSourceConfig, Restaurant, RestaurantCuisine, RestaurantProviderRef, Session, SuggestionHistory, SyncAlert, SyncJob, User, UserDietPreference, UserPreference, UserRestaurantPreference];
+export const entities = [DietInferenceResult, DietManualOverride, DietTag, DietTagAllergenExclusion, DietTagContradictionPattern, DietTagDish, DietTagKeyword, DietTagNegativeKeyword, DietTagQualifiedNegException, DietTagStrongSignal, MenuItemDietOverride, MenuCategory, MenuItem, ProviderCredential, ProviderFetchCache, ProviderSourceConfig, Restaurant, RestaurantCuisine, RestaurantProviderRef, Session, SuggestionHistory, SyncAlert, SyncJob, User, UserDietPreference, UserPreference, UserRestaurantPreference];
 
-export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000, CreateDietTag1740500000000, CreateDietInferenceResult1740600000000, CreateDietManualOverride1740700000000, CreateUserDietPreference1740800000000, CreateSuggestionHistory1740900000000, CreateUserRestaurantPreference1741000000000, CreateSyncJob1741100000000, CreateSyncAlert1741200000000, CreateProviderCredential1741300000000, CreateProviderSourceConfig1741400000000, CreateProviderFetchCache1741500000000, AddForeignKeyIndexes1741600000000, AddRestaurantOpeningDetails1741700000000, DropRestaurantOpenNow1741900000000, SeedDefaultDietTags1742000000000, AddSyncJobQuery1742100000000, CreateMenuItemDietOverride1742200000000, AddMenuItemDietContext1742300000000, AddHeuristicAndCuisineFields1742400000000, AddDietTagAllergenExclusions1742500000000, NormalizeDietTagJsonColumns1742600000000, NormalizeRestaurantCuisines1742700000000];
+export const migrations = [CreateRestaurant1740100000000, CreateMenuCategoryAndItem1740200000000, CreateUserPreference1740300000000, CreateRestaurantProviderRef1740400000000, CreateDietTag1740500000000, CreateDietInferenceResult1740600000000, CreateDietManualOverride1740700000000, CreateUserDietPreference1740800000000, CreateSuggestionHistory1740900000000, CreateUserRestaurantPreference1741000000000, CreateSyncJob1741100000000, CreateSyncAlert1741200000000, CreateProviderCredential1741300000000, CreateProviderSourceConfig1741400000000, CreateProviderFetchCache1741500000000, AddForeignKeyIndexes1741600000000, AddRestaurantOpeningDetails1741700000000, DropRestaurantOpenNow1741900000000, SeedDefaultDietTags1742000000000, AddSyncJobQuery1742100000000, CreateMenuItemDietOverride1742200000000, AddMenuItemDietContext1742300000000, AddHeuristicAndCuisineFields1742400000000, AddDietTagAllergenExclusions1742500000000, NormalizeDietTagJsonColumns1742600000000, NormalizeRestaurantCuisines1742700000000, AddDietTagInferenceChildTables1742800000000];
 
 export const subscribers = [];

@@ -27,9 +27,25 @@ const CDN_BASE_URLS = [
 const COUNTRY_CODE = 'de';
 const execFileAsync = promisify(execFile);
 
+export interface LieferandoConnectorConfig {
+    /** Number of concurrent allergen API requests per batch. Default: 5 */
+    allergenFetchBatchSize?: number;
+    /** Whether to include "mayContain" level allergens. Default: true */
+    includeMayContainAllergens?: boolean;
+}
+
 export class LieferandoConnector implements DeliveryProviderConnector {
     readonly providerKey = ProviderKey.LIEFERANDO;
     readonly displayName = 'Lieferando';
+
+    private readonly config: Required<LieferandoConnectorConfig>;
+
+    constructor(config: LieferandoConnectorConfig = {}) {
+        this.config = {
+            allergenFetchBatchSize: config.allergenFetchBatchSize ?? 5,
+            includeMayContainAllergens: config.includeMayContainAllergens ?? true,
+        };
+    }
 
     /**
      * List restaurants from a listing URL.
@@ -384,9 +400,9 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         if (productIds.length === 0) return;
 
         // Fetch allergens in parallel batches to avoid overwhelming the API
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-            const batch = productIds.slice(i, i + BATCH_SIZE);
+        const batchSize = this.config.allergenFetchBatchSize;
+        for (let i = 0; i < productIds.length; i += batchSize) {
+            const batch = productIds.slice(i, i + batchSize);
             const results = await Promise.allSettled(
                 batch.map(async ({productId}) => {
                     const allergens = await this.fetchProductAllergens(restaurantNumericId, productId);
@@ -413,7 +429,7 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         try {
             const data = await this.fetchJson(url) as Record<string, unknown> | null;
             if (!data) return [];
-            return parseAllergenResponse(data);
+            return parseAllergenResponse(data, this.config.includeMayContainAllergens);
         } catch {
             return [];
         }
@@ -1129,15 +1145,17 @@ const ALLERGEN_TYPE_MAP: Record<string, string> = {
 /**
  * Parse the Lieferando product information API response to extract human-readable allergen names.
  *
- * Response format:
- * ```json
- * { "allergens": { "provided": true, "allergenSets": [
- *   { "level": "contains", "type": "glutenCereal", "subTypes": ["wheat"] },
- *   { "level": "contains", "type": "milkLactose", "subTypes": [] }
- * ]}}
- * ```
+ * On the Lieferando website:
+ * - `"contains"` → "Contains X and products thereof" (definitely present)
+ * - `"mayContain"` → "May contain X and products thereof" (potential cross-contamination)
+ *
+ * Both levels represent real allergen information from the restaurant.
+ * By default, both are included for conservative diet inference.
+ *
+ * @param data - Parsed JSON response from the product information API
+ * @param includeMayContain - Whether to include "mayContain" level allergens (default: true)
  */
-function parseAllergenResponse(data: Record<string, unknown>): string[] {
+function parseAllergenResponse(data: Record<string, unknown>, includeMayContain = true): string[] {
     const allergens = data.allergens as Record<string, unknown> | undefined;
     if (!allergens || allergens.provided !== true) return [];
 
@@ -1149,8 +1167,9 @@ function parseAllergenResponse(data: Record<string, unknown>): string[] {
         if (!set || typeof set !== 'object') continue;
         const allergenSet = set as Record<string, unknown>;
 
-        // Only include "contains" level (skip "mayContain" for conservative approach)
-        if (allergenSet.level !== 'contains') continue;
+        // Include "contains" level always; include "mayContain" based on configuration
+        const level = allergenSet.level;
+        if (level !== 'contains' && !(includeMayContain && level === 'mayContain')) continue;
 
         const type = typeof allergenSet.type === 'string' ? allergenSet.type : '';
         const label = ALLERGEN_TYPE_MAP[type] ?? type;

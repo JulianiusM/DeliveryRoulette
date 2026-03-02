@@ -84,6 +84,25 @@ export type Settings = {
     providerCacheListingTtlSeconds: number;
     providerCacheMenuTtlSeconds: number;
 
+    // Diet inference engine configuration
+    inferenceHighConfidenceMinRatio: number;
+    inferenceHighConfidenceMinStrongSignals: number;
+    inferenceMediumConfidenceMinRatio: number;
+    inferenceSmallMenuThreshold: number;
+    inferenceEvidenceBoostCap: number;
+    inferenceEvidencePenaltyCap: number;
+    inferenceStrongSignalWeight: number;
+    inferenceManualOverrideWeight: number;
+    inferenceRatioWeight: number;
+    inferencePenaltyPerExcluded: number;
+    inferenceConfidenceMultiplierMedium: number;
+    inferenceConfidenceMultiplierLow: number;
+    inferenceNegativeEvidenceWeight: number;
+    inferenceDishHitWeight: number;
+    inferenceCrossContaminationWeight: number;
+    inferenceAllergenFetchBatchSize: number;
+    inferenceIncludeMayContainAllergens: boolean;
+
     initialized: boolean;
 };
 
@@ -164,6 +183,25 @@ const defaults: Settings = {
     // Provider fetch cache TTL (seconds)
     providerCacheListingTtlSeconds: 6 * 60 * 60,    // 6 hours
     providerCacheMenuTtlSeconds: 24 * 60 * 60,      // 24 hours
+
+    // Diet inference engine configuration
+    inferenceHighConfidenceMinRatio: 0.3,
+    inferenceHighConfidenceMinStrongSignals: 2,
+    inferenceMediumConfidenceMinRatio: 0.5,
+    inferenceSmallMenuThreshold: 5,
+    inferenceEvidenceBoostCap: 20,
+    inferenceEvidencePenaltyCap: 18,
+    inferenceStrongSignalWeight: 3,
+    inferenceManualOverrideWeight: 5,
+    inferenceRatioWeight: 4,
+    inferencePenaltyPerExcluded: 2,
+    inferenceConfidenceMultiplierMedium: 0.92,
+    inferenceConfidenceMultiplierLow: 0.82,
+    inferenceNegativeEvidenceWeight: 0.35,
+    inferenceDishHitWeight: 1.2,
+    inferenceCrossContaminationWeight: 0.5,
+    inferenceAllergenFetchBatchSize: 5,
+    inferenceIncludeMayContainAllergens: true,
 };
 
 // CSV_KEY -> settings key
@@ -212,6 +250,23 @@ const keyMap: Record<string, keyof Settings> = {
     PROVIDER_HTTP_MAX_CONCURRENT: "providerHttpMaxConcurrent",
     PROVIDER_CACHE_LISTING_TTL_SECONDS: "providerCacheListingTtlSeconds",
     PROVIDER_CACHE_MENU_TTL_SECONDS: "providerCacheMenuTtlSeconds",
+    INFERENCE_HIGH_CONFIDENCE_MIN_RATIO: "inferenceHighConfidenceMinRatio",
+    INFERENCE_HIGH_CONFIDENCE_MIN_STRONG_SIGNALS: "inferenceHighConfidenceMinStrongSignals",
+    INFERENCE_MEDIUM_CONFIDENCE_MIN_RATIO: "inferenceMediumConfidenceMinRatio",
+    INFERENCE_SMALL_MENU_THRESHOLD: "inferenceSmallMenuThreshold",
+    INFERENCE_EVIDENCE_BOOST_CAP: "inferenceEvidenceBoostCap",
+    INFERENCE_EVIDENCE_PENALTY_CAP: "inferenceEvidencePenaltyCap",
+    INFERENCE_STRONG_SIGNAL_WEIGHT: "inferenceStrongSignalWeight",
+    INFERENCE_MANUAL_OVERRIDE_WEIGHT: "inferenceManualOverrideWeight",
+    INFERENCE_RATIO_WEIGHT: "inferenceRatioWeight",
+    INFERENCE_PENALTY_PER_EXCLUDED: "inferencePenaltyPerExcluded",
+    INFERENCE_CONFIDENCE_MULTIPLIER_MEDIUM: "inferenceConfidenceMultiplierMedium",
+    INFERENCE_CONFIDENCE_MULTIPLIER_LOW: "inferenceConfidenceMultiplierLow",
+    INFERENCE_NEGATIVE_EVIDENCE_WEIGHT: "inferenceNegativeEvidenceWeight",
+    INFERENCE_DISH_HIT_WEIGHT: "inferenceDishHitWeight",
+    INFERENCE_CROSS_CONTAMINATION_WEIGHT: "inferenceCrossContaminationWeight",
+    INFERENCE_ALLERGEN_FETCH_BATCH_SIZE: "inferenceAllergenFetchBatchSize",
+    INFERENCE_INCLUDE_MAY_CONTAIN_ALLERGENS: "inferenceIncludeMayContainAllergens",
 };
 
 // per-field coercion
@@ -237,6 +292,23 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     providerHttpMaxConcurrent: (v) => Number(v),
     providerCacheListingTtlSeconds: (v) => Number(v),
     providerCacheMenuTtlSeconds: (v) => Number(v),
+    inferenceHighConfidenceMinRatio: (v) => Number(v),
+    inferenceHighConfidenceMinStrongSignals: (v) => Number(v),
+    inferenceMediumConfidenceMinRatio: (v) => Number(v),
+    inferenceSmallMenuThreshold: (v) => Number(v),
+    inferenceEvidenceBoostCap: (v) => Number(v),
+    inferenceEvidencePenaltyCap: (v) => Number(v),
+    inferenceStrongSignalWeight: (v) => Number(v),
+    inferenceManualOverrideWeight: (v) => Number(v),
+    inferenceRatioWeight: (v) => Number(v),
+    inferencePenaltyPerExcluded: (v) => Number(v),
+    inferenceConfidenceMultiplierMedium: (v) => Number(v),
+    inferenceConfidenceMultiplierLow: (v) => Number(v),
+    inferenceNegativeEvidenceWeight: (v) => Number(v),
+    inferenceDishHitWeight: (v) => Number(v),
+    inferenceCrossContaminationWeight: (v) => Number(v),
+    inferenceAllergenFetchBatchSize: (v) => Number(v),
+    inferenceIncludeMayContainAllergens: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),

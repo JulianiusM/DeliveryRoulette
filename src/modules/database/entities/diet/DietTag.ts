@@ -2,6 +2,10 @@ import {Column, Entity, OneToMany, PrimaryGeneratedColumn} from "typeorm";
 import {DietTagKeyword} from "./DietTagKeyword";
 import {DietTagDish} from "./DietTagDish";
 import {DietTagAllergenExclusion} from "./DietTagAllergenExclusion";
+import {DietTagNegativeKeyword} from "./DietTagNegativeKeyword";
+import {DietTagStrongSignal} from "./DietTagStrongSignal";
+import {DietTagContradictionPattern} from "./DietTagContradictionPattern";
+import {DietTagQualifiedNegException} from "./DietTagQualifiedNegException";
 
 @Entity("diet_tags")
 export class DietTag {
@@ -14,6 +18,10 @@ export class DietTag {
     @Column("varchar", {name: "label", length: 100})
     label!: string;
 
+    /** Key of the parent diet tag for subdiet inheritance (e.g. VEGAN → VEGETARIAN). */
+    @Column("varchar", {name: "parent_tag_key", length: 50, nullable: true})
+    parentTagKey!: string | null;
+
     @OneToMany(() => DietTagKeyword, (kw) => kw.dietTag, {cascade: true, eager: true})
     keywords!: DietTagKeyword[];
 
@@ -22,6 +30,18 @@ export class DietTag {
 
     @OneToMany(() => DietTagAllergenExclusion, (ae) => ae.dietTag, {cascade: true, eager: true})
     allergenExclusions!: DietTagAllergenExclusion[];
+
+    @OneToMany(() => DietTagNegativeKeyword, (nk) => nk.dietTag, {cascade: true, eager: true})
+    negativeKeywords!: DietTagNegativeKeyword[];
+
+    @OneToMany(() => DietTagStrongSignal, (ss) => ss.dietTag, {cascade: true, eager: true})
+    strongSignals!: DietTagStrongSignal[];
+
+    @OneToMany(() => DietTagContradictionPattern, (cp) => cp.dietTag, {cascade: true, eager: true})
+    contradictionPatterns!: DietTagContradictionPattern[];
+
+    @OneToMany(() => DietTagQualifiedNegException, (qne) => qne.dietTag, {cascade: true, eager: true})
+    qualifiedNegExceptions!: DietTagQualifiedNegException[];
 
     @Column("timestamp", {
         name: "created_at",

@@ -8,7 +8,11 @@
  */
 import * as ConnectorRegistry from './ConnectorRegistry';
 import {LieferandoConnector} from './lieferando/LieferandoConnector';
+import settings from '../modules/settings';
 
 export function registerConnectors(): void {
-    ConnectorRegistry.register(new LieferandoConnector());
+    ConnectorRegistry.register(new LieferandoConnector({
+        allergenFetchBatchSize: settings.value.inferenceAllergenFetchBatchSize,
+        includeMayContainAllergens: settings.value.inferenceIncludeMayContainAllergens,
+    }));
 }

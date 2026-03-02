@@ -4,9 +4,10 @@ import {DietInferenceResult} from '../entities/diet/DietInferenceResult';
 import {DietTag} from '../entities/diet/DietTag';
 import {MenuItemDietOverride} from '../entities/diet/MenuItemDietOverride';
 import {MenuCategory} from '../entities/menu/MenuCategory';
+import settings from '../../settings';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '4.0.0';
+export const ENGINE_VERSION = '5.0.0';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -64,126 +65,23 @@ export interface InferenceMenuItem {
 }
 
 /**
- * Map of diet-tag key -> keywords to look for in item name / description.
- * All comparisons are case-insensitive after normalization.
+ * Tag data shape used by the inference engine.
+ * Fully data-driven — no hardcoded keys or rules.
  */
-export const DIET_KEYWORD_RULES: Record<string, string[]> = {
-    VEGAN: [
-        'vegan', 'plant-based', 'plant based', 'tofu',
-        'tempeh', 'seitan', 'dairy-free', 'dairy free',
-        'without dairy', 'no dairy', 'animal-free', 'animal free',
-        'pflanzlich', 'pflanzenbasiert', 'veganes',
-        'vegano', 'vegana', 'sin ingredientes animales',
-    ],
-    VEGETARIAN: [
-        'vegetarian', 'veggie', 'vegan', 'meat-free',
-        'meat free', 'meatless', 'ovo-lacto', 'ovo lacto',
-        'vegetarisch', 'vegetarische', 'vegetarischer', 'vegetarisches',
-        'fleischlos', 'ohne fleisch', 'vegetariano', 'vegetariana', 'sin carne',
-    ],
-    GLUTEN_FREE: [
-        'gluten-free', 'gluten free', 'gf', 'celiac',
-        'coeliac', 'no gluten',
-        'glutenfrei', 'ohne gluten', 'sin gluten', 'sans gluten',
-    ],
-    LACTOSE_FREE: [
-        'lactose-free', 'lactose free', 'dairy-free',
-        'dairy free', 'no dairy', 'no lactose',
-        'laktosefrei', 'ohne laktose', 'milchfrei', 'sin lactosa', 'sans lactose',
-    ],
-    HALAL: [
-        'halal', 'halal certified', 'halal-zertifiziert', 'halal zertifiziert',
-    ],
-};
+interface InferenceTagData {
+    id: string;
+    key: string;
+    parentTagKey?: string | null;
+    keywords?: Array<{value: string}>;
+    dishes?: Array<{value: string}>;
+    allergenExclusions?: Array<{value: string}>;
+    negativeKeywords?: Array<{value: string}>;
+    strongSignals?: Array<{value: string}>;
+    contradictionPatterns?: Array<{value: string}>;
+    qualifiedNegExceptions?: Array<{value: string}>;
+}
 
-const DEFAULT_DISH_WHITELIST: Record<string, string[]> = {
-    VEGAN: [
-        'falafel',
-        'hummus',
-        'chana masala',
-        'aloo gobi',
-        'tofu bowl',
-        'vegan sushi',
-        'vegetable ramen',
-    ],
-    VEGETARIAN: [
-        'margherita pizza',
-        'caprese',
-        'palak paneer',
-        'paneer tikka',
-        'vegetable spring rolls',
-        'egg fried rice',
-    ],
-    GLUTEN_FREE: [
-        'corn tortilla tacos',
-        'rice bowl',
-        'poke bowl',
-        'sashimi',
-        'quinoa salad',
-    ],
-    LACTOSE_FREE: [
-        'sorbet',
-        'coconut curry',
-        'tom yum',
-        'olive oil pasta',
-        'oat milk latte',
-    ],
-    HALAL: [
-        'chicken biryani',
-        'shawarma',
-        'halal doner',
-        'beef kofta',
-    ],
-};
-
-const NEGATIVE_KEYWORD_RULES: Record<string, string[]> = {
-    VEGAN: [
-        'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
-        'shrimp', 'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
-        'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'whopper',
-        'rind', 'huhn', 'schwein', 'speck', 'fisch', 'ei', 'eier',
-        'kase', 'milch', 'sahne', 'butter',
-    ],
-    VEGETARIAN: [
-        'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
-        'shrimp', 'seafood', 'whopper',
-        'rind', 'huhn', 'schwein', 'speck', 'fisch', 'garnelen',
-    ],
-    GLUTEN_FREE: [
-        'wheat', 'barley', 'rye', 'breaded', 'breadcrumbs',
-        'weizen', 'gerste', 'roggen',
-    ],
-    LACTOSE_FREE: [
-        'milk', 'dairy', 'cheese', 'cream', 'butter', 'yoghurt', 'yogurt',
-        'milch', 'kase', 'sahne', 'butter', 'joghurt',
-    ],
-    HALAL: [
-        'pork', 'ham', 'bacon',
-        'schwein', 'speck', 'schinken',
-    ],
-};
-
-const STRONG_NAME_SIGNALS: Record<string, string[]> = {
-    VEGAN: ['vegan', 'plant-based', 'plant based', 'pflanzlich', 'pflanzenbasiert'],
-    VEGETARIAN: ['vegetarian', 'veggie', 'vegetarisch', 'fleischlos', 'meat-free', 'meat free'],
-    GLUTEN_FREE: ['gluten-free', 'gluten free', 'glutenfrei', 'ohne gluten'],
-    LACTOSE_FREE: ['lactose-free', 'lactose free', 'laktosefrei', 'milchfrei', 'dairy-free', 'dairy free'],
-    HALAL: ['halal'],
-};
-
-const QUALIFIED_MEAT_NEGATIVES: Record<string, string[]> = {
-    VEGAN: [
-        'whopper', 'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
-        'huhn', 'rind', 'schwein', 'fisch',
-        'mayonnaise', 'mayo',
-    ],
-    VEGETARIAN: ['whopper', 'burger', 'patty', 'chicken', 'beef', 'pork', 'fish', 'huhn', 'rind', 'schwein', 'fisch'],
-};
-
-const SUBDIET_INHERITANCE: Record<string, string[]> = {
-    VEGAN: ['VEGETARIAN'],
-};
-
+// ── Cross-contamination patterns (universal, not diet-specific) ──
 const CROSS_CONTAMINATION_PATTERNS: RegExp[] = [
     /\bmay come into contact\b/i,
     /\bprepared on (the )?same grill\b/i,
@@ -192,28 +90,6 @@ const CROSS_CONTAMINATION_PATTERNS: RegExp[] = [
     /\btraces of\b/i,
     /\bspuren von\b/i,
 ];
-
-const CONTRADICTION_PATTERNS: Record<string, RegExp[]> = {
-    VEGAN: [
-        /\bcontains (dairy|milk|cheese|egg|eggs)\b/i,
-        /\bnot vegan\b/i,
-    ],
-    VEGETARIAN: [
-        /\bcontains (beef|chicken|pork|fish|seafood)\b/i,
-        /\bnot vegetarian\b/i,
-    ],
-    GLUTEN_FREE: [
-        /\bcontains gluten\b/i,
-        /\bnot gluten[- ]?free\b/i,
-    ],
-    LACTOSE_FREE: [
-        /\bcontains (dairy|milk|cheese|cream|lactose)\b/i,
-        /\bnot lactose[- ]?free\b/i,
-    ],
-    HALAL: [
-        /\bnot halal\b/i,
-    ],
-};
 
 /**
  * Parse a comma-separated allergen string into normalized tokens.
@@ -248,26 +124,31 @@ function hasCrossContamination(text: string): boolean {
     return CROSS_CONTAMINATION_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function hasContradiction(dietTagKey: string, text: string): boolean {
-    const patterns = CONTRADICTION_PATTERNS[dietTagKey] ?? [];
+function hasContradiction(text: string, patterns: RegExp[]): boolean {
     return patterns.some((pattern) => pattern.test(text));
 }
 
 /**
  * Detect cases where a diet keyword appears only as a side-note in context
  * that does not make the whole item diet-compatible.
+ * Uses strong signals from the tag data rather than hardcoded keys.
  */
-function hasContextFalsePositive(dietTagKey: string, text: string, nameText?: string): boolean {
-    if (dietTagKey !== 'VEGAN' && dietTagKey !== 'VEGETARIAN') {
+function hasContextFalsePositive(
+    text: string,
+    nameText: string,
+    strongSignals: string[],
+): boolean {
+    if (strongSignals.length === 0) return false;
+
+    // Check if any strong signal is in the name — if so, it's a primary claim
+    if (nameText && strongSignals.some((signal) => buildKeywordPattern(signal).test(nameText))) {
         return false;
     }
 
-    if (nameText && hasDietQualifierInName(dietTagKey, nameText)) {
-        return false;
-    }
-
-    const condimentMention = /\b(vegan|vegetarian)\b.*\b(mayo|mayonnaise|sauce|dressing|salad mayonnaise)\b/i.test(text);
-    const sideComponentPhrase = /\b(comes with|also comes with|served with|with our)\b.*\b(vegan|vegetarian)\b/i.test(text);
+    // Check for condiment/side component mention pattern
+    const signalPattern = strongSignals.map((s) => escapeRegex(s)).join('|');
+    const condimentMention = new RegExp(`\\b(${signalPattern})\\b.*\\b(mayo|mayonnaise|sauce|dressing|salad mayonnaise)\\b`, 'i').test(text);
+    const sideComponentPhrase = new RegExp(`\\b(comes with|also comes with|served with|with our)\\b.*\\b(${signalPattern})\\b`, 'i').test(text);
 
     if (!condimentMention && !sideComponentPhrase) {
         return false;
@@ -306,44 +187,10 @@ function isNegatedOrFreeContext(text: string, keyword: string): boolean {
     return patterns.some((pattern) => pattern.test(text));
 }
 
-function hasStrongLactoseFreeSignal(positiveHits: string[]): boolean {
-    const strongSignals = new Set([
-        'lactose-free',
-        'lactose free',
-        'no lactose',
-        'laktosefrei',
-        'ohne laktose',
-        'dairy-free',
-        'dairy free',
-        'milchfrei',
-    ]);
-    return positiveHits.some((hit) => strongSignals.has(hit));
-}
-
-function hasExplicitCompatibilityClaim(dietTagKey: string, text: string): boolean {
-    if (dietTagKey === 'VEGAN') {
-        return [
-            /\b(is|it's|its)\s+vegan\b/i,
-            /\bvegan\s+too\b/i,
-            /\b100%\s+vegan\b/i,
-            /\bfully\s+vegan\b/i,
-        ].some((pattern) => pattern.test(text));
-    }
-
-    if (dietTagKey === 'VEGETARIAN') {
-        return [
-            /\b(is|it's|its)\s+vegetarian\b/i,
-            /\b100%\s+vegetarian\b/i,
-        ].some((pattern) => pattern.test(text));
-    }
-
-    return false;
-}
-
-function hasDietQualifierInName(dietTagKey: string, nameText: string): boolean {
-    if (!nameText) return false;
-    const strongSignals = STRONG_NAME_SIGNALS[dietTagKey] ?? [];
-    return strongSignals.some((signal) => buildKeywordPattern(signal).test(nameText));
+function findDishHits(nameText: string, contextText: string, dishWhitelist: string[]): string[] {
+    if (dishWhitelist.length === 0) return [];
+    const text = `${nameText} ${contextText}`.trim();
+    return dishWhitelist.filter((dish) => buildKeywordPattern(dish).test(text));
 }
 
 function mergeUnique(values: string[]): string[] {
@@ -376,6 +223,7 @@ export function normalizeText(text: string): string {
 /**
  * Given a ratio of matching items to total items (0-1),
  * return a score (0-100) and confidence level.
+ * All thresholds and weights read from settings for configurability.
  */
 export function computeScoreAndConfidence(
     matchRatio: number,
@@ -396,6 +244,7 @@ export function computeScoreAndConfidence(
         finalScore: number;
     };
 } {
+    const s = settings.value;
     const safeRatio = Math.max(0, Math.min(1, matchRatio));
     const ratioScore = Math.round(safeRatio * 100);
     const strongSignalCount = context.strongSignalCount ?? 0;
@@ -405,11 +254,11 @@ export function computeScoreAndConfidence(
     let confidence: Confidence;
     if (totalMenuItems === 0) {
         confidence = 'LOW';
-    } else if (strongSignalCount >= 2 && safeRatio >= 0.2) {
+    } else if (strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals && safeRatio >= 0.2) {
         confidence = 'HIGH';
-    } else if (totalMenuItems < 5) {
-        confidence = safeRatio >= 0.5 ? 'MEDIUM' : 'LOW';
-    } else if (safeRatio >= 0.3) {
+    } else if (totalMenuItems < s.inferenceSmallMenuThreshold) {
+        confidence = safeRatio >= s.inferenceMediumConfidenceMinRatio ? 'MEDIUM' : 'LOW';
+    } else if (safeRatio >= s.inferenceHighConfidenceMinRatio) {
         confidence = 'HIGH';
     } else if (safeRatio > 0) {
         confidence = 'MEDIUM';
@@ -418,15 +267,15 @@ export function computeScoreAndConfidence(
     }
 
     const evidenceBoost = Math.min(
-        20,
-        Math.round((strongSignalCount * 3) + (manualOverrideCount * 5) + (safeRatio * 4)),
+        s.inferenceEvidenceBoostCap,
+        Math.round((strongSignalCount * s.inferenceStrongSignalWeight) + (manualOverrideCount * s.inferenceManualOverrideWeight) + (safeRatio * s.inferenceRatioWeight)),
     );
-    const evidencePenalty = Math.min(18, excludedCount * 2);
+    const evidencePenalty = Math.min(s.inferenceEvidencePenaltyCap, excludedCount * s.inferencePenaltyPerExcluded);
     const confidenceMultiplier = confidence === 'HIGH'
         ? 1
         : confidence === 'MEDIUM'
-            ? 0.92
-            : 0.82;
+            ? s.inferenceConfidenceMultiplierMedium
+            : s.inferenceConfidenceMultiplierLow;
     const weighted = Math.round((ratioScore + evidenceBoost - evidencePenalty) * confidenceMultiplier);
     const finalScore = Math.max(0, Math.min(100, weighted));
 
@@ -443,43 +292,44 @@ export function computeScoreAndConfidence(
     };
 }
 
-function findDishHits(nameText: string, contextText: string, dishWhitelist: string[]): string[] {
-    if (dishWhitelist.length === 0) return [];
-    const text = `${nameText} ${contextText}`.trim();
-    return dishWhitelist.filter((dish) => buildKeywordPattern(dish).test(text));
-}
-
 /**
  * Run keyword matching for a single diet tag against a list of menu items.
+ * Fully data-driven: all rules come from the tag's child tables.
  * Supports item-level manual overrides and context-aware false-positive filtering.
  */
 export function inferForTag(
-    dietTag: {id: string; key: string; keywords?: Array<{value: string}>; dishes?: Array<{value: string}>; allergenExclusions?: Array<{value: string}>},
+    dietTag: InferenceTagData,
     items: InferenceMenuItem[],
     options: InferTagOptions = {},
 ): InferenceOutput {
-    const tagKeywordWhitelist = (dietTag.keywords ?? []).map((kw) => kw.value);
-    const tagDishWhitelist = (dietTag.dishes ?? []).map((d) => d.value);
-    const tagAllergenExclusions = (dietTag.allergenExclusions ?? []).map((ae) => ae.value);
-    const optionKeywordWhitelist = (options.keywordWhitelist ?? []).map((entry) => normalizeText(entry));
-    const optionDishWhitelist = (options.dishWhitelist ?? []).map((entry) => normalizeText(entry));
-    const optionAllergenExclusions = (options.allergenExclusions ?? []).map((entry) => normalizeText(entry));
+    const s = settings.value;
 
+    // Load all rules from tag data (fully data-driven, no hardcoded keys)
+    const tagKeywords = (dietTag.keywords ?? []).map((kw) => kw.value);
+    const tagDishes = (dietTag.dishes ?? []).map((d) => d.value);
+    const tagAllergenExclusions = (dietTag.allergenExclusions ?? []).map((ae) => ae.value);
+    const tagNegativeKeywords = (dietTag.negativeKeywords ?? []).map((nk) => nk.value);
+    const tagStrongSignals = (dietTag.strongSignals ?? []).map((ss) => ss.value);
+    const tagContradictionPatterns = (dietTag.contradictionPatterns ?? []).map((cp) => {
+        try { return new RegExp(cp.value, 'i'); } catch { return null; }
+    }).filter((p): p is RegExp => p !== null);
+    const tagQualifiedNegExceptions = new Set((dietTag.qualifiedNegExceptions ?? []).map((qne) => qne.value.toLowerCase()));
+
+    // Merge with runtime options
     const keywords = mergeUnique([
-        ...(DIET_KEYWORD_RULES[dietTag.key] ?? []),
-        ...tagKeywordWhitelist,
-        ...optionKeywordWhitelist,
+        ...tagKeywords,
+        ...(options.keywordWhitelist ?? []).map((entry) => normalizeText(entry)),
     ]);
     const dishWhitelist = mergeUnique([
-        ...(DEFAULT_DISH_WHITELIST[dietTag.key] ?? []),
-        ...tagDishWhitelist,
-        ...optionDishWhitelist,
+        ...tagDishes,
+        ...(options.dishWhitelist ?? []).map((entry) => normalizeText(entry)),
     ]);
     const allergenExclusions = mergeUnique([
         ...tagAllergenExclusions,
-        ...optionAllergenExclusions,
+        ...(options.allergenExclusions ?? []).map((entry) => normalizeText(entry)),
     ]);
-    const negativeKeywords = NEGATIVE_KEYWORD_RULES[dietTag.key] ?? [];
+    const negativeKeywords = tagNegativeKeywords;
+    const strongSignals = tagStrongSignals;
     const manualOverridesByItemId = options.manualOverridesByItemId ?? new Map<string, boolean>();
 
     const matchedItems: MatchedItem[] = [];
@@ -537,10 +387,11 @@ export function inferForTag(
         }
 
         const penalties: string[] = [];
-        const strongLactoseFreeSignal = dietTag.key === 'LACTOSE_FREE'
-            && hasStrongLactoseFreeSignal(positiveHits);
-        const explicitCompatibilityClaim = hasExplicitCompatibilityClaim(dietTag.key, text);
-        const dietQualifierInName = hasDietQualifierInName(dietTag.key, nameText);
+        const dietQualifierInName = strongSignals.some((signal) => buildKeywordPattern(signal).test(nameText));
+        const hasStrongLactoseFreeSignal = strongSignals.some((signal) =>
+            ['lactose-free', 'lactose free', 'no lactose', 'laktosefrei', 'ohne laktose', 'dairy-free', 'dairy free', 'milchfrei']
+                .includes(signal.toLowerCase()) && positiveHits.includes(signal));
+        const explicitCompatibilityClaim = hasExplicitCompatibilityClaim(text, strongSignals);
         const hasStrongSignal = dietQualifierInName
             || explicitCompatibilityClaim
             || positiveNameHits.length > 0
@@ -557,19 +408,18 @@ export function inferForTag(
         const negativeHits = mergeUnique([...negativeNameHits, ...negativeContextHits])
             .filter((keyword) => {
                 if (!dietQualifierInName) return true;
-                const allow = QUALIFIED_MEAT_NEGATIVES[dietTag.key] ?? [];
-                return !allow.includes(keyword);
+                return !tagQualifiedNegExceptions.has(keyword.toLowerCase());
             })
             .filter((keyword) => {
-                if (!strongLactoseFreeSignal) return true;
+                if (!hasStrongLactoseFreeSignal) return true;
                 return !['milk', 'dairy', 'milch'].includes(keyword);
             })
             .filter((keyword) => {
                 if (!explicitCompatibilityClaim) return true;
-                return !['chicken', 'beef', 'pork', 'fish', 'whopper', 'huhn', 'rind', 'schwein', 'fisch'].includes(keyword);
+                return !tagQualifiedNegExceptions.has(keyword.toLowerCase());
             });
-        const contradiction = hasContradiction(dietTag.key, text);
-        const contextFalsePositive = hasContextFalsePositive(dietTag.key, text, nameText);
+        const contradiction = hasContradiction(text, tagContradictionPatterns);
+        const contextFalsePositive = hasContextFalsePositive(text, nameText, strongSignals);
         const crossContamination = hasCrossContamination(text);
         const itemAllergenExclusions = findAllergenExclusions(item.allergens, allergenExclusions);
 
@@ -607,7 +457,7 @@ export function inferForTag(
                 keywords: [...positiveHits, 'cross-contamination'],
                 source: 'heuristic',
             });
-            positiveEvidence += 0.5;
+            positiveEvidence += s.inferenceCrossContaminationWeight;
             continue;
         }
 
@@ -617,12 +467,12 @@ export function inferForTag(
             keywords: positiveHits,
             source: 'heuristic',
         });
-        positiveEvidence += dishHits.length > 0 ? 1.2 : 1;
+        positiveEvidence += dishHits.length > 0 ? s.inferenceDishHitWeight : 1;
     }
 
     const totalMenuItems = items.length;
     const rawRatio = totalMenuItems > 0
-        ? (positiveEvidence - (negativeEvidence * 0.35)) / totalMenuItems
+        ? (positiveEvidence - (negativeEvidence * s.inferenceNegativeEvidenceWeight)) / totalMenuItems
         : 0;
     const matchRatio = Math.max(0, Math.min(1, rawRatio));
     const {score, confidence, breakdown} = computeScoreAndConfidence(matchRatio, totalMenuItems, {
@@ -644,6 +494,24 @@ export function inferForTag(
             scoreBreakdown: breakdown,
         },
     };
+}
+
+/**
+ * Check for explicit compatibility claims using strong signals.
+ * E.g., "is vegan", "100% vegetarian", "fully vegan"
+ */
+function hasExplicitCompatibilityClaim(text: string, strongSignals: string[]): boolean {
+    for (const signal of strongSignals) {
+        const escaped = escapeRegex(signal);
+        const patterns = [
+            new RegExp(`\\b(is|it's|its)\\s+${escaped}\\b`, 'i'),
+            new RegExp(`\\b${escaped}\\s+too\\b`, 'i'),
+            new RegExp(`\\b100%\\s+${escaped}\\b`, 'i'),
+            new RegExp(`\\bfully\\s+${escaped}\\b`, 'i'),
+        ];
+        if (patterns.some((p) => p.test(text))) return true;
+    }
+    return false;
 }
 
 /**
@@ -673,46 +541,48 @@ export async function getActiveMenuItems(restaurantId: string): Promise<Inferenc
     return items;
 }
 
-function applySubdietInheritance(outputs: InferenceOutput[]): void {
+/**
+ * Apply subdiet inheritance using the parentTagKey field.
+ * E.g., VEGAN items are inherited by VEGETARIAN.
+ */
+function applySubdietInheritance(outputs: InferenceOutput[], tags: DietTag[]): void {
     const byKey = new Map(outputs.map((output) => [output.dietTagKey, output]));
+    const tagsByKey = new Map(tags.map((tag) => [tag.key, tag]));
 
-    for (const [parentKey, childKeys] of Object.entries(SUBDIET_INHERITANCE)) {
-        const parent = byKey.get(parentKey);
-        if (!parent) continue;
+    for (const tag of tags) {
+        if (!tag.parentTagKey) continue;
+        const parent = byKey.get(tag.key);
+        const child = byKey.get(tag.parentTagKey);
+        if (!parent || !child) continue;
 
-        for (const childKey of childKeys) {
-            const child = byKey.get(childKey);
-            if (!child) continue;
+        const merged = new Map(
+            child.reasons.matchedItems.map((item) => [item.itemId, item]),
+        );
 
-            const merged = new Map(
-                child.reasons.matchedItems.map((item) => [item.itemId, item]),
-            );
-
-            for (const item of parent.reasons.matchedItems) {
-                if (merged.has(item.itemId)) continue;
-                merged.set(item.itemId, {
-                    ...item,
-                    keywords: mergeUnique([...item.keywords, `inherited-from:${parentKey.toLowerCase()}`]),
-                    source: item.source ?? 'heuristic',
-                });
-            }
-
-            const totalMenuItems = Math.max(
-                child.reasons.totalMenuItems,
-                parent.reasons.totalMenuItems,
-            );
-            const inheritedRatio = totalMenuItems > 0
-                ? merged.size / totalMenuItems
-                : 0;
-            const inherited = computeScoreAndConfidence(inheritedRatio, totalMenuItems);
-
-            child.reasons.matchedItems = [...merged.values()];
-            child.reasons.totalMenuItems = totalMenuItems;
-            child.reasons.matchRatio = Math.max(child.reasons.matchRatio, inheritedRatio);
-            child.reasons.scoreBreakdown = inherited.breakdown;
-            child.score = Math.max(child.score, inherited.score);
-            child.confidence = maxConfidence(child.confidence, inherited.confidence);
+        for (const item of parent.reasons.matchedItems) {
+            if (merged.has(item.itemId)) continue;
+            merged.set(item.itemId, {
+                ...item,
+                keywords: mergeUnique([...item.keywords, `inherited-from:${tag.key.toLowerCase()}`]),
+                source: item.source ?? 'heuristic',
+            });
         }
+
+        const totalMenuItems = Math.max(
+            child.reasons.totalMenuItems,
+            parent.reasons.totalMenuItems,
+        );
+        const inheritedRatio = totalMenuItems > 0
+            ? merged.size / totalMenuItems
+            : 0;
+        const inherited = computeScoreAndConfidence(inheritedRatio, totalMenuItems);
+
+        child.reasons.matchedItems = [...merged.values()];
+        child.reasons.totalMenuItems = totalMenuItems;
+        child.reasons.matchRatio = Math.max(child.reasons.matchRatio, inheritedRatio);
+        child.reasons.scoreBreakdown = inherited.breakdown;
+        child.score = Math.max(child.score, inherited.score);
+        child.confidence = maxConfidence(child.confidence, inherited.confidence);
     }
 }
 
@@ -748,7 +618,7 @@ export async function computeForRestaurant(restaurantId: string): Promise<DietIn
             outputs.push(output);
         }
 
-        applySubdietInheritance(outputs);
+        applySubdietInheritance(outputs, dietTags);
 
         const results: DietInferenceResult[] = [];
         for (const output of outputs) {
