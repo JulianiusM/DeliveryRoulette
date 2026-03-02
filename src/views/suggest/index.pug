@@ -77,6 +77,19 @@ block content
                 | Advanced Filters
 
         #advancedFilters.collapse.mt-3
+            //── Open Now Filter ───────────────────────
+            .mb-3
+                .form-check.form-switch.d-flex.justify-content-center
+                    input#openOnly.form-check-input(
+                        type="checkbox"
+                        name="openOnly"
+                        role="switch"
+                        checked
+                    )
+                    label.form-check-label.ms-2(for="openOnly")
+                        i.bi.bi-clock.me-1
+                        | Only open restaurants
+
             .row.g-4
                 //── Diet Filters ──────────────────────────
                 .col-md-6
@@ -131,6 +144,25 @@ block content
                                     placeholder="e.g. Fast Food, Burger"
                                 )
                                 .form-text.text-white-50 Comma-separated. Restaurants matching these names will be excluded.
+
+            //── Allergen Exclusion ────────────────────────
+            .row.g-4.mt-2
+                .col-12
+                    .card.text-bg-dark.border-secondary
+                        .card-header
+                            i.bi.bi-exclamation-triangle.me-2
+                            | Allergen Exclusion
+                        .card-body
+                            .mb-0
+                                label.form-label.mb-1(for="excludeAllergens")
+                                    i.bi.bi-shield-exclamation.me-1
+                                    | Exclude Allergens
+                                input#excludeAllergens.form-control.text-bg-dark(
+                                    type="text"
+                                    name="excludeAllergens"
+                                    placeholder="e.g. Gluten, Eggs, Milk"
+                                )
+                                .form-text.text-white-50 Comma-separated. Restaurants where all menu items contain these allergens will be excluded. Works alongside diet filters for comprehensive dietary safety.
 
 block scripts
     script(type="module" src="/js/modules/suggest.gen.js")

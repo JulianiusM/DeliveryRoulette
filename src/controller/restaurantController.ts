@@ -65,7 +65,7 @@ export async function getRestaurantDetail(id: string, userId?: number): Promise<
     const dietSuitability = await dietOverrideService.computeEffectiveSuitability(restaurant.id);
     const itemDietChips = await buildItemDietChips(categories, dietSuitability);
     const cuisineProfile = cuisineInferenceService.parseCuisineInference(restaurant.cuisineInferenceJson);
-    const providerCuisines = cuisineInferenceService.parseProviderCuisineList(restaurant.providerCuisinesJson);
+    const providerCuisines = (restaurant.providerCuisines ?? []).map((c) => c.value);
 
     let isFavorite = false;
     let doNotSuggest = false;

@@ -32,6 +32,7 @@ export const E2EDataSource = new DataSource({
     // Never use synchronize in CI; rely on migrations.
     synchronize: false,
     logging: false,
+    relationLoadStrategy: 'query', // Use separate queries for relations to avoid Cartesian product JOINs
 });
 
 async function main() {

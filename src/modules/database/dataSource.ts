@@ -27,6 +27,7 @@ export async function initDataSource() {
         migrations: migrations,
         subscribers: subscribers,
         synchronize: false,
+        relationLoadStrategy: 'query', // Use separate queries for relations to avoid Cartesian product JOINs
     });
 
     await AppDataSource.initialize();

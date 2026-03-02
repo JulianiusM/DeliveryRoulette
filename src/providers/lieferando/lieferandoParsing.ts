@@ -68,26 +68,27 @@ export function parseMenuHtml(html: string): ParsedMenu {
     // Extract restaurant name (best-effort)
     const restaurantName = extractRestaurantName($);
     const restaurantDetails = extractRestaurantDetailsFromNextData($);
+    const restaurantNumericId = extractRestaurantNumericIdFromNextData($);
 
     // Tier 0: Parse Next.js preloaded menu payload (most complete source)
     let categories = tryNextDataMenu($);
     if (categories.length > 0) {
         const rawText = buildRawText(categories);
-        return {restaurantName, restaurantDetails, categories, rawText, parseOk: true, warnings};
+        return {restaurantName, restaurantNumericId, restaurantDetails, categories, rawText, parseOk: true, warnings};
     }
 
     // Tier 1: Try JSON-LD
     categories = tryJsonLd($);
     if (categories.length > 0) {
         const rawText = buildRawText(categories);
-        return {restaurantName, restaurantDetails, categories, rawText, parseOk: true, warnings};
+        return {restaurantName, restaurantNumericId, restaurantDetails, categories, rawText, parseOk: true, warnings};
     }
 
     // Tier 1b: Try embedded preloaded state
     categories = tryPreloadedState($);
     if (categories.length > 0) {
         const rawText = buildRawText(categories);
-        return {restaurantName, restaurantDetails, categories, rawText, parseOk: true, warnings};
+        return {restaurantName, restaurantNumericId, restaurantDetails, categories, rawText, parseOk: true, warnings};
     }
 
     // Tier 2: HTML heuristics
@@ -98,6 +99,7 @@ export function parseMenuHtml(html: string): ParsedMenu {
 
     return {
         restaurantName,
+        restaurantNumericId,
         restaurantDetails,
         categories,
         rawText,
@@ -1258,6 +1260,51 @@ function extractRestaurantDetailsFromNextData($: cheerio.CheerioAPI): ParsedMenu
         openingHours,
         openingDays,
     };
+}
+
+/**
+ * Extract the restaurant's numeric ID from __NEXT_DATA__.
+ *
+ * Lieferando stores the numeric restaurant ID at several possible paths:
+ * - preloadedState.menu.restaurant.cdn.restaurant.restaurantInfo.id
+ * - preloadedState.menu.restaurant.cdn.restaurant.id
+ * - Direct id fields on the restaurant or restaurantInfo objects
+ *
+ * The numeric ID is needed for the product information REST API.
+ */
+function extractRestaurantNumericIdFromNextData($: cheerio.CheerioAPI): string | null {
+    const nextDataJson = readNextDataJson($);
+    if (!nextDataJson || typeof nextDataJson !== 'object') return null;
+
+    const props = (nextDataJson as Record<string, unknown>).props as Record<string, unknown> | undefined;
+    const appProps = props?.appProps as Record<string, unknown> | undefined;
+    const preloadedState = appProps?.preloadedState as Record<string, unknown> | undefined;
+    const menuState = preloadedState?.menu as Record<string, unknown> | undefined;
+    const restaurantState = menuState?.restaurant as Record<string, unknown> | undefined;
+    const cdn = restaurantState?.cdn as Record<string, unknown> | undefined;
+    const restaurant = cdn?.restaurant as Record<string, unknown> | undefined;
+    const restaurantInfo = restaurant?.restaurantInfo as Record<string, unknown> | undefined;
+
+    // Try multiple possible locations for the numeric ID
+    const candidates = [
+        restaurantInfo?.id,
+        restaurantInfo?.restaurantId,
+        restaurant?.id,
+        restaurant?.restaurantId,
+        cdn?.restaurantId,
+        restaurantState?.restaurantId,
+    ];
+
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && /^\d+$/.test(candidate.trim())) {
+            return candidate.trim();
+        }
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+            return String(candidate);
+        }
+    }
+
+    return null;
 }
 
 const MAX_LISTING_JSON_SEARCH_DEPTH = 12;

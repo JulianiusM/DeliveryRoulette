@@ -15,8 +15,10 @@ import {
     computeScoreAndConfidence,
     inferForTag,
     ENGINE_VERSION,
-    DIET_KEYWORD_RULES,
 } from '../../src/modules/database/services/DietInferenceService';
+import {
+    DEFAULT_DIET_TAGS,
+} from '../../src/modules/database/data/defaultDietTags';
 
 describe('DietInferenceService', () => {
     describe('ENGINE_VERSION', () => {
@@ -38,39 +40,80 @@ describe('DietInferenceService', () => {
         });
     });
 
-    describe('DIET_KEYWORD_RULES', () => {
-        test('has rules for all five default diet tags', () => {
+    describe('DEFAULT_DIET_TAGS keyword rules', () => {
+        test('has keyword rules for all five default diet tags', () => {
             const expectedKeys = ['VEGAN', 'VEGETARIAN', 'GLUTEN_FREE', 'LACTOSE_FREE', 'HALAL'];
             for (const key of expectedKeys) {
-                expect(DIET_KEYWORD_RULES[key]).toBeDefined();
-                expect(DIET_KEYWORD_RULES[key].length).toBeGreaterThan(0);
+                const tag = DEFAULT_DIET_TAGS.find((t) => t.key === key);
+                expect(tag).toBeDefined();
+                expect(tag!.keywordWhitelist.length).toBeGreaterThan(0);
             }
         });
 
         test('all keywords are lowercase', () => {
-            for (const [, keywords] of Object.entries(DIET_KEYWORD_RULES)) {
-                for (const kw of keywords) {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                for (const kw of tag.keywordWhitelist) {
                     expect(kw).toBe(kw.toLowerCase());
                 }
             }
         });
 
         test('no duplicate keywords within the same tag', () => {
-            for (const [key, keywords] of Object.entries(DIET_KEYWORD_RULES)) {
-                const unique = new Set(keywords);
-                expect(unique.size).toBe(keywords.length);
+            for (const tag of DEFAULT_DIET_TAGS) {
+                const unique = new Set(tag.keywordWhitelist);
+                expect(unique.size).toBe(tag.keywordWhitelist.length);
             }
         });
 
         test.each(germanKeywordExpectations)(
             'includes German keywords for $key',
             ({key, expectedKeywords}) => {
-                const rules = DIET_KEYWORD_RULES[key];
+                const tag = DEFAULT_DIET_TAGS.find((t) => t.key === key);
+                expect(tag).toBeDefined();
                 for (const kw of expectedKeywords) {
-                    expect(rules).toContain(kw);
+                    expect(tag!.keywordWhitelist).toContain(kw);
                 }
             },
         );
+    });
+
+    describe('DEFAULT_DIET_TAGS negative keywords', () => {
+        test('all five tags have negative keywords', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                expect(tag.negativeKeywords.length).toBeGreaterThan(0);
+            }
+        });
+
+        test('all negative keywords are lowercase', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                for (const kw of tag.negativeKeywords) {
+                    expect(kw).toBe(kw.toLowerCase());
+                }
+            }
+        });
+    });
+
+    describe('DEFAULT_DIET_TAGS strong signals', () => {
+        test('all five tags have strong signals', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                expect(tag.strongSignals.length).toBeGreaterThan(0);
+            }
+        });
+    });
+
+    describe('DEFAULT_DIET_TAGS subdiet inheritance', () => {
+        test('VEGAN has VEGETARIAN as parent', () => {
+            const veganTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'VEGAN');
+            expect(veganTag!.parentTagKey).toBe('VEGETARIAN');
+        });
+
+        test('other tags have no parent', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                if (tag.key !== 'VEGAN') {
+                    expect(tag.parentTagKey ?? null).toBeNull();
+                }
+            }
+        });
     });
 
     describe('normalizeText', () => {
@@ -87,6 +130,45 @@ describe('DietInferenceService', () => {
             );
             expect(score).toBe(testCase.expectedScore);
             expect(confidence).toBe(testCase.expectedConfidence);
+        });
+    });
+
+    describe('Allergen exclusions (data-driven from DEFAULT_DIET_TAGS)', () => {
+        const veganTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'VEGAN')!;
+        const lactoseFreeTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'LACTOSE_FREE')!;
+        const glutenFreeTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'GLUTEN_FREE')!;
+        const halalTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'HALAL')!;
+
+        test('VEGAN tag has egg allergen exclusions', () => {
+            expect(veganTag.allergenExclusions).toContain('egg');
+            expect(veganTag.allergenExclusions).toContain('eggs');
+        });
+
+        test('VEGAN tag has milk/dairy allergen exclusions', () => {
+            expect(veganTag.allergenExclusions).toContain('milk');
+            expect(veganTag.allergenExclusions).toContain('dairy');
+        });
+
+        test('LACTOSE_FREE tag has milk/lactose allergen exclusions', () => {
+            expect(lactoseFreeTag.allergenExclusions).toContain('milk');
+            expect(lactoseFreeTag.allergenExclusions).toContain('lactose');
+        });
+
+        test('GLUTEN_FREE tag has gluten/wheat allergen exclusions', () => {
+            expect(glutenFreeTag.allergenExclusions).toContain('gluten');
+            expect(glutenFreeTag.allergenExclusions).toContain('wheat');
+        });
+
+        test('HALAL tag has pork allergen exclusions', () => {
+            expect(halalTag.allergenExclusions).toContain('pork');
+        });
+
+        test('all exclusion tokens are lowercase', () => {
+            for (const tag of DEFAULT_DIET_TAGS) {
+                for (const exclusion of (tag.allergenExclusions ?? [])) {
+                    expect(exclusion).toBe(exclusion.toLowerCase());
+                }
+            }
         });
     });
 

@@ -2,13 +2,13 @@
  * Test data for DietTag seed tests
  */
 
-export const EXPECTED_DIET_TAGS = [
-    {key: 'VEGAN', label: 'Vegan'},
-    {key: 'VEGETARIAN', label: 'Vegetarian'},
-    {key: 'GLUTEN_FREE', label: 'Gluten-free'},
-    {key: 'LACTOSE_FREE', label: 'Lactose-free'},
-    {key: 'HALAL', label: 'Halal'},
-];
+import {DEFAULT_DIET_TAGS} from '../../../src/modules/database/data/defaultDietTags';
+
+/**
+ * Expected diet tags for structural verification.
+ * Derived directly from DEFAULT_DIET_TAGS to avoid duplication (DRY).
+ */
+export const EXPECTED_DIET_TAGS = DEFAULT_DIET_TAGS;
 
 export const dietTagSeedData = [
     {

@@ -75,8 +75,8 @@ export const userUsernameDuplicateData = [
 export const dietTagDuplicateData = [
     {
         description: 'rejects duplicate diet tag key',
-        first: {id: uuidv4(), key: 'vegan', label: 'Vegan'},
-        second: {id: uuidv4(), key: 'vegan', label: 'Vegan Diet'},
+        first: {id: uuidv4(), key: 'test_duplicate_key', label: 'Test Diet'},
+        second: {id: uuidv4(), key: 'test_duplicate_key', label: 'Test Diet Duplicate'},
     },
 ];
 
@@ -270,12 +270,17 @@ export const userRestaurantPrefDuplicateData = [
 export const expectedMigrationTables = [
     'diet_inference_results',
     'diet_manual_overrides',
+    'diet_tag_allergen_exclusions',
+    'diet_tag_dishes',
+    'diet_tag_keywords',
     'diet_tags',
     'menu_categories',
+    'menu_item_diet_overrides',
     'menu_items',
     'provider_credentials',
     'provider_fetch_cache',
     'provider_source_configs',
+    'restaurant_cuisines',
     'restaurant_provider_refs',
     'restaurants',
     'suggestion_history',

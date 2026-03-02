@@ -1,5 +1,6 @@
 import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
+import {RestaurantCuisine} from '../entities/restaurant/RestaurantCuisine';
 import {ProviderRestaurant} from '../../../providers/ProviderTypes';
 
 export interface ListRestaurantsOptions {
@@ -16,7 +17,6 @@ export async function createRestaurant(data: {
     country?: string;
     openingHours?: string | null;
     openingDays?: string | null;
-    providerCuisinesJson?: string | null;
     cuisineInferenceJson?: string | null;
 }): Promise<Restaurant> {
     const repo = AppDataSource.getRepository(Restaurant);
@@ -36,7 +36,6 @@ export async function updateRestaurant(id: string, data: {
     country?: string;
     openingHours?: string | null;
     openingDays?: string | null;
-    providerCuisinesJson?: string | null;
     cuisineInferenceJson?: string | null;
     isActive?: boolean;
 }): Promise<Restaurant | null> {
@@ -51,7 +50,7 @@ export async function updateRestaurant(id: string, data: {
 
 export async function getRestaurantById(id: string): Promise<Restaurant | null> {
     const repo = AppDataSource.getRepository(Restaurant);
-    return await repo.findOne({where: {id}});
+    return await repo.findOne({where: {id}, relations: ['providerCuisines']});
 }
 
 export async function listRestaurants(options: ListRestaurantsOptions = {}): Promise<Restaurant[]> {
@@ -85,11 +84,12 @@ export async function listRestaurants(options: ListRestaurantsOptions = {}): Pro
 export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<string> {
     return AppDataSource.transaction(async (manager) => {
         const repo = manager.getRepository(Restaurant);
+        const cuisineRepo = manager.getRepository(RestaurantCuisine);
         const all = await repo.find();
         const existing = all.find(
             (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
         );
-        const providerCuisinesJson = normalizeCuisineJson(incoming.cuisines);
+        const providerCuisines = normalizeCuisineList(incoming.cuisines);
 
         if (existing) {
             Object.assign(existing, {
@@ -100,11 +100,15 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
                 country: incoming.country ?? '',
                 openingHours: incoming.openingHours ?? existing.openingHours ?? null,
                 openingDays: incoming.openingDays ?? existing.openingDays ?? null,
-                providerCuisinesJson: providerCuisinesJson ?? existing.providerCuisinesJson ?? null,
                 isActive: true,
             });
             existing.updatedAt = new Date();
             await repo.save(existing);
+
+            if (providerCuisines.length > 0) {
+                await syncProviderCuisines(cuisineRepo, existing.id, providerCuisines);
+            }
+
             return existing.id;
         }
 
@@ -117,20 +121,54 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
             country: incoming.country ?? '',
             openingHours: incoming.openingHours ?? null,
             openingDays: incoming.openingDays ?? null,
-            providerCuisinesJson,
             isActive: true,
         });
         const saved = await repo.save(created);
+
+        if (providerCuisines.length > 0) {
+            await syncProviderCuisines(cuisineRepo, saved.id, providerCuisines);
+        }
+
         return saved.id;
     });
 }
 
-function normalizeCuisineJson(cuisines?: string[] | null): string | null {
-    if (!cuisines || cuisines.length === 0) return null;
+/**
+ * Get the provider-supplied cuisine list for a restaurant.
+ */
+export async function getProviderCuisines(restaurantId: string): Promise<string[]> {
+    const repo = AppDataSource.getRepository(RestaurantCuisine);
+    const rows = await repo.find({where: {restaurantId, source: 'provider'}});
+    return rows.map((r) => r.value);
+}
+
+async function syncProviderCuisines(
+    repo: import('typeorm').Repository<RestaurantCuisine>,
+    restaurantId: string,
+    cuisines: string[],
+): Promise<void> {
+    const existing = await repo.find({where: {restaurantId, source: 'provider'}});
+    const existingValues = new Set(existing.map((r) => r.value.toLowerCase()));
+    const desired = new Set(cuisines.map((c) => c.toLowerCase()));
+
+    for (const row of existing) {
+        if (!desired.has(row.value.toLowerCase())) {
+            await repo.remove(row);
+        }
+    }
+
+    for (const cuisine of cuisines) {
+        if (!existingValues.has(cuisine.toLowerCase())) {
+            const row = repo.create({restaurantId, value: cuisine, source: 'provider'});
+            await repo.save(row);
+        }
+    }
+}
+
+function normalizeCuisineList(cuisines?: string[] | null): string[] {
+    if (!cuisines || cuisines.length === 0) return [];
     const normalized = cuisines
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0);
-    if (normalized.length === 0) return null;
-    const deduped = [...new Set(normalized)];
-    return JSON.stringify(deduped);
+    return [...new Set(normalized)];
 }

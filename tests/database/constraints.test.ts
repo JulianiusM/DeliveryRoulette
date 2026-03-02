@@ -46,8 +46,8 @@ beforeAll(async () => {
     await insertRow(ds, 'users', seedUser2);
     await insertRow(ds, 'restaurants', seedRestaurant(ids.restaurant1));
     await insertRow(ds, 'restaurants', seedRestaurant(ids.restaurant2));
-    await insertRow(ds, 'diet_tags', seedDietTag(ids.dietTag1, 'gluten_free'));
-    await insertRow(ds, 'diet_tags', seedDietTag(ids.dietTag2, 'halal'));
+    await insertRow(ds, 'diet_tags', seedDietTag(ids.dietTag1, 'TEST_DIET_ALPHA'));
+    await insertRow(ds, 'diet_tags', seedDietTag(ids.dietTag2, 'TEST_DIET_BETA'));
 });
 
 afterAll(async () => {
@@ -86,7 +86,7 @@ describe('User unique constraints', () => {
 
 describe('DietTag unique constraints', () => {
     afterEach(async () => {
-        await ds.query(`DELETE FROM diet_tags WHERE \`key\` = 'vegan'`);
+        await ds.query(`DELETE FROM diet_tags WHERE \`key\` = 'test_duplicate_key'`);
     });
 
     test.each(dietTagDuplicateData)('$description', async ({first, second}) => {

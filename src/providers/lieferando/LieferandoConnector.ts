@@ -27,9 +27,25 @@ const CDN_BASE_URLS = [
 const COUNTRY_CODE = 'de';
 const execFileAsync = promisify(execFile);
 
+export interface LieferandoConnectorConfig {
+    /** Number of concurrent allergen API requests per batch. Default: 5 */
+    allergenFetchBatchSize?: number;
+    /** Whether to include "mayContain" level allergens. Default: true */
+    includeMayContainAllergens?: boolean;
+}
+
 export class LieferandoConnector implements DeliveryProviderConnector {
     readonly providerKey = ProviderKey.LIEFERANDO;
     readonly displayName = 'Lieferando';
+
+    private readonly config: Required<LieferandoConnectorConfig>;
+
+    constructor(config: LieferandoConnectorConfig = {}) {
+        this.config = {
+            allergenFetchBatchSize: config.allergenFetchBatchSize ?? 5,
+            includeMayContainAllergens: config.includeMayContainAllergens ?? true,
+        };
+    }
 
     /**
      * List restaurants from a listing URL.
@@ -109,15 +125,21 @@ export class LieferandoConnector implements DeliveryProviderConnector {
             throwOnFailure: false,
         });
         let parsedFromHtml: ParsedMenu | null = null;
+        let restaurantNumericId: string | null = null;
+
         if (html && !looksLikeBotProtectionPage(html) && hasTrustedMenuSignals(html)) {
             parsedFromHtml = parseMenuHtml(html);
+            restaurantNumericId = parsedFromHtml.restaurantNumericId ?? null;
             if (hasMenuItems(parsedFromHtml.categories)) {
+                await this.enrichWithAllergens(parsedFromHtml.categories, restaurantNumericId);
                 return toProviderMenu(parsedFromHtml, externalId);
             }
         }
 
         const parsedFromCdn = await this.fetchMenuFromCdn(menuUrl, html);
         if (parsedFromCdn && hasMenuItems(parsedFromCdn.categories)) {
+            restaurantNumericId = restaurantNumericId ?? parsedFromCdn.restaurantNumericId ?? null;
+            await this.enrichWithAllergens(parsedFromCdn.categories, restaurantNumericId);
             return toProviderMenu(parsedFromCdn, externalId);
         }
 
@@ -353,6 +375,66 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         return null;
     }
 
+    /**
+     * Enrich parsed menu items with allergen data from the Lieferando product information API.
+     *
+     * For each item that has a sourceId (variation/product UUID) and no existing allergen data,
+     * fetches allergen info from the Lieferando REST API. Items that already have allergens
+     * from HTML/CDN parsing are preserved as-is.
+     *
+     * No-op when restaurantNumericId is null (restaurant ID could not be extracted from page data).
+     */
+    private async enrichWithAllergens(categories: ParsedMenuCategory[], restaurantNumericId: string | null): Promise<void> {
+        if (!restaurantNumericId) return;
+
+        const productIds: Array<{categoryIdx: number; itemIdx: number; productId: string}> = [];
+        for (let ci = 0; ci < categories.length; ci++) {
+            for (let ii = 0; ii < categories[ci].items.length; ii++) {
+                const item = categories[ci].items[ii];
+                if (item.sourceId && !item.allergens?.length) {
+                    productIds.push({categoryIdx: ci, itemIdx: ii, productId: item.sourceId});
+                }
+            }
+        }
+
+        if (productIds.length === 0) return;
+
+        // Fetch allergens in parallel batches to avoid overwhelming the API
+        const batchSize = this.config.allergenFetchBatchSize;
+        for (let i = 0; i < productIds.length; i += batchSize) {
+            const batch = productIds.slice(i, i + batchSize);
+            const results = await Promise.allSettled(
+                batch.map(async ({productId}) => {
+                    const allergens = await this.fetchProductAllergens(restaurantNumericId, productId);
+                    return {productId, allergens};
+                }),
+            );
+
+            for (let j = 0; j < batch.length; j++) {
+                const result = results[j];
+                if (result.status === 'fulfilled' && result.value.allergens.length > 0) {
+                    const {categoryIdx, itemIdx} = batch[j];
+                    categories[categoryIdx].items[itemIdx].allergens = result.value.allergens;
+                }
+            }
+        }
+    }
+
+    /**
+     * Fetch allergens for a single product/variation from the Lieferando REST API.
+     */
+    private async fetchProductAllergens(restaurantId: string, productId: string): Promise<string[]> {
+        const url = `https://rest.api.eu-central-1.production.jet-external.com/restaurants/${COUNTRY_CODE}/${restaurantId}/products/${productId}/information`;
+
+        try {
+            const data = await this.fetchJson(url) as Record<string, unknown> | null;
+            if (!data) return [];
+            return parseAllergenResponse(data, this.config.includeMayContainAllergens);
+        } catch {
+            return [];
+        }
+    }
+
     private async fetchJson(url: string): Promise<unknown | null> {
         try {
             const controller = new AbortController();
@@ -542,10 +624,12 @@ function parseCdnMenuPayload(
     const itemDetailsMap = buildCdnItemMap([
         payloads.itemDetailsPayload,
     ]);
-    const categories = parseCdnCategories(menus, itemMap, itemDetailsMap);
+    const dietModifiersByGroup = parseCdnDietModifiers(payloads.itemDetailsPayload);
+    const categories = parseCdnCategories(menus, itemMap, itemDetailsMap, dietModifiersByGroup);
 
     return {
         restaurantName: parseCdnRestaurantName(manifest),
+        restaurantNumericId: parseCdnRestaurantNumericId(manifest),
         restaurantDetails: parseCdnRestaurantDetails(manifest),
         categories,
         rawText: categoriesToRawText(categories),
@@ -600,10 +684,112 @@ function buildCdnItemMap(
     return map;
 }
 
+/**
+ * Diet-related keyword patterns for matching modifier names.
+ * Covers English and German terms commonly found on Lieferando.
+ */
+const DIET_MODIFIER_PATTERNS: RegExp[] = [
+    /\bvegan\b/i,
+    /\bvegetari(an|sch)\b/i,
+    /\bpflanzlich\b/i,
+    /\bplant[- ]?based\b/i,
+    /\bgluten[- ]?fr(ee|ei)\b/i,
+    /\blakto(se)?[- ]?frei\b/i,
+    /\blactose[- ]?free\b/i,
+    /\bdairy[- ]?free\b/i,
+    /\bmilchfrei\b/i,
+    /\bhalal\b/i,
+];
+
+/**
+ * Parse diet-related customization modifiers from the itemDetails CDN payload.
+ *
+ * The itemDetails payload contains:
+ * - `ModifierGroups`: groups of options, each with an ID, name, and list of modifier set IDs
+ * - `ModifierSets`: individual modifiers with ID, name, and price
+ *
+ * Items reference modifier groups via `Variations[].ModifierGroupsIds`.
+ *
+ * @returns Map from modifier group ID to array of diet-related modifier names
+ */
+function parseCdnDietModifiers(
+    payload: Record<string, unknown> | null,
+): Map<string, string[]> {
+    const result = new Map<string, string[]>();
+    if (!payload) return result;
+
+    const modifierGroups = Array.isArray(payload.ModifierGroups) ? payload.ModifierGroups : [];
+    const modifierSets = Array.isArray(payload.ModifierSets) ? payload.ModifierSets : [];
+
+    // Build a map from modifier set ID to modifier name
+    const modifierNameById = new Map<string, string>();
+    for (const ms of modifierSets) {
+        if (!ms || typeof ms !== 'object') continue;
+        const msRecord = ms as Record<string, unknown>;
+        const id = asTrimmedString(msRecord.Id);
+        const modifier = msRecord.Modifier;
+        if (!id || !modifier || typeof modifier !== 'object') continue;
+        const name = asTrimmedString((modifier as Record<string, unknown>).Name);
+        if (name) modifierNameById.set(id, name);
+    }
+
+    // For each modifier group, collect diet-related modifier names
+    for (const mg of modifierGroups) {
+        if (!mg || typeof mg !== 'object') continue;
+        const mgRecord = mg as Record<string, unknown>;
+        const groupId = asTrimmedString(mgRecord.Id);
+        if (!groupId) continue;
+
+        const modifierIds = Array.isArray(mgRecord.Modifiers) ? mgRecord.Modifiers : [];
+        const dietNames: string[] = [];
+
+        for (const modId of modifierIds) {
+            if (typeof modId !== 'string') continue;
+            const name = modifierNameById.get(modId);
+            if (!name) continue;
+            if (DIET_MODIFIER_PATTERNS.some((p) => p.test(name))) {
+                dietNames.push(name);
+            }
+        }
+
+        if (dietNames.length > 0) {
+            result.set(groupId, dietNames);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Resolve diet modifier names for an item based on its variation's ModifierGroupsIds.
+ */
+function resolveDietModifiersForItem(
+    item: Record<string, unknown>,
+    dietModifiersByGroup: Map<string, string[]>,
+): string[] {
+    if (dietModifiersByGroup.size === 0) return [];
+    const variations = Array.isArray(item.Variations) ? item.Variations : [];
+    const names: string[] = [];
+
+    for (const raw of variations) {
+        if (!raw || typeof raw !== 'object') continue;
+        const variation = raw as Record<string, unknown>;
+        const groupIds = Array.isArray(variation.ModifierGroupsIds) ? variation.ModifierGroupsIds : [];
+        for (const gid of groupIds) {
+            if (typeof gid !== 'string') continue;
+            const modNames = dietModifiersByGroup.get(gid);
+            if (modNames) names.push(...modNames);
+        }
+    }
+
+    return [...new Set(names)];
+}
+
 function parseCdnCategories(
     menus: Record<string, unknown>[],
     itemMap: Map<string, Record<string, unknown>>,
     itemDetailsMap: Map<string, Record<string, unknown>>,
+    dietModifiersByGroup: Map<string, string[]> = new Map(),
 ): ParsedMenuCategory[] {
     const categoriesByName = new Map<string, {name: string; items: ParsedMenuCategory['items']; seenItemIds: Set<string>}>();
 
@@ -637,11 +823,13 @@ function parseCdnCategories(
                 if (!item) continue;
 
                 const itemDetails = itemDetailsMap.get(itemId) ?? null;
+                const dietModifiers = resolveDietModifiersForItem(item, dietModifiersByGroup);
                 const parsedItem = parseCdnMenuItem(item, {
                     itemId,
                     itemDetails,
                     categoryName,
                     categoryDescription,
+                    dietModifiers,
                 });
                 if (!parsedItem) continue;
 
@@ -668,6 +856,7 @@ function parseCdnMenuItem(
         itemDetails: Record<string, unknown> | null;
         categoryName: string;
         categoryDescription: string | null;
+        dietModifiers?: string[];
     },
 ): ParsedMenuCategory['items'][number] | null {
     const mergedItem = context.itemDetails ? {...context.itemDetails, ...item} : item;
@@ -733,6 +922,11 @@ function parseCdnMenuItem(
     ));
     if (allergyValues.length > 0) {
         dietContextParts.push(`allergens:${allergyValues.join(' | ')}`);
+    }
+
+    const dietMods = context.dietModifiers ?? [];
+    if (dietMods.length > 0) {
+        dietContextParts.push(`diet-options:${dietMods.join(', ')}`);
     }
 
     return {
@@ -802,6 +996,28 @@ function parseCdnRestaurantDetails(manifest: Record<string, unknown>): ParsedMen
         openingHours,
         openingDays,
     };
+}
+
+function parseCdnRestaurantNumericId(manifest: Record<string, unknown>): string | null {
+    // CDN manifest may contain RestaurantId at top level or in RestaurantInfo
+    const candidates = [
+        manifest.RestaurantId,
+        manifest.restaurantId,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.Id,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.id,
+        (manifest.RestaurantInfo as Record<string, unknown> | undefined)?.RestaurantId,
+    ];
+
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && /^\d+$/.test(candidate.trim())) {
+            return candidate.trim();
+        }
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+            return String(candidate);
+        }
+    }
+
+    return null;
 }
 
 function categoriesToRawText(categories: ParsedMenuCategory[]): string {
@@ -1013,4 +1229,80 @@ function parseCuisineList(value: string | null | undefined): string[] | null {
         .filter((entry) => entry.length > 0);
     if (normalized.length === 0) return null;
     return [...new Set(normalized)];
+}
+
+// ── Allergen type mapping ────────────────────────────────────────
+// Maps Lieferando allergen API types to human-readable names.
+// Based on the Lieferando product information API response format:
+//   { "allergenSets": [{ "level": "contains", "type": "glutenCereal", "subTypes": ["wheat"] }] }
+
+const ALLERGEN_TYPE_MAP: Record<string, string> = {
+    glutenCereal: 'Gluten',
+    milkLactose: 'Milk',
+    egg: 'Eggs',
+    fish: 'Fish',
+    crustaceans: 'Crustaceans',
+    molluscs: 'Molluscs',
+    peanuts: 'Peanuts',
+    treeNuts: 'Tree Nuts',
+    soy: 'Soy',
+    sesame: 'Sesame',
+    celery: 'Celery',
+    mustard: 'Mustard',
+    lupin: 'Lupin',
+    sulphites: 'Sulphites',
+};
+
+/**
+ * Parse the Lieferando product information API response to extract human-readable allergen names.
+ *
+ * On the Lieferando website:
+ * - `"contains"` → "Contains X and products thereof" (definitely present)
+ * - `"mayContain"` → "May contain X and products thereof" (potential cross-contamination)
+ *
+ * Both levels represent real allergen information from the restaurant.
+ * By default, both are included for conservative diet inference.
+ *
+ * @param data - Parsed JSON response from the product information API
+ * @param includeMayContain - Whether to include "mayContain" level allergens (default: true)
+ */
+function parseAllergenResponse(data: Record<string, unknown>, includeMayContain = true): string[] {
+    const allergens = data.allergens as Record<string, unknown> | undefined;
+    if (!allergens || allergens.provided !== true) return [];
+
+    const allergenSets = allergens.allergenSets;
+    if (!Array.isArray(allergenSets)) return [];
+
+    const result: string[] = [];
+    for (const set of allergenSets) {
+        if (!set || typeof set !== 'object') continue;
+        const allergenSet = set as Record<string, unknown>;
+
+        // Include "contains" level always; include "mayContain" based on configuration
+        const level = allergenSet.level;
+        if (level !== 'contains' && !(includeMayContain && level === 'mayContain')) continue;
+
+        const type = typeof allergenSet.type === 'string' ? allergenSet.type : '';
+        const label = ALLERGEN_TYPE_MAP[type] ?? type;
+        if (!label) continue;
+
+        const subTypes = Array.isArray(allergenSet.subTypes)
+            ? allergenSet.subTypes.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+            : [];
+
+        if (subTypes.length > 0) {
+            // Include both the main type and sub-types for comprehensive matching
+            result.push(label);
+            for (const sub of subTypes) {
+                const subLabel = sub.charAt(0).toUpperCase() + sub.slice(1);
+                if (subLabel.toLowerCase() !== label.toLowerCase()) {
+                    result.push(subLabel);
+                }
+            }
+        } else {
+            result.push(label);
+        }
+    }
+
+    return [...new Set(result)];
 }

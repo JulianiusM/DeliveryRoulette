@@ -2,6 +2,27 @@
  * Test data for DietInferenceService unit tests
  */
 
+import {DEFAULT_DIET_TAGS} from '../../../src/modules/database/data/defaultDietTags';
+
+// Helper: build a test tag in the child-table format used by inferForTag()
+function buildTestTag(key: string, id: string, overrides?: {
+    allergenExclusions?: Array<{value: string}>;
+}) {
+    const def = DEFAULT_DIET_TAGS.find((t) => t.key === key);
+    return {
+        id,
+        key,
+        parentTagKey: def?.parentTagKey ?? null,
+        keywords: (def?.keywordWhitelist ?? []).map((v) => ({value: v})),
+        dishes: (def?.dishWhitelist ?? []).map((v) => ({value: v})),
+        allergenExclusions: overrides?.allergenExclusions ?? (def?.allergenExclusions ?? []).map((v) => ({value: v})),
+        negativeKeywords: (def?.negativeKeywords ?? []).map((v) => ({value: v})),
+        strongSignals: (def?.strongSignals ?? []).map((v) => ({value: v})),
+        contradictionPatterns: (def?.contradictionPatterns ?? []).map((v) => ({value: v})),
+        qualifiedNegExceptions: (def?.qualifiedNegExceptions ?? []).map((v) => ({value: v})),
+    };
+}
+
 // ── Sample diet tags ────────────────────────────────────────
 
 export const sampleDietTags = [
@@ -123,18 +144,18 @@ export const scoreAndConfidenceData = [
 export const inferForTagData = [
     {
         description: 'detects vegan items in menu',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Vegan Burger', description: 'Plant-based patty'},
             {id: 'item-2', name: 'Caesar Salad', description: 'Fresh romaine'},
-            {id: 'item-3', name: 'Tofu Bowl', description: 'Crispy tofu'},
+            {id: 'item-3', name: 'Pflanzlich Bowl', description: 'Fresh vegetables'},
         ],
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-3'],
     },
     {
         description: 'detects vegetarian items in menu',
-        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
         items: [
             {id: 'item-1', name: 'Vegetarian Pizza', description: null},
             {id: 'item-2', name: 'Steak', description: 'Grilled beef'},
@@ -145,7 +166,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects gluten-free items in menu',
-        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        tag: buildTestTag('GLUTEN_FREE', 'tag-gluten-free'),
         items: [
             {id: 'item-1', name: 'Rice Bowl', description: 'Gluten-free option'},
             {id: 'item-2', name: 'Pasta', description: 'Wheat-based'},
@@ -156,7 +177,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects halal items in menu',
-        tag: {id: 'tag-halal', key: 'HALAL'},
+        tag: buildTestTag('HALAL', 'tag-halal'),
         items: [
             {id: 'item-1', name: 'Halal Chicken', description: 'Certified halal'},
             {id: 'item-2', name: 'Pork Ribs', description: null},
@@ -166,7 +187,7 @@ export const inferForTagData = [
     },
     {
         description: 'returns zero matches when no keywords found',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Steak', description: 'Grilled beef'},
             {id: 'item-2', name: 'Chicken Wings', description: null},
@@ -176,14 +197,14 @@ export const inferForTagData = [
     },
     {
         description: 'handles empty menu',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [],
         expectedMatchCount: 0,
         expectedMatchedItemIds: [],
     },
     {
         description: 'handles unknown diet tag key gracefully',
-        tag: {id: 'tag-unknown', key: 'UNKNOWN_DIET'},
+        tag: {id: 'tag-unknown', key: 'UNKNOWN_DIET', keywords: [], dishes: [], allergenExclusions: [], negativeKeywords: [], strongSignals: [], contradictionPatterns: [], qualifiedNegExceptions: []},
         items: [
             {id: 'item-1', name: 'Anything', description: 'Something'},
         ],
@@ -192,9 +213,9 @@ export const inferForTagData = [
     },
     {
         description: 'matches keywords in description only',
-        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Smoothie', description: 'Made with dairy-free milk'},
+            {id: 'item-1', name: 'Smoothie', description: 'Dairy-free, made with oat beverage'},
             {id: 'item-2', name: 'Regular Latte', description: 'Whole milk'},
         ],
         expectedMatchCount: 1,
@@ -202,7 +223,7 @@ export const inferForTagData = [
     },
     {
         description: 'matching is case-insensitive',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'VEGAN BOWL', description: null},
             {id: 'item-2', name: 'Vegan Wrap', description: 'PLANT-BASED'},
@@ -213,7 +234,7 @@ export const inferForTagData = [
     // ── German keyword test cases ──────────────────────────────
     {
         description: 'detects German vegan keywords (pflanzlich)',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Pflanzlich Bowl', description: 'Mit Tofu'},
             {id: 'item-2', name: 'Schnitzel', description: 'Paniert mit Semmelbröseln'},
@@ -223,7 +244,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects German vegetarian keywords (vegetarisch, fleischlos)',
-        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
         items: [
             {id: 'item-1', name: 'Vegetarische Gemüsepfanne', description: null},
             {id: 'item-2', name: 'Fleischlos Glücklich Teller', description: null},
@@ -234,7 +255,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects German gluten-free keywords (glutenfrei)',
-        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        tag: buildTestTag('GLUTEN_FREE', 'tag-gluten-free'),
         items: [
             {id: 'item-1', name: 'Reispfanne', description: 'Glutenfrei zubereitet'},
             {id: 'item-2', name: 'Nudeln', description: 'Weizen-basiert'},
@@ -244,7 +265,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects German lactose-free keywords (laktosefrei, milchfrei)',
-        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
             {id: 'item-1', name: 'Hafermilch Latte', description: 'Laktosefrei'},
             {id: 'item-2', name: 'Sorbet', description: 'Milchfrei und erfrischend'},
@@ -255,7 +276,7 @@ export const inferForTagData = [
     },
     {
         description: 'detects German "ohne fleisch" keyword for vegetarian',
-        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
         items: [
             {id: 'item-1', name: 'Gemüsecurry', description: 'Ohne Fleisch, mit Reis'},
             {id: 'item-2', name: 'Rindergulasch', description: null},
@@ -265,11 +286,11 @@ export const inferForTagData = [
     },
     {
         description: 'detects mixed German/English keywords in same menu',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Vegan Bowl', description: null},
             {id: 'item-2', name: 'Pflanzlich Wrap', description: null},
-            {id: 'item-3', name: 'Seitan Steak', description: 'Pflanzenbasiert'},
+            {id: 'item-3', name: 'Plant-Based Steak', description: 'Pflanzenbasiert'},
             {id: 'item-4', name: 'Currywurst', description: null},
         ],
         expectedMatchCount: 3,
@@ -278,7 +299,7 @@ export const inferForTagData = [
     // ── Negative-hit test cases ────────────────────────────────
     {
         description: 'negative hit: "Hamburg" does not match halal',
-        tag: {id: 'tag-halal', key: 'HALAL'},
+        tag: buildTestTag('HALAL', 'tag-halal'),
         items: [
             {id: 'item-1', name: 'Hamburger', description: 'Classic burger'},
         ],
@@ -287,7 +308,7 @@ export const inferForTagData = [
     },
     {
         description: 'negative hit: "Steak" does not match vegan',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Steak', description: 'Ribeye steak with butter'},
             {id: 'item-2', name: 'Chicken Wings', description: 'Spicy buffalo'},
@@ -298,7 +319,7 @@ export const inferForTagData = [
     },
     {
         description: 'negative hit: "Fleischkäse" does not match vegetarian despite containing "fleisch"',
-        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
         items: [
             {id: 'item-1', name: 'Fleischkäse', description: 'Bayerischer Leberkäs'},
         ],
@@ -307,7 +328,7 @@ export const inferForTagData = [
     },
     {
         description: 'negative hit: "Milchreis" does not match lactose-free',
-        tag: {id: 'tag-lactose-free', key: 'LACTOSE_FREE'},
+        tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
             {id: 'item-1', name: 'Milchreis', description: 'Klassisch mit Zimt'},
         ],
@@ -316,7 +337,7 @@ export const inferForTagData = [
     },
     {
         description: 'context disclaimer: plant-based item with dairy disclaimer is not vegan',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Plant-Based Burger', description: 'Plant-based patty. The cheese contains dairy products.'},
         ],
@@ -325,7 +346,7 @@ export const inferForTagData = [
     },
     {
         description: 'cross-contamination warning does not automatically exclude vegan alternative',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Vegan Nuggets', description: 'The beef alternatives are prepared on the same grill as the beef patties and may come into contact with them.'},
         ],
@@ -334,7 +355,7 @@ export const inferForTagData = [
     },
     {
         description: 'default dish whitelist detects vegan dishes without explicit vegan keyword',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Falafel Plate', description: 'Served with tahini and salad'},
             {id: 'item-2', name: 'Chicken Schnitzel', description: 'Breaded chicken breast'},
@@ -344,7 +365,7 @@ export const inferForTagData = [
     },
     {
         description: 'context false positive: vegan mayo mention on whopper should not mark vegan',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Whopper', description: 'Whopper also comes with our vegan salad mayonnaise.'},
         ],
@@ -353,7 +374,7 @@ export const inferForTagData = [
     },
     {
         description: 'plant-based whopper is considered vegan when title carries strong qualifier',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {
                 id: 'item-1',
@@ -366,7 +387,7 @@ export const inferForTagData = [
     },
     {
         description: 'explicit vegan claim outweighs serving-context meat words',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {
                 id: 'item-1',
@@ -380,11 +401,11 @@ export const inferForTagData = [
     // ── Sample menu fixtures ───────────────────────────────────
     {
         description: 'fully vegan menu: all items match VEGAN tag',
-        tag: {id: 'tag-vegan', key: 'VEGAN'},
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
-            {id: 'item-1', name: 'Vegan Pad Thai', description: 'Tofu and vegetables'},
-            {id: 'item-2', name: 'Tempeh Salad', description: 'Fresh greens'},
-            {id: 'item-3', name: 'Seitan Wrap', description: 'Plant-based protein'},
+            {id: 'item-1', name: 'Vegan Pad Thai', description: 'Rice noodles and vegetables'},
+            {id: 'item-2', name: 'Plant-Based Salad', description: 'Fresh greens'},
+            {id: 'item-3', name: 'Pflanzlich Wrap', description: 'No animal products'},
             {id: 'item-4', name: 'Pflanzlich Burger', description: 'Dairy-free bun'},
         ],
         expectedMatchCount: 4,
@@ -392,7 +413,7 @@ export const inferForTagData = [
     },
     {
         description: 'mixed menu: some items match VEGETARIAN tag',
-        tag: {id: 'tag-vegetarian', key: 'VEGETARIAN'},
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
         items: [
             {id: 'item-1', name: 'Veggie Burger', description: 'Meat-free patty'},
             {id: 'item-2', name: 'Grilled Salmon', description: 'Wild-caught'},
@@ -406,7 +427,7 @@ export const inferForTagData = [
     },
     {
         description: 'ambiguous menu: items with partial keyword overlap for GLUTEN_FREE',
-        tag: {id: 'tag-gluten-free', key: 'GLUTEN_FREE'},
+        tag: buildTestTag('GLUTEN_FREE', 'tag-gluten-free'),
         items: [
             {id: 'item-1', name: 'Rice Noodle Soup', description: 'Naturally gluten free'},
             {id: 'item-2', name: 'Bread Basket', description: 'Assorted wheat breads'},
@@ -415,6 +436,47 @@ export const inferForTagData = [
         ],
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-4'],
+    },
+    // ── Allergen-based exclusion test cases ─────────────────────
+    {
+        description: 'allergen exclusion: vegan noodles with egg allergen excluded from vegan',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Vegan Noodles', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
+            {id: 'item-2', name: 'Vegan Pad Thai', description: 'Rice noodles', allergens: 'Soy, Peanuts'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-2'],
+    },
+    {
+        description: 'allergen exclusion: milk allergen excludes from lactose-free',
+        tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
+        items: [
+            {id: 'item-1', name: 'Dairy-Free Latte', description: 'Made with oat beverage', allergens: null},
+            {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'allergen exclusion: gluten allergen excludes from gluten-free',
+        tag: buildTestTag('GLUTEN_FREE', 'tag-gluten-free'),
+        items: [
+            {id: 'item-1', name: 'Gluten-Free Pizza', description: 'Rice flour base', allergens: null},
+            {id: 'item-2', name: 'GF Bread', description: 'Our gf option', allergens: 'Wheat'},
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'allergen exclusion: no allergens means no exclusion',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Vegan Curry', description: 'With coconut sauce', allergens: null},
+            {id: 'item-2', name: 'Plant-Based Bowl', description: 'Fresh greens'},
+        ],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
     },
 ];
 
@@ -431,6 +493,6 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '3.0.0',
+    expectedCurrent: '6.0.0',
 };
 

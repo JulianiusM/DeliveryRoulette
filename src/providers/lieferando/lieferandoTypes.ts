@@ -35,6 +35,7 @@ export interface ParsedMenuCategory {
 /** Result of parsing a Lieferando menu page. */
 export interface ParsedMenu {
     restaurantName?: string | null;
+    restaurantNumericId?: string | null;
     restaurantDetails?: {
         address?: string | null;
         city?: string | null;

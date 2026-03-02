@@ -91,8 +91,10 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
  */
 export async function processSuggestion(body: {
     dietTagIds?: string | string[];
+    excludeAllergens?: string;
     cuisineIncludes?: string;
     cuisineExcludes?: string;
+    openOnly?: boolean | string;
 }, userId?: number | null): Promise<SuggestionResultData> {
     // Normalize dietTagIds to array
     let dietTagIds: string[] = [];
@@ -116,11 +118,13 @@ export async function processSuggestion(body: {
 
     const filters: SuggestionFilters = {
         dietTagIds,
+        excludeAllergens: parseCsvList(body.excludeAllergens),
         cuisineIncludes: parseCsvList(body.cuisineIncludes),
         cuisineExcludes: parseCsvList(body.cuisineExcludes),
         excludeRestaurantIds,
         doNotSuggestIds,
         favoriteIds,
+        openOnly: body.openOnly === true || body.openOnly === 'true',
     };
 
     const result = await suggestionService.suggest(filters);

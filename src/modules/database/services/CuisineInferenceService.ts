@@ -140,7 +140,7 @@ export async function recomputeForRestaurant(restaurantId: string): Promise<Cuis
     if (!restaurant) return null;
 
     const menuItems = await getActiveMenuItemsForCuisine(restaurantId);
-    const providerCuisines = parseProviderCuisineList(restaurant.providerCuisinesJson);
+    const providerCuisines = (restaurant.providerCuisines ?? []).map((c) => c.value);
     const profile = inferCuisineProfile({
         restaurantName: restaurant.name,
         providerCuisines,
@@ -288,9 +288,9 @@ export function parseProviderCuisineList(raw: string | null | undefined): string
     }
 }
 
-export function getRestaurantCuisineTokens(restaurant: Pick<Restaurant, 'providerCuisinesJson' | 'cuisineInferenceJson'>): Set<string> {
+export function getRestaurantCuisineTokens(restaurant: Pick<Restaurant, 'providerCuisines' | 'cuisineInferenceJson'>): Set<string> {
     const tokens = new Set<string>();
-    const providerCuisines = parseProviderCuisineList(restaurant.providerCuisinesJson);
+    const providerCuisines = (restaurant.providerCuisines ?? []).map((c) => c.value);
     const profile = parseCuisineInference(restaurant.cuisineInferenceJson);
 
     for (const cuisine of providerCuisines) {

@@ -10,8 +10,8 @@ import * as cuisineInferenceService from '../database/services/CuisineInferenceS
 import * as syncAlertService from '../database/services/SyncAlertService';
 import * as providerFetchCache from '../providers/ProviderFetchCacheService';
 import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
-import {ProviderKey} from '../../providers';
-import {DeliveryProviderConnector} from '../../providers';
+import {ProviderKey} from '../../providers/ProviderKey';
+import type {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
 import settings from '../settings';
 
 /**

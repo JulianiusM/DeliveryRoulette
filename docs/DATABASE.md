@@ -48,6 +48,7 @@ All entities live under `src/modules/database/entities/` and are grouped by doma
 | Entity | Table | Description |
 |--------|-------|-------------|
 | `Restaurant` | `restaurants` | Core restaurant record (name, address, active flag) |
+| `RestaurantCuisine` | `restaurant_cuisines` | Normalized cuisine types for a restaurant (one-to-many) |
 | `RestaurantProviderRef` | `restaurant_provider_refs` | Links a restaurant to an external delivery provider |
 
 ### Menu domain
@@ -62,6 +63,13 @@ All entities live under `src/modules/database/entities/` and are grouped by doma
 | Entity | Table | Description |
 |--------|-------|-------------|
 | `DietTag` | `diet_tags` | Seed-able lookup table (`VEGAN`, `HALAL`, …) |
+| `DietTagKeyword` | `diet_tag_keywords` | Positive keyword whitelist per diet tag |
+| `DietTagDish` | `diet_tag_dishes` | Known-compatible dish names per diet tag |
+| `DietTagAllergenExclusion` | `diet_tag_allergen_exclusions` | Allergen tokens that disqualify items per diet tag |
+| `DietTagNegativeKeyword` | `diet_tag_negative_keywords` | Ingredient keywords that disqualify items per diet tag |
+| `DietTagStrongSignal` | `diet_tag_strong_signals` | High-confidence positive indicators per diet tag |
+| `DietTagContradictionPattern` | `diet_tag_contradiction_patterns` | Regex patterns for context contradiction detection |
+| `DietTagQualifiedNegException` | `diet_tag_qualified_neg_exceptions` | Negative keywords to ignore when a strong qualifier is present |
 | `DietInferenceResult` | `diet_inference_results` | Heuristic inference from menu text |
 | `DietManualOverride` | `diet_manual_overrides` | Manual per-restaurant diet tag override |
 

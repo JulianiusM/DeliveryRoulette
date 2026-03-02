@@ -29,6 +29,8 @@ async function runSuggestion(): Promise<void> {
     const dietTagIds = Array.from(dietCheckboxes).map(cb => cb.value);
     const cuisineIncludes = (document.getElementById('cuisineIncludes') as HTMLInputElement)?.value || '';
     const cuisineExcludes = (document.getElementById('cuisineExcludes') as HTMLInputElement)?.value || '';
+    const excludeAllergens = (document.getElementById('excludeAllergens') as HTMLInputElement)?.value || '';
+    const openOnly = (document.getElementById('openOnly') as HTMLInputElement)?.checked || false;
 
     // Show spinner, hide previous result
     spinner.classList.remove('d-none');
@@ -36,7 +38,7 @@ async function runSuggestion(): Promise<void> {
     emptyState.classList.add('d-none');
 
     try {
-        const data = await post('/suggest', {dietTagIds, cuisineIncludes, cuisineExcludes});
+        const data = await post('/suggest', {dietTagIds, excludeAllergens, cuisineIncludes, cuisineExcludes, openOnly});
         renderResult(data);
         resultSection.classList.remove('d-none');
     } catch (err: any) {
