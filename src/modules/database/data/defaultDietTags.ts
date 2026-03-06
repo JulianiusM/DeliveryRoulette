@@ -53,8 +53,9 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         dishWhitelist: [
             // EN
             'falafel', 'hummus', 'chana masala', 'aloo gobi',
+            'fries', 'french fries',
             // DE
-            'linseneintopf', 'kartoffelpuffer',
+            'linseneintopf', 'kartoffelpuffer', 'pommes', 'fritten', 'gitterkartoffeln',
         ],
         allergenExclusions: [
             'egg', 'eggs', 'ei', 'eier',
@@ -66,6 +67,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             // EN
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
+            'calamari', 'squid', 'doner', 'doener', 'shawarma', 'schawarma',
             'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
             'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey',
             // DE
@@ -81,17 +83,18 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         ],
         contradictionPatterns: [
             '\\b(contains|enthält) (dairy|milk|cheese|egg|eggs|milch|käse|ei|eier)\\b',
+            '\\b(cheese|käse)\\b[^.!?]{0,40}\\b(contains|enthält)\\b[^.!?]{0,40}\\b(dairy|milk|milk products|milch|milchprodukte)\\b',
             '\\b(not|nicht|kein|keine) vegan\\b',
         ],
         qualifiedNegExceptions: [
             // EN
             'burger', 'patty', 'chicken', 'beef', 'pork', 'fish',
             'steak', 'nugget', 'nuggets', 'sausage', 'mince',
-            'mayonnaise', 'mayo', 'cheese', 'egg', 'honey',
+            'mayonnaise', 'mayo',
             // DE
             'huhn', 'hähnchen', 'rind', 'schwein', 'fisch',
             'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
-            'käse', 'ei', 'honig',
+            'soße', 'sosse',
         ],
     },
     {
@@ -121,6 +124,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             // EN
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
+            'calamari', 'squid', 'doner', 'doener', 'shawarma', 'schawarma',
             // DE
             'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
@@ -215,6 +219,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         ],
         contradictionPatterns: [
             '\\b(contains|enthält) (dairy|milk|cheese|cream|lactose|milch|käse|sahne|laktose)\\b',
+            '\\b(cheese|käse)\\b[^.!?]{0,40}\\b(contains|enthält)\\b[^.!?]{0,40}\\b(dairy|milk|milk products|milch|milchprodukte|lactose|laktose)\\b',
             '\\b(not|nicht|kein|keine) laktosefrei\\b',
             '\\bnot lactose[- ]?free\\b',
         ],

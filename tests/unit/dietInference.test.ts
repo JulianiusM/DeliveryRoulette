@@ -208,5 +208,38 @@ describe('DietInferenceService', () => {
                 expect(match.keywords.length).toBeGreaterThan(0);
             }
         });
+
+        test('returns zero score when all positive hints are excluded by safeguards', () => {
+            const veganTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'VEGAN')!;
+            const result = inferForTag(
+                {
+                    id: 'tag-vegan',
+                    key: 'VEGAN',
+                    parentTagKey: veganTag.parentTagKey ?? null,
+                    keywords: veganTag.keywordWhitelist.map((value) => ({value})),
+                    dishes: veganTag.dishWhitelist.map((value) => ({value})),
+                    allergenExclusions: veganTag.allergenExclusions.map((value) => ({value})),
+                    negativeKeywords: veganTag.negativeKeywords.map((value) => ({value})),
+                    strongSignals: veganTag.strongSignals.map((value) => ({value})),
+                    contradictionPatterns: veganTag.contradictionPatterns.map((value) => ({value})),
+                    qualifiedNegExceptions: veganTag.qualifiedNegExceptions.map((value) => ({value})),
+                },
+                [
+                    {
+                        id: 'item-1',
+                        name: 'Plant-based Big King',
+                        description: 'Plant-based burger with sauce',
+                        dietContext: 'diet-addon:plant-based zubereitet => Ja | Nein',
+                        allergens: 'Eggs, Milk',
+                    },
+                ],
+            );
+
+            expect(result.reasons.matchedItems).toHaveLength(0);
+            expect(result.reasons.excludedItems).toHaveLength(1);
+            expect(result.score).toBe(0);
+            expect(result.confidence).toBe('LOW');
+            expect(result.reasons.scoreBreakdown?.finalScore).toBe(0);
+        });
     });
 });

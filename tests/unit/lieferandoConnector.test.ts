@@ -154,6 +154,352 @@ describe('fetchMenu', () => {
         expect(result.categories[0].items[0].name).toBe('Plant-based Bowl');
         expect(result.categories[0].items[0].dietContext).toContain('category:Vegan Specials');
     });
+
+    test('captures diet option group labels and nested variation allergens from CDN item details', async () => {
+        const manifestUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/namaste_de_manifest_en.json';
+        const itemsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/namaste_de_items_en.json';
+        const itemDetailsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/namaste_de_item-details_en.json';
+
+        jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.includes('/en/menu/namaste-2')) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    text: async () => '<html><body><script>{"ManifestUrl":"\\/TOKEN\\/namaste_de_manifest_en.json"}</script>Cloudflare</body></html>',
+                } as Response;
+            }
+            if (url === manifestUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Menus: [
+                            {
+                                Categories: [
+                                    {
+                                        Name: 'Curries',
+                                        ItemIds: ['item-1'],
+                                    },
+                                ],
+                            },
+                        ],
+                        RestaurantInfo: {
+                            Name: 'Namaste 2',
+                            Location: {
+                                Address: 'Sample Street 9',
+                                City: 'Regensburg',
+                                PostCode: '93047',
+                            },
+                        },
+                        ItemsUrl: 'namaste_de_items_en.json',
+                        ItemDetailsUrl: 'namaste_de_item-details_en.json',
+                    }),
+                } as Response;
+            }
+            if (url === itemsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Items: [
+                            {
+                                Id: 'item-1',
+                                Name: 'Paneer Tikka Masala',
+                                Variations: [
+                                    {
+                                        BasePrice: 11.9,
+                                        CurrencyCode: 'EUR',
+                                        ModifierGroupsIds: ['group-1'],
+                                    },
+                                ],
+                            },
+                        ],
+                    }),
+                } as Response;
+            }
+            if (url === itemDetailsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Items: [
+                            {
+                                Id: 'item-1',
+                                Variations: [
+                                    {
+                                        ModifierGroupsIds: ['group-1'],
+                                        AllergenInformation: [
+                                            {Name: 'Milk'},
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                        ModifierGroups: [
+                            {
+                                Id: 'group-1',
+                                Name: 'Your Special Request',
+                                MinChoices: 0,
+                                MaxChoices: 1,
+                                Modifiers: ['modifier-1'],
+                            },
+                        ],
+                        ModifierSets: [
+                            {Id: 'modifier-1', Modifier: {Name: 'vegan prepared'}},
+                        ],
+                    }),
+                } as Response;
+            }
+
+            return {
+                ok: false,
+                status: 404,
+                statusText: 'Not Found',
+                json: async () => ({}),
+                text: async () => '',
+            } as Response;
+        });
+
+        const result = await connector.fetchMenu('https://www.lieferando.de/en/menu/namaste-2');
+        expect(result.categories).toHaveLength(1);
+        expect(result.categories[0].items[0].allergens).toEqual(['Milk']);
+        expect(result.categories[0].items[0].dietContext).toContain('diet-preparation:Your Special Request => vegan prepared');
+    });
+
+    test('separates explicit replacement choices from optional vegan add-ons', async () => {
+        const manifestUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/multi-options_de_manifest_en.json';
+        const itemsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/multi-options_de_items_en.json';
+        const itemDetailsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/multi-options_de_item-details_en.json';
+
+        jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.includes('/en/menu/mikes-pizza-burger-augsburger-strasse-regensburg')) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    text: async () => '<html><body><script>{"ManifestUrl":"\\/TOKEN\\/multi-options_de_manifest_en.json"}</script></body></html>',
+                } as Response;
+            }
+            if (url === manifestUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Menus: [
+                            {
+                                Categories: [
+                                    {
+                                        Name: 'Pizza',
+                                        ItemIds: ['item-1'],
+                                    },
+                                ],
+                            },
+                        ],
+                        ItemsUrl: 'multi-options_de_items_en.json',
+                        ItemDetailsUrl: 'multi-options_de_item-details_en.json',
+                    }),
+                } as Response;
+            }
+            if (url === itemsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Items: [
+                            {
+                                Id: 'item-1',
+                                Name: 'Ham Pizza',
+                                Description: 'Pizza with cheese and ham',
+                                Variations: [
+                                    {
+                                        BasePrice: 12.9,
+                                        CurrencyCode: 'EUR',
+                                        ModifierGroupsIds: ['group-choice', 'group-addon'],
+                                    },
+                                ],
+                            },
+                        ],
+                    }),
+                } as Response;
+            }
+            if (url === itemDetailsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Items: [
+                            {
+                                Id: 'item-1',
+                                Variations: [
+                                    {
+                                        ModifierGroupsIds: ['group-choice', 'group-addon'],
+                                        AllergenInformation: [{Name: 'Milk'}],
+                                    },
+                                ],
+                            },
+                        ],
+                        ModifierGroups: [
+                            {
+                                Id: 'group-choice',
+                                Name: 'Choose your cheese',
+                                MinimumQuantity: 1,
+                                MaximumQuantity: 1,
+                                Modifiers: ['modifier-1', 'modifier-2'],
+                            },
+                            {
+                                Id: 'group-addon',
+                                Name: 'Choose your dip',
+                                MinimumQuantity: 0,
+                                MaximumQuantity: 1,
+                                Modifiers: ['modifier-3', 'modifier-4'],
+                            },
+                        ],
+                        ModifierSets: [
+                            {Id: 'modifier-1', Modifier: {Name: 'Mozzarella'}},
+                            {Id: 'modifier-2', Modifier: {Name: 'Vegan Cheese'}},
+                            {Id: 'modifier-3', Modifier: {Name: 'Ketchup'}},
+                            {Id: 'modifier-4', Modifier: {Name: 'Vegan Mayo'}},
+                        ],
+                    }),
+                } as Response;
+            }
+
+            return {
+                ok: false,
+                status: 404,
+                statusText: 'Not Found',
+                json: async () => ({}),
+                text: async () => '',
+            } as Response;
+        });
+
+        const result = await connector.fetchMenu('https://www.lieferando.de/en/menu/mikes-pizza-burger-augsburger-strasse-regensburg');
+        expect(result.categories).toHaveLength(1);
+        expect(result.categories[0].items[0].dietContext).toContain('diet-choice:Choose your cheese => Mozzarella | Vegan Cheese');
+        expect(result.categories[0].items[0].dietContext).toContain('diet-addon:Choose your dip => Ketchup | Vegan Mayo');
+    });
+
+    test('prefers richer CDN data even when HTML parsing already found menu items', async () => {
+        const manifestUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/rich-menu_de_manifest_en.json';
+        const itemsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/rich-menu_de_items_en.json';
+        const itemDetailsUrl = 'https://globalmenucdn.eu-central-1.production.jet-external.com/TOKEN/rich-menu_de_item-details_en.json';
+
+        jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.includes('/en/menu/rich-menu')) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    text: async () => '<html><body><div data-qa="item-category"></div><script>{"ManifestUrl":"\\/TOKEN\\/rich-menu_de_manifest_en.json"}</script></body></html>',
+                } as Response;
+            }
+            if (url === manifestUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        RestaurantId: '2559484',
+                        Menus: [
+                            {
+                                Categories: [
+                                    {
+                                        Name: 'Curries',
+                                        ItemIds: ['item-1'],
+                                    },
+                                ],
+                            },
+                        ],
+                        ItemsUrl: 'rich-menu_de_items_en.json',
+                        ItemDetailsUrl: 'rich-menu_de_item-details_en.json',
+                    }),
+                } as Response;
+            }
+            if (url === itemsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        Items: [
+                            {
+                                Id: 'item-1',
+                                Name: 'Palak Paneer',
+                                Description: 'Spinach curry with paneer',
+                                Variations: [
+                                    {
+                                        Id: 'variation-1',
+                                        BasePrice: 12.9,
+                                        CurrencyCode: 'EUR',
+                                        ModifierGroupsIds: ['group-1'],
+                                    },
+                                ],
+                            },
+                        ],
+                    }),
+                } as Response;
+            }
+            if (url === itemDetailsUrl) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        ModifierGroups: [
+                            {
+                                Id: 'group-1',
+                                Name: 'vegan zubereitet',
+                                Modifiers: ['modifier-1'],
+                            },
+                        ],
+                        ModifierSets: [
+                            {Id: 'modifier-1', Modifier: {Name: 'Yes'}},
+                        ],
+                    }),
+                } as Response;
+            }
+            if (url.includes('/restaurants/de/2559484/products/item-1/information')) {
+                return {
+                    ok: true,
+                    status: 200,
+                    statusText: 'OK',
+                    json: async () => ({
+                        allergens: {
+                            provided: true,
+                            allergenSets: [
+                                {level: 'contains', type: 'milkLactose', subTypes: []},
+                            ],
+                        },
+                    }),
+                } as Response;
+            }
+
+            return {
+                ok: false,
+                status: 404,
+                statusText: 'Not Found',
+                json: async () => ({}),
+                text: async () => '',
+            } as Response;
+        });
+
+        const result = await connector.fetchMenu('https://www.lieferando.de/en/menu/rich-menu');
+        expect(result.categories).toHaveLength(1);
+        expect(result.categories[0].items[0].name).toBe('Palak Paneer');
+        expect(result.categories[0].items[0].dietContext).toContain('diet-preparation:vegan zubereitet => Yes');
+        expect(result.categories[0].items[0].dietContext).toContain('customizations:vegan zubereitet');
+        expect(result.categories[0].items[0].allergens).toEqual(['Milk']);
+    });
 });
 
 // ── listRestaurants ─────────────────────────────────────────

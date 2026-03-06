@@ -386,6 +386,101 @@ export const inferForTagData = [
         expectedMatchedItemIds: ['item-1'],
     },
     {
+        description: 'german same-grill beef warning does not exclude plant-based nuggets',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'King Nuggets Plant-based',
+                description: "Der moderne Klassiker unter den King Snacks hat eine neue Rezeptur bekommen. Durch die neue Panade sind unsere King Nuggets Plant-based jetzt noch mehr Geschmack und noch mehr Crunch. Probier's aus! Unsere Plant-based Pattys sind auf Soja- und Weizenbasis. Die Beef-Alternativen werden auf demselben Grill zubereitet wie die Beef-Pattys und konnten mit diesen in Kontakt kommen.",
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'strong vegan title does not override cheese mentioned in supporting text',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Chili Cheese Tortilla Menu',
+                description: 'VeganVegetarian. Our Green Deal: As green as the jalapenos, this Plant-based Tortilla also packs a punch. Featuring a delicious Plant-based Whopper Patty surrounded by Chili Cheese Nuggets, Chili Cheese Sauce, and tasty cheese, all wrapped in a crispy tortilla shell. Our Plant-based Patties are made from a soy and wheat base. The beef alternatives are cooked on the same grill as the beef patties and may come into contact with them.',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'plant-based cheeseburger with german milk disclaimer is not vegan even without allergen import',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Double Cheeseburger Menu',
+                description: 'VeganVegetarian. Unsere Plant-based Pattys sind auf Soja- und Weizenbasis. Die Beef-Alternativen werden auf demselben Grill zubereitet wie die Beef-Pattys und konnten mit diesen in Kontakt kommen. Käse enthält Milchprodukte. Preis zzgl. Pfand',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'ingredient keyword in plant-based item name still excludes vegan match',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Cheeseburger',
+                description: 'Unsere Plant-based Pattys sind auf Soja- und Weizenbasis.',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'explicit vegan item name overrides description negatives',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Vegano-Burger (vegan)',
+                description: 'Gemüseburger mit veganem Käse, Tomaten, Zwiebeln, Salat und veganer Mayonnaise-Ketchup-Senfsauce',
+                allergens: 'Gluten, Wheat, Mustard',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'explicit vegan item name overrides allergen signal',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Vegane Bambinis mit Broccoli',
+                description: '-',
+                allergens: 'Gluten, Wheat, Milk',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'explicit vegan category overrides allergen signal',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Bambinis mit Broccoli',
+                categoryName: 'Vegane Gerichte',
+                description: '-',
+                allergens: 'Gluten, Wheat, Milk',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
         description: 'explicit vegan claim outweighs serving-context meat words',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
@@ -439,24 +534,24 @@ export const inferForTagData = [
     },
     // ── Allergen-based exclusion test cases ─────────────────────
     {
-        description: 'allergen exclusion: vegan noodles with egg allergen excluded from vegan',
+        description: 'explicit vegan item names override egg allergen signal',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {id: 'item-1', name: 'Vegan Noodles', description: 'Stir-fried noodles', allergens: 'Eggs, Soy'},
             {id: 'item-2', name: 'Vegan Pad Thai', description: 'Rice noodles', allergens: 'Soy, Peanuts'},
         ],
-        expectedMatchCount: 1,
-        expectedMatchedItemIds: ['item-2'],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
     },
     {
-        description: 'allergen exclusion: milk allergen excludes from lactose-free',
+        description: 'explicit lactose-free item names override milk allergen signal',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
             {id: 'item-1', name: 'Dairy-Free Latte', description: 'Made with oat beverage', allergens: null},
             {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
         ],
-        expectedMatchCount: 1,
-        expectedMatchedItemIds: ['item-1'],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
     },
     {
         description: 'allergen exclusion: gluten allergen excludes from gluten-free',
@@ -478,6 +573,227 @@ export const inferForTagData = [
         expectedMatchCount: 2,
         expectedMatchedItemIds: ['item-1', 'item-2'],
     },
+    {
+        description: 'preparation option marked vegan overrides default allergen signal',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Palak Paneer',
+                description: 'Spinach curry with paneer',
+                dietContext: 'diet-preparation:vegan zubereitet => Ja | Nein\ncustomizations:Ihr Sonderwunsch',
+                allergens: 'Milk',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'explicit lactose-free category overrides allergen signal',
+        tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Hauslimonade',
+                categoryName: 'Laktosefrei',
+                description: '-',
+                allergens: 'Milk',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'plant-based preparation option does not override vegan allergen exclusion',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Big King',
+                description: 'Plant-based burger with sauce',
+                dietContext: 'diet-options:plant-based zubereitet\ncustomizations:prepare as plant-based',
+                allergens: 'Eggs, Milk',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'optional vegan add-ons do not make a ham pizza vegan',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Ham Pizza',
+                description: 'Pizza with cheese and ham',
+                dietContext: 'diet-addon:Choose your dip => Ketchup | Vegan Mayo\ncustomizations:Choose your dip',
+                allergens: 'Milk',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'required vegan replacement choice can override default dairy allergen',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Pizza',
+                description: 'Pizza with tomato sauce and cheese',
+                dietContext: 'diet-choice:Choose your cheese => Mozzarella | Vegan Cheese\ncustomizations:Choose your cheese',
+                allergens: 'Milk',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'replacement choice only covers the ingredients it can actually replace',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Ham Pizza',
+                description: 'Pizza with cheese and ham',
+                dietContext: 'diet-choice:Choose your cheese => Mozzarella | Vegan Cheese\ncustomizations:Choose your cheese',
+                allergens: 'Milk',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'german explicit vegan dip claim outweighs pairing meat words',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Teriyaki Dip 25ml',
+                description: 'Die Teriyaki Sauce ist ganz neu bei uns auf der Karte - und dann auch noch in vegan. Am besten kommt sie beim Dippen der neuen King Nuggets Chicken oder der neuen King Nuggets Plant-based.',
+                allergens: 'Gluten, Wheat, soybean, Sesame',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
+    {
+        description: 'vegan dish whitelist detects fries and churros without explicit vegan keyword',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'King Pommes',
+                description: '-',
+            },
+            {
+                id: 'item-2',
+                name: 'Gitterkartoffeln',
+                description: 'Außen crunchy, innen soft. Genau wie Pommes sein sollten, doch jetzt in Gitterform zum besseren dippen und snacken.',
+                allergens: 'Gluten, Wheat',
+            },
+            {
+                id: 'item-3',
+                name: 'Churros Zimt & Zucker',
+                description: 'Außen knusprig, innen herrlich lecker und bestäubt mit Zimt und Zucker sind sie unwiderstehlich.',
+                allergens: 'Gluten, Wheat',
+            },
+        ],
+        expectedMatchCount: 3,
+        expectedMatchedItemIds: ['item-1', 'item-2', 'item-3'],
+    },
+    {
+        description: 'side-dish wording in descriptions does not make non-vegan mains vegan',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Calamari',
+                description: 'mit Pommes frites, Ketchup und Salat',
+            },
+            {
+                id: 'item-2',
+                name: '2 Arabische Schawarma',
+                description: 'Pommes und Salat',
+            },
+            {
+                id: 'item-3',
+                name: 'Putenschnitzel',
+                description: 'mit Pommes frites, Salat und einer Sauce nach Wahl',
+            },
+            {
+                id: 'item-4',
+                name: 'Schawarma Döner Teller',
+                description: 'mit Dönerfleisch, Pommes frites, Eisbergsalat, Zwiebeln, Weißkraut, Blaukraut, Tomaten und Gurken',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'side-dish wording in descriptions does not make non-vegetarian mains vegetarian',
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Calamari',
+                description: 'mit Pommes frites, Ketchup und Salat',
+            },
+            {
+                id: 'item-2',
+                name: '2 Arabische Schawarma',
+                description: 'Pommes und Salat',
+            },
+            {
+                id: 'item-3',
+                name: 'Putenschnitzel',
+                description: 'mit Pommes frites, Salat und einer Sauce nach Wahl',
+            },
+            {
+                id: 'item-4',
+                name: 'Schawarma Döner Teller',
+                description: 'mit Dönerfleisch, Pommes frites, Eisbergsalat, Zwiebeln, Weißkraut, Blaukraut, Tomaten und Gurken',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'whitelisted side dishes in mixed titles do not make non-vegan mains vegan',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: '8 Knusprige Fischnuggets mit Pommes und Remulade',
+                description: 'Knusprige Fischnuggets mit Pommes Frites und Remulade 8 Stück',
+            },
+            {
+                id: 'item-2',
+                name: 'Döner teller mit pommes und salat',
+                description: '-',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'whitelisted side dishes in mixed titles do not make non-vegetarian mains vegetarian',
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
+        items: [
+            {
+                id: 'item-1',
+                name: '8 Knusprige Fischnuggets mit Pommes und Remulade',
+                description: 'Knusprige Fischnuggets mit Pommes Frites und Remulade 8 Stück',
+            },
+            {
+                id: 'item-2',
+                name: 'Döner teller mit pommes und salat',
+                description: '-',
+            },
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
 ];
 
 // ── German keyword rules expected data ─────────────────────
@@ -493,6 +809,6 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '6.0.0',
+    expectedCurrent: '6.6.0',
 };
 
