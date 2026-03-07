@@ -4,8 +4,10 @@
 import {ProviderKey} from '../../../src/providers/ProviderKey';
 import {ConnectorCapabilities, DeliveryProviderConnector} from '../../../src/providers/DeliveryProviderConnector';
 import {
+    ProviderLocationContext,
     ProviderMenu,
     ProviderRestaurant,
+    ProviderRestaurantAvailability,
     ProviderRestaurantListRequest,
     RateLimitPolicy,
 } from '../../../src/providers/ProviderTypes';
@@ -16,6 +18,8 @@ export function stubConnector(key: ProviderKey, displayName: string): DeliveryPr
         providerKey: key,
         displayName,
         listRestaurants: jest.fn<Promise<ProviderRestaurant[]>, [ProviderRestaurantListRequest]>()
+            .mockResolvedValue([]),
+        fetchAvailability: jest.fn<Promise<ProviderRestaurantAvailability[]>, [string, ProviderLocationContext, Date]>()
             .mockResolvedValue([]),
         fetchMenu: jest.fn<Promise<ProviderMenu>, [string]>()
             .mockResolvedValue({categories: []}),

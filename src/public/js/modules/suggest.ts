@@ -2,9 +2,12 @@ import {post} from '../core/http';
 import {setCurrentNavLocation} from '../core/navigation';
 
 type FavoriteMode = 'prefer' | 'only' | 'ignore';
+type ServiceType = 'delivery' | 'collection';
 
 interface SuggestionPayload {
     dietTagIds: string[];
+    locationId?: string;
+    serviceType: ServiceType;
     excludeAllergens: string;
     cuisineIncludes: string;
     cuisineExcludes: string;
@@ -97,6 +100,9 @@ async function runSuggestion(): Promise<void> {
 function collectPayload(): SuggestionPayload {
     const dietCheckboxes = document.querySelectorAll<HTMLInputElement>('input[name="dietTagIds"]:checked');
     const dietTagIds = Array.from(dietCheckboxes).map((checkbox) => checkbox.value);
+    const serviceTypeValue = (document.getElementById('serviceType') as HTMLSelectElement | null)?.value;
+    const serviceType: ServiceType = serviceTypeValue === 'collection' ? 'collection' : 'delivery';
+    const locationId = (document.getElementById('locationId') as HTMLInputElement | null)?.value?.trim() || undefined;
 
     const favoriteModeValue = (document.getElementById('favoriteMode') as HTMLSelectElement | null)?.value;
     const favoriteMode: FavoriteMode = favoriteModeValue === 'only' || favoriteModeValue === 'ignore'
@@ -105,6 +111,8 @@ function collectPayload(): SuggestionPayload {
 
     return {
         dietTagIds,
+        locationId,
+        serviceType,
         excludeAllergens: (document.getElementById('excludeAllergens') as HTMLInputElement | null)?.value || '',
         cuisineIncludes: (document.getElementById('cuisineIncludes') as HTMLInputElement | null)?.value || '',
         cuisineExcludes: (document.getElementById('cuisineExcludes') as HTMLInputElement | null)?.value || '',
@@ -271,6 +279,7 @@ function renderFilterSummary(payload: SuggestionPayload): void {
         filterBadges.push('No diet filters');
     }
 
+    filterBadges.push(payload.serviceType === 'collection' ? 'Collection availability' : 'Delivery availability');
     filterBadges.push(payload.openOnly ? 'Open now only' : 'Open and closed');
     filterBadges.push(payload.excludeRecentlySuggested ? 'Recent repeats blocked' : 'Recent repeats allowed');
     filterBadges.push(payload.respectDoNotSuggest ? 'Blocked restaurants hidden' : 'Blocked restaurants allowed');

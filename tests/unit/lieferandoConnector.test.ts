@@ -12,6 +12,8 @@ import {
     validListingUrls,
     invalidListingUrls,
     fetchMenuData,
+    fetchAvailabilityData,
+    fetchAvailabilityFailureData,
     listRestaurantsData,
     listRestaurantsFailureData,
     listRestaurantsExternalIdData,
@@ -556,6 +558,56 @@ describe('listRestaurants externalId mapping', () => {
 });
 
 // ── rateLimitPolicy / capabilities ──────────────────────────
+
+describe('fetchAvailability', () => {
+    test.each(fetchAvailabilityData)('$description', async ({
+        providerRestaurantId,
+        locationContext,
+        orderTime,
+        response,
+        expectedUrl,
+        expected,
+    }) => {
+        jest.spyOn(global, 'fetch').mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => response,
+        } as Response);
+
+        const result = await connector.fetchAvailability(providerRestaurantId, locationContext as any, orderTime);
+        const normalized = [...result].sort((a, b) => a.serviceType.localeCompare(b.serviceType));
+        const expectedSorted = [...expected].sort((a, b) => a.serviceType.localeCompare(b.serviceType));
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            expectedUrl,
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    Origin: 'https://www.lieferando.de',
+                }),
+            }),
+        );
+        normalized.forEach((entry, idx) => {
+            expect(entry).toMatchObject(expectedSorted[idx]);
+            expect(entry.providerRestaurantId).toBe(providerRestaurantId);
+            expect(entry.providerNativeId).toBe(providerRestaurantId);
+            expect(entry.observedAt).toEqual(orderTime);
+        });
+    });
+});
+
+describe('fetchAvailability failures', () => {
+    test.each(fetchAvailabilityFailureData)('$description', async ({
+        providerRestaurantId,
+        locationContext,
+        orderTime,
+        expectedError,
+    }) => {
+        await expect(
+            connector.fetchAvailability(providerRestaurantId, locationContext as any, orderTime),
+        ).rejects.toThrow(expectedError);
+    });
+});
 
 describe('rateLimitPolicy', () => {
     test('returns expected rate limit', () => {

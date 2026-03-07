@@ -1,7 +1,7 @@
 /**
  * Test data for ProviderSyncService unit tests.
  */
-import {ProviderMenu} from '../../../src/providers/ProviderTypes';
+import {ProviderMenu, ProviderRestaurantAvailability} from '../../../src/providers/ProviderTypes';
 
 /** A minimal ProviderMenu used by sync tests. */
 export const sampleProviderMenu: ProviderMenu = {
@@ -93,3 +93,38 @@ export const importPayloadMultiple = {
         },
     ],
 };
+
+/** Dynamic provider availability payloads used by location-aware sync tests. */
+export const sampleProviderAvailabilitySnapshots: ProviderRestaurantAvailability[] = [
+    {
+        providerRestaurantId: '1590874',
+        providerNativeId: '1590874',
+        serviceType: 'delivery',
+        isAvailable: true,
+        isTemporaryOffline: false,
+        isThrottled: false,
+        etaMin: 35,
+        etaMax: 60,
+        minOrderAmountMinor: 3000,
+        currency: 'EUR',
+        feeBands: [
+            {
+                minOrderAmountMinor: 3000,
+                feeMinor: 150,
+            },
+        ],
+        bagFeeMinor: null,
+        serviceFeeMinor: null,
+        smallOrderFeeMinor: null,
+        observedAt: new Date('2026-03-01T15:42:25.146Z'),
+    },
+    {
+        providerRestaurantId: '1590874',
+        providerNativeId: '1590874',
+        serviceType: 'collection',
+        isAvailable: true,
+        isTemporaryOffline: false,
+        isThrottled: false,
+        observedAt: new Date('2026-03-01T15:42:25.146Z'),
+    },
+];

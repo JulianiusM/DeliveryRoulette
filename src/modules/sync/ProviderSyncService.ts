@@ -724,12 +724,36 @@ async function executeSyncJob(
                     }
 
                     if (listingQuery?.providerLocationRefId) {
-                        await persistListingAvailabilitySnapshot(
-                            incoming,
-                            restaurantId,
-                            primaryProviderRef.id,
-                            listingQuery.providerLocationRefId,
-                        );
+                        let availabilitySynced = false;
+
+                        try {
+                            availabilitySynced = await syncLocationAwareAvailabilitySnapshot({
+                                connector: conn,
+                                incoming,
+                                restaurantId,
+                                providerRef: primaryProviderRef,
+                                providerNativeId: syncedMenu.providerNativeId ?? incoming.providerNativeId ?? null,
+                                providerLocationRefId: listingQuery.providerLocationRefId,
+                                locationContext,
+                            });
+                        } catch (err) {
+                            logger.warn({
+                                err,
+                                providerKey: conn.providerKey,
+                                restaurantId,
+                                providerRefId: primaryProviderRef.id,
+                                providerLocationRefId: listingQuery.providerLocationRefId,
+                            }, 'Provider availability sync failed; falling back to listing snapshot');
+                        }
+
+                        if (!availabilitySynced) {
+                            await persistListingAvailabilitySnapshot(
+                                incoming,
+                                restaurantId,
+                                primaryProviderRef.id,
+                                listingQuery.providerLocationRefId,
+                            );
+                        }
                     }
                     await checkDietOverrideAlerts(restaurantId, conn.providerKey, preScores);
                     await updateLastSyncAt(primaryProviderRef.id);
@@ -837,6 +861,72 @@ async function buildListingLocationContext(
         latitude: locationRef.latitude ?? null,
         longitude: locationRef.longitude ?? null,
     };
+}
+
+async function syncLocationAwareAvailabilitySnapshot(data: {
+    connector: DeliveryProviderConnector;
+    incoming: ProviderRestaurant;
+    restaurantId: string;
+    providerRef: RestaurantProviderRef;
+    providerNativeId?: string | null;
+    providerLocationRefId: string;
+    locationContext: ProviderLocationContext | null;
+}): Promise<boolean> {
+    if (!data.locationContext || !data.connector.fetchAvailability) {
+        return false;
+    }
+
+    const providerRestaurantId = normalizeProviderRestaurantId(
+        data.providerRef.providerNativeId
+        ?? data.providerNativeId
+        ?? data.incoming.providerNativeId
+        ?? null,
+    );
+    if (!providerRestaurantId) {
+        return false;
+    }
+
+    const observedAt = new Date();
+    const dynamicSnapshots = await data.connector.fetchAvailability(
+        providerRestaurantId,
+        data.locationContext,
+        observedAt,
+    );
+    if (!dynamicSnapshots || dynamicSnapshots.length === 0) {
+        return false;
+    }
+
+    const coverage = await restaurantAvailabilityService.upsertCoverageFromListing({
+        restaurantId: data.restaurantId,
+        restaurantProviderRefId: data.providerRef.id,
+        providerLocationRefId: data.providerLocationRefId,
+        observedAt,
+        sourceUrl: data.incoming.url,
+        rawListingJson: data.incoming.rawListingJson ?? null,
+    });
+
+    for (const snapshot of dynamicSnapshots) {
+        await restaurantAvailabilityService.recordServiceSnapshot({
+            coverageId: coverage.id,
+            serviceType: snapshot.serviceType,
+            isAvailable: snapshot.isAvailable,
+            isTemporaryOffline: snapshot.isTemporaryOffline ?? false,
+            isThrottled: snapshot.isThrottled ?? false,
+            etaMin: snapshot.etaMin ?? null,
+            etaMax: snapshot.etaMax ?? null,
+            minOrderAmountMinor: snapshot.minOrderAmountMinor ?? null,
+            currency: snapshot.currency ?? null,
+            feeBandsJson: snapshot.feeBands ? JSON.stringify(snapshot.feeBands) : null,
+            bagFeeMinor: snapshot.bagFeeMinor ?? null,
+            serviceFeeMinor: snapshot.serviceFeeMinor ?? null,
+            smallOrderFeeMinor: snapshot.smallOrderFeeMinor ?? null,
+            observedAt: snapshot.observedAt ?? observedAt,
+            expiresAt: snapshot.expiresAt ?? buildDynamicAvailabilityExpiry(observedAt),
+            rawPayloadJson: snapshot.rawPayloadJson ?? null,
+        });
+    }
+
+    return true;
 }
 
 async function executeMenuRefSyncJob(
@@ -1294,6 +1384,17 @@ async function persistListingAvailabilitySnapshot(
             providerNativeId: incoming.providerNativeId ?? null,
         }),
     });
+}
+
+function normalizeProviderRestaurantId(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+}
+
+function buildDynamicAvailabilityExpiry(observedAt: Date): Date {
+    return new Date(
+        observedAt.getTime() + (settings.value.providerAvailabilityDynamicSnapshotTtlSeconds * 1000),
+    );
 }
 
 function toResult(job: SyncJob): Omit<SyncResult, 'restaurants'> {

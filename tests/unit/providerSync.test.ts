@@ -12,6 +12,7 @@ import {
     importPayloadWithMenu,
     importPayloadNoMenu,
     importPayloadMultiple,
+    sampleProviderAvailabilitySnapshots,
 } from '../data/unit/providerSyncData';
 import {stubConnector} from '../data/unit/connectorRegistryData';
 
@@ -95,6 +96,11 @@ jest.mock('../../src/modules/database/services/ProviderLocationRefService');
 import * as providerLocationRefService from '../../src/modules/database/services/ProviderLocationRefService';
 const mockGetProviderLocationRefById = providerLocationRefService.getById as jest.Mock;
 
+jest.mock('../../src/modules/database/services/RestaurantAvailabilityService');
+import * as restaurantAvailabilityService from '../../src/modules/database/services/RestaurantAvailabilityService';
+const mockUpsertCoverageFromListing = restaurantAvailabilityService.upsertCoverageFromListing as jest.Mock;
+const mockRecordServiceSnapshot = restaurantAvailabilityService.recordServiceSnapshot as jest.Mock;
+
 jest.mock('../../src/modules/database/services/DietInferenceService');
 import * as dietInference from '../../src/modules/database/services/DietInferenceService';
 const mockRecompute = dietInference.recomputeAfterMenuChange as jest.Mock;
@@ -147,6 +153,8 @@ describe('ProviderSyncService', () => {
         mockGetRestaurantById.mockResolvedValue(null);
         mockUpdateRestaurant.mockResolvedValue(null);
         mockGetProviderLocationRefById.mockResolvedValue(null);
+        mockUpsertCoverageFromListing.mockResolvedValue({id: 'coverage-1'});
+        mockRecordServiceSnapshot.mockResolvedValue({id: 'snapshot-1'});
         mockEnsureProviderRef.mockImplementation(async (data: any) => ({
             id: `ref-${data.providerKey ?? 'provider'}`,
             restaurantId: data.restaurantId,
@@ -422,6 +430,72 @@ describe('ProviderSyncService', () => {
                 country: 'DE',
                 openingHours: 'delivery: Monday 11:00-22:00',
                 openingDays: 'Monday',
+            }));
+        });
+
+        test('persists dynamic provider availability for location-scoped listing syncs', async () => {
+            const connector = stubConnector(ProviderKey.UBER_EATS, 'Uber Eats');
+            (connector.listRestaurants as jest.Mock).mockResolvedValue([
+                {
+                    externalId: 'ext-1',
+                    providerNativeId: '1590874',
+                    name: 'Availability Place',
+                    url: 'https://example.com/availability-place',
+                },
+            ]);
+            (connector.fetchMenu as jest.Mock).mockResolvedValue(sampleProviderMenu);
+            (connector.fetchAvailability as jest.Mock).mockResolvedValue(sampleProviderAvailabilitySnapshots);
+            mockResolve.mockReturnValue(connector);
+            mockRegisteredKeys.mockReturnValue([ProviderKey.UBER_EATS]);
+            mockUpsertFromProvider.mockResolvedValue('rest-availability');
+            mockUpsertCategories.mockResolvedValue([{id: 'cat-1', name: 'Starters'}, {id: 'cat-2', name: 'Mains'}]);
+            mockUpsertItems.mockResolvedValue([]);
+            mockRecompute.mockResolvedValue([]);
+            mockGetProviderLocationRefById.mockResolvedValue({
+                id: 'provider-loc-1',
+                sourceLocationId: 'user-loc-1',
+                providerKey: ProviderKey.UBER_EATS,
+                providerAreaId: '93073',
+                providerLocationSlug: 'neutraubling-93073',
+                latitude: 48.9889211,
+                longitude: 12.1984299,
+            });
+
+            const result = await runSync({
+                providerKey: ProviderKey.UBER_EATS,
+                query: `listing-url:${encodeURIComponent('https://www.lieferando.de/en/delivery/food/neutraubling-93073')}|provider-loc-1`,
+            });
+
+            expect(result.status).toBe('completed');
+            expect(connector.fetchAvailability).toHaveBeenCalledWith(
+                '1590874',
+                {
+                    sourceLocationId: 'user-loc-1',
+                    providerKey: ProviderKey.UBER_EATS,
+                    providerAreaId: '93073',
+                    providerLocationSlug: 'neutraubling-93073',
+                    latitude: 48.9889211,
+                    longitude: 12.1984299,
+                },
+                expect.any(Date),
+            );
+            expect(mockUpsertCoverageFromListing).toHaveBeenCalledWith(expect.objectContaining({
+                restaurantId: 'rest-availability',
+                restaurantProviderRefId: `ref-${ProviderKey.UBER_EATS}`,
+                providerLocationRefId: 'provider-loc-1',
+            }));
+            expect(mockRecordServiceSnapshot).toHaveBeenCalledTimes(2);
+            expect(mockRecordServiceSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+                coverageId: 'coverage-1',
+                serviceType: 'delivery',
+                etaMin: 35,
+                etaMax: 60,
+                minOrderAmountMinor: 3000,
+            }));
+            expect(mockRecordServiceSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+                coverageId: 'coverage-1',
+                serviceType: 'collection',
+                isAvailable: true,
             }));
         });
 

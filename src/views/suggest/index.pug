@@ -12,6 +12,8 @@ block body
     - const activeLocation = d.activeLocation || null
 
     form#suggestionForm.suggestion-page.py-3
+        if activeLocation
+            input#locationId(type="hidden" name="locationId" value=activeLocation.id)
         section.card.border-0.shadow-lg.overflow-hidden.restaurant-list-hero.suggestion-hero-card
             .card-body.p-4.p-lg-5
                 .row.g-4.align-items-end
@@ -38,6 +40,7 @@ block body
                 .d-flex.flex-wrap.gap-2.mt-4
                     span.badge.rounded-pill.text-bg-success #{d.openOnly ? 'Open now default' : 'Open and closed'}
                     span.badge.rounded-pill.text-bg-dark.border.border-secondary #{d.excludeRecentlySuggested ? `Avoid last ${d.recentSuggestionCount}` : 'Recent repeats allowed'}
+                    span.badge.rounded-pill.text-bg-dark.border.border-secondary #{d.serviceType === 'collection' ? 'Collection mode' : 'Delivery mode'}
                     if d.respectDoNotSuggest
                         span.badge.rounded-pill.text-bg-dark.border.border-secondary Respect blocked restaurants
                     if activeLocation
@@ -77,6 +80,7 @@ block body
                         .d-flex.flex-wrap.gap-2
                             span.badge.rounded-pill.text-bg-dark.border.border-secondary Min diet score #{d.minDietScore}%
                             span.badge.rounded-pill.text-bg-dark.border.border-secondary #{favoriteMode === 'only' ? 'Favorites only' : favoriteMode === 'ignore' ? 'Favorites ignored' : 'Favorites preferred'}
+                            span.badge.rounded-pill.text-bg-dark.border.border-secondary #{d.serviceType === 'collection' ? 'Collection' : 'Delivery'}
                             if activeLocation
                                 span.badge.rounded-pill.text-bg-dark.border.border-secondary Location #{activeLocation.label}
                             if d.cuisineIncludes
@@ -149,6 +153,15 @@ block body
                                             option(value="only" selected=(favoriteMode === 'only')) Only favorites
                                             option(value="ignore" selected=(favoriteMode === 'ignore')) Ignore favorites
                                         .form-text.text-white-50 Control whether favorites are boosted, required, or ignored.
+
+                                    .col-12
+                                        label.form-label(for="serviceType")
+                                            i.bi.bi-bicycle.me-1
+                                            | Service Type
+                                        select#serviceType.form-select.text-bg-dark(name="serviceType")
+                                            option(value="delivery" selected=(d.serviceType !== 'collection')) Delivery
+                                            option(value="collection" selected=(d.serviceType === 'collection')) Collection
+                                        .form-text.text-white-50 Use delivery or pickup availability snapshots when filtering the pool.
 
                                     .col-12
                                         label.form-label(for="openOnly")

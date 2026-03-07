@@ -142,7 +142,8 @@ export class LieferandoConnector implements DeliveryProviderConnector {
     async resolveLocation(location: ProviderLocationInput): Promise<ProviderLocationResolution | null> {
         const providerLocationSlug = normalizeLocationValue(location.providerLocationSlug)
             ?? extractLocationSlugFromListingUrl(location.listingUrl ?? null);
-        const providerAreaId = normalizeLocationValue(location.providerAreaId);
+        const providerAreaId = normalizeLocationValue(location.providerAreaId)
+            ?? extractAreaIdFromLocationSlug(providerLocationSlug);
         const latitude = Number.isFinite(location.latitude) ? Number(location.latitude) : null;
         const longitude = Number.isFinite(location.longitude) ? Number(location.longitude) : null;
 
@@ -172,13 +173,35 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         locationContext: ProviderLocationContext,
         orderTime: Date,
     ): Promise<ProviderRestaurantAvailability[]> {
-        void providerRestaurantId;
-        void locationContext;
-        void orderTime;
+        const normalizedRestaurantId = normalizeLocationValue(providerRestaurantId);
+        const latitude = Number.isFinite(locationContext.latitude) ? Number(locationContext.latitude) : null;
+        const longitude = Number.isFinite(locationContext.longitude) ? Number(locationContext.longitude) : null;
+        const areaId = normalizeLocationValue(locationContext.providerAreaId)
+            ?? extractAreaIdFromLocationSlug(locationContext.providerLocationSlug ?? null);
 
-        throw new Error(
-            'Lieferando availability fetch is not implemented yet; TODO: wire the captured dynamic availability endpoint into this connector.',
-        );
+        if (!normalizedRestaurantId) {
+            return [];
+        }
+        if (latitude === null || longitude === null || !areaId) {
+            throw new Error(
+                'Lieferando availability fetch requires latitude, longitude, and provider area ID in the location context.',
+            );
+        }
+
+        const query = new URLSearchParams({
+            latLong: `${latitude},${longitude}`,
+            areaId,
+            orderTime: orderTime.toISOString(),
+        });
+        const url = `https://rest.api.eu-central-1.production.jet-external.com/restaurant/${COUNTRY_CODE}/${encodeURIComponent(normalizedRestaurantId)}/menu/dynamic?${query.toString()}`;
+        const payload = await this.fetchJson(url, {
+            'Origin': 'https://www.lieferando.de',
+        });
+        if (!isObjectRecord(payload)) {
+            return [];
+        }
+
+        return parseDynamicAvailabilityPayload(normalizedRestaurantId, payload, orderTime);
     }
 
     /**
@@ -502,7 +525,7 @@ export class LieferandoConnector implements DeliveryProviderConnector {
         }
     }
 
-    private async fetchJson(url: string): Promise<unknown | null> {
+    private async fetchJson(url: string, extraHeaders: Record<string, string> = {}): Promise<unknown | null> {
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -515,21 +538,25 @@ export class LieferandoConnector implements DeliveryProviderConnector {
                         'Accept-Language': 'en,de;q=0.9,en-US;q=0.8',
                         'Cache-Control': 'no-cache',
                         'Referer': 'https://www.lieferando.de/',
+                        ...extraHeaders,
                     },
                 });
                 if (!response.ok) {
-                    return await this.fetchJsonWithCurl(url);
+                    return await this.fetchJsonWithCurl(url, extraHeaders);
                 }
                 return await response.json();
             } finally {
                 clearTimeout(timer);
             }
         } catch {
-            return await this.fetchJsonWithCurl(url);
+            return await this.fetchJsonWithCurl(url, extraHeaders);
         }
     }
 
-    private async fetchJsonWithCurl(url: string): Promise<unknown | null> {
+    private async fetchJsonWithCurl(
+        url: string,
+        extraHeaders: Record<string, string> = {},
+    ): Promise<unknown | null> {
         if (!canUseCurlFallback()) {
             return null;
         }
@@ -551,6 +578,7 @@ export class LieferandoConnector implements DeliveryProviderConnector {
             'Accept-Language: en,de;q=0.9,en-US;q=0.8',
             '--header',
             'Referer: https://www.lieferando.de/',
+            ...Object.entries(extraHeaders).flatMap(([name, value]) => ['--header', `${name}: ${value}`]),
             '--write-out',
             `\\n${CURL_STATUS_MARKER}%{http_code}`,
             url,
@@ -603,6 +631,157 @@ function toProviderMenu(parsed: ParsedMenu, externalId: string): ProviderMenu {
         })),
         restaurantDetails: parsed.restaurantDetails ?? undefined,
     };
+}
+
+function parseDynamicAvailabilityPayload(
+    providerRestaurantId: string,
+    payload: Record<string, unknown>,
+    observedAt: Date,
+): ProviderRestaurantAvailability[] {
+    const globalTempOffline = firstBoolean([
+        payload.IsTemporaryOffline,
+        payload.isTemporaryOffline,
+    ]) ?? false;
+    const isThrottled = firstBoolean([
+        payload.IsThrottled,
+        payload.isThrottled,
+    ]) ?? false;
+
+    const deliveryAdjustment = isObjectRecord(payload.DeliveryAdjustment)
+        ? payload.DeliveryAdjustment
+        : null;
+    const deliveryFees = isObjectRecord(payload.DeliveryFees)
+        ? payload.DeliveryFees
+        : null;
+    const restaurantFees = isObjectRecord(payload.RestaurantFees)
+        ? payload.RestaurantFees
+        : null;
+
+    const serviceTempOffline = new Map<ProviderRestaurantAvailability['serviceType'], boolean>();
+    const tempOfflineEntries = Array.isArray(payload.TempOffline) ? payload.TempOffline : [];
+    for (const entry of tempOfflineEntries) {
+        if (!isObjectRecord(entry)) continue;
+        const serviceType = mapServiceType(asTrimmedString(entry.ServiceType) ?? asTrimmedString(entry.serviceType));
+        if (!serviceType) continue;
+        serviceTempOffline.set(
+            serviceType,
+            firstBoolean([entry.IsTempOffline, entry.isTempOffline]) ?? globalTempOffline,
+        );
+    }
+
+    const serviceTypes = new Set<ProviderRestaurantAvailability['serviceType']>();
+    for (const serviceType of serviceTempOffline.keys()) {
+        serviceTypes.add(serviceType);
+    }
+    if (deliveryAdjustment || deliveryFees) {
+        serviceTypes.add('delivery');
+    }
+    if (serviceTypes.size === 0) {
+        serviceTypes.add('delivery');
+    }
+
+    const deliveryEta = extractDeliveryEta(deliveryAdjustment);
+    const deliveryCurrency = asTrimmedString(deliveryFees?.Currency) ?? asTrimmedString(deliveryFees?.currency);
+    const deliveryFeeBands = extractDeliveryFeeBands(deliveryFees);
+    const bagFeeMinor = firstNumber([restaurantFees?.BagFee, restaurantFees?.bagFee]);
+    const serviceFeeMinor = firstNumber([restaurantFees?.ServiceFee, restaurantFees?.serviceFee]);
+    const smallOrderFeeMinor = firstNumber([restaurantFees?.SmallOrderFee, restaurantFees?.smallOrderFee]);
+
+    return [...serviceTypes].map((serviceType) => {
+        const serviceIsTempOffline = globalTempOffline || (serviceTempOffline.get(serviceType) ?? false);
+        const deliveryOnly = serviceType === 'delivery';
+        return {
+            providerRestaurantId,
+            providerNativeId: providerRestaurantId,
+            serviceType,
+            isAvailable: !serviceIsTempOffline,
+            isTemporaryOffline: serviceIsTempOffline,
+            isThrottled,
+            etaMin: deliveryOnly ? deliveryEta.etaMin : null,
+            etaMax: deliveryOnly ? deliveryEta.etaMax : null,
+            minOrderAmountMinor: deliveryOnly
+                ? firstNumber([deliveryFees?.MinimumOrderValue, deliveryFees?.minimumOrderValue])
+                : null,
+            currency: deliveryOnly ? deliveryCurrency : null,
+            feeBands: deliveryOnly ? deliveryFeeBands : null,
+            bagFeeMinor: deliveryOnly ? bagFeeMinor : null,
+            serviceFeeMinor: deliveryOnly ? serviceFeeMinor : null,
+            smallOrderFeeMinor: deliveryOnly ? smallOrderFeeMinor : null,
+            observedAt,
+            rawPayloadJson: JSON.stringify({
+                serviceType,
+                payload,
+            }),
+        };
+    });
+}
+
+function extractDeliveryEta(deliveryAdjustment: Record<string, unknown> | null): {
+    etaMin: number | null;
+    etaMax: number | null;
+} {
+    if (!deliveryAdjustment) {
+        return {
+            etaMin: null,
+            etaMax: null,
+        };
+    }
+
+    const eta = isObjectRecord(deliveryAdjustment.ETA)
+        ? deliveryAdjustment.ETA
+        : null;
+    return {
+        etaMin: firstNumber([
+            eta?.LowerBoundMinutes,
+            eta?.lowerBoundMinutes,
+            deliveryAdjustment.ETAMinutes,
+            deliveryAdjustment.etaMinutes,
+        ]),
+        etaMax: firstNumber([
+            eta?.UpperBoundMinutes,
+            eta?.upperBoundMinutes,
+            deliveryAdjustment.ETAMinutes,
+            deliveryAdjustment.etaMinutes,
+        ]),
+    };
+}
+
+function extractDeliveryFeeBands(deliveryFees: Record<string, unknown> | null): Array<{
+    label?: string | null;
+    minOrderAmountMinor?: number | null;
+    feeMinor?: number | null;
+}> | null {
+    if (!deliveryFees) {
+        return null;
+    }
+
+    const bands = Array.isArray(deliveryFees.Bands)
+        ? deliveryFees.Bands
+        : Array.isArray(deliveryFees.bands)
+            ? deliveryFees.bands
+            : [];
+    if (bands.length === 0) {
+        return null;
+    }
+
+    const normalized = bands
+        .filter((entry): entry is Record<string, unknown> => isObjectRecord(entry))
+        .map((entry) => ({
+            label: asTrimmedString(entry.Label) ?? asTrimmedString(entry.label),
+            minOrderAmountMinor: firstNumber([entry.MinimumAmount, entry.minimumAmount]),
+            feeMinor: firstNumber([entry.Fee, entry.fee]),
+        }))
+        .filter((entry) => entry.minOrderAmountMinor !== null || entry.feeMinor !== null);
+
+    return normalized.length > 0 ? normalized : null;
+}
+
+function mapServiceType(value: string | null): ProviderRestaurantAvailability['serviceType'] | null {
+    if (!value) return null;
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'delivery') return 'delivery';
+    if (normalized === 'collection' || normalized === 'pickup') return 'collection';
+    return null;
 }
 
 function hasMenuItems(categories: ParsedMenuCategory[]): boolean {
@@ -1736,6 +1915,12 @@ function extractLocationSlugFromListingUrl(url: string | null): string | null {
         return decodeURIComponent(match[1].trim());
     }
     return null;
+}
+
+function extractAreaIdFromLocationSlug(locationSlug: string | null): string | null {
+    if (!locationSlug) return null;
+    const match = locationSlug.match(/-(\d{4,10})$/);
+    return match?.[1] ?? null;
 }
 
 function normalizeLocationValue(value?: string | null): string | null {

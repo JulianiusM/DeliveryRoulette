@@ -89,6 +89,7 @@ export type Settings = {
     providerCacheListingTtlSeconds: number;
     providerCacheMenuTtlSeconds: number;
     providerAvailabilityListingSnapshotTtlSeconds: number;
+    providerAvailabilityDynamicSnapshotTtlSeconds: number;
     providerRefreshVersion: string;
 
     // Diet inference engine configuration
@@ -203,6 +204,7 @@ const defaults: Settings = {
     providerCacheListingTtlSeconds: 6 * 60 * 60,    // 6 hours
     providerCacheMenuTtlSeconds: 24 * 60 * 60,      // 24 hours
     providerAvailabilityListingSnapshotTtlSeconds: 90 * 60, // 90 minutes
+    providerAvailabilityDynamicSnapshotTtlSeconds: 30 * 60, // 30 minutes
     providerRefreshVersion: "1.0.0",
 
     // Diet inference engine configuration
@@ -284,6 +286,7 @@ const keyMap: Record<string, keyof Settings> = {
     PROVIDER_CACHE_LISTING_TTL_SECONDS: "providerCacheListingTtlSeconds",
     PROVIDER_CACHE_MENU_TTL_SECONDS: "providerCacheMenuTtlSeconds",
     PROVIDER_AVAILABILITY_LISTING_SNAPSHOT_TTL_SECONDS: "providerAvailabilityListingSnapshotTtlSeconds",
+    PROVIDER_AVAILABILITY_DYNAMIC_SNAPSHOT_TTL_SECONDS: "providerAvailabilityDynamicSnapshotTtlSeconds",
     PROVIDER_REFRESH_VERSION: "providerRefreshVersion",
     INFERENCE_HIGH_CONFIDENCE_MIN_RATIO: "inferenceHighConfidenceMinRatio",
     INFERENCE_HIGH_CONFIDENCE_MIN_STRONG_SIGNALS: "inferenceHighConfidenceMinStrongSignals",
@@ -339,6 +342,7 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     providerCacheListingTtlSeconds: (v) => Number(v),
     providerCacheMenuTtlSeconds: (v) => Number(v),
     providerAvailabilityListingSnapshotTtlSeconds: (v) => Number(v),
+    providerAvailabilityDynamicSnapshotTtlSeconds: (v) => Number(v),
     inferenceHighConfidenceMinRatio: (v) => Number(v),
     inferenceHighConfidenceMinStrongSignals: (v) => Number(v),
     inferenceMediumConfidenceMinRatio: (v) => Number(v),

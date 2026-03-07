@@ -178,3 +178,132 @@ export const listRestaurantsExternalIdData = [
         ],
     },
 ];
+
+export const fetchAvailabilityData = [
+    {
+        description: 'maps the dynamic menu endpoint into delivery and collection availability snapshots',
+        providerRestaurantId: '1590874',
+        locationContext: {
+            providerKey: 'lieferando',
+            providerAreaId: '93073',
+            providerLocationSlug: 'neutraubling-93073',
+            latitude: 48.9889211,
+            longitude: 12.1984299,
+        },
+        orderTime: new Date('2026-03-01T15:42:25.146Z'),
+        response: {
+            RestaurantId: '1590874',
+            DeliveryAdjustment: {
+                ETAMinutes: 45,
+                IsBusy: false,
+                ETA: {
+                    UpperBoundMinutes: 60,
+                    LowerBoundMinutes: 35,
+                },
+            },
+            IsTemporaryOffline: false,
+            IsThrottled: false,
+            TempOffline: [
+                {ServiceType: 'Collection', IsTempOffline: false},
+                {ServiceType: 'Delivery', IsTempOffline: false},
+            ],
+            DeliveryFees: {
+                MinimumOrderValue: 3000,
+                Currency: 'EUR',
+                Bands: [
+                    {
+                        MinimumAmount: 3000,
+                        Fee: 150,
+                    },
+                ],
+            },
+            RestaurantFees: {
+                BagFee: null,
+                ServiceFee: null,
+                SmallOrderFee: null,
+            },
+        },
+        expectedUrl: 'https://rest.api.eu-central-1.production.jet-external.com/restaurant/de/1590874/menu/dynamic?latLong=48.9889211%2C12.1984299&areaId=93073&orderTime=2026-03-01T15%3A42%3A25.146Z',
+        expected: [
+            {
+                serviceType: 'delivery',
+                isAvailable: true,
+                isTemporaryOffline: false,
+                isThrottled: false,
+                etaMin: 35,
+                etaMax: 60,
+                minOrderAmountMinor: 3000,
+                currency: 'EUR',
+                feeBands: [
+                    {
+                        minOrderAmountMinor: 3000,
+                        feeMinor: 150,
+                    },
+                ],
+            },
+            {
+                serviceType: 'collection',
+                isAvailable: true,
+                isTemporaryOffline: false,
+                isThrottled: false,
+                etaMin: null,
+                etaMax: null,
+                minOrderAmountMinor: null,
+                currency: null,
+                feeBands: null,
+            },
+        ],
+    },
+    {
+        description: 'marks delivery unavailable when the provider reports service-specific temporary offline state',
+        providerRestaurantId: '1590874',
+        locationContext: {
+            providerKey: 'lieferando',
+            providerAreaId: '93073',
+            providerLocationSlug: 'neutraubling-93073',
+            latitude: 48.9889211,
+            longitude: 12.1984299,
+        },
+        orderTime: new Date('2026-03-01T15:42:25.146Z'),
+        response: {
+            RestaurantId: '1590874',
+            IsTemporaryOffline: false,
+            IsThrottled: true,
+            TempOffline: [
+                {ServiceType: 'Collection', IsTempOffline: false},
+                {ServiceType: 'Delivery', IsTempOffline: true},
+            ],
+        },
+        expectedUrl: 'https://rest.api.eu-central-1.production.jet-external.com/restaurant/de/1590874/menu/dynamic?latLong=48.9889211%2C12.1984299&areaId=93073&orderTime=2026-03-01T15%3A42%3A25.146Z',
+        expected: [
+            {
+                serviceType: 'collection',
+                isAvailable: true,
+                isTemporaryOffline: false,
+                isThrottled: true,
+            },
+            {
+                serviceType: 'delivery',
+                isAvailable: false,
+                isTemporaryOffline: true,
+                isThrottled: true,
+            },
+        ],
+    },
+];
+
+export const fetchAvailabilityFailureData = [
+    {
+        description: 'requires full location context before calling the dynamic endpoint',
+        providerRestaurantId: '1590874',
+        locationContext: {
+            providerKey: 'lieferando',
+            providerAreaId: null,
+            providerLocationSlug: 'neutraubling-93073',
+            latitude: null,
+            longitude: 12.1984299,
+        },
+        orderTime: new Date('2026-03-01T15:42:25.146Z'),
+        expectedError: 'Lieferando availability fetch requires latitude, longitude, and provider area ID',
+    },
+];
