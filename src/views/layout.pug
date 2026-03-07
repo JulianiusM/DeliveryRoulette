@@ -27,11 +27,11 @@ html(lang="en")
             window.DeliveryRouletteApp = {};
         meta(name="csrf-token" content=csrfToken)
 
-    body(class="d-flex flex-column min-vh-100 bg-secondary" onload="window.DeliveryRouletteApp.init()")
+    body(class="app-root d-flex flex-column min-vh-100" onload="window.DeliveryRouletteApp.init()")
 
         //── Navbar ────────────────────────────────────────────────────
-        header
-            nav.navbar.navbar-expand-lg.navbar-dark.bg-dark.shadow-sm
+        header.app-header
+            nav.navbar.navbar-expand-lg.navbar-dark.shadow-sm.app-navbar
                 .container
                     a.navbar-brand.d-flex.align-items-center(href="/")
                         img(src="/img/logo.png" alt="DeliveryRoulette" height="30" class="me-2")
@@ -42,31 +42,46 @@ html(lang="en")
 
                     .collapse.navbar-collapse#navbarMain
                         // Left side: primary navigation
-                        ul.navbar-nav.me-auto.mb-2.mb-lg-0
-                            // Restaurants
+                        ul.navbar-nav.me-auto.mb-2.mb-lg-0.app-primary-nav
                             li.nav-item
-                                a.nav-link(href="/restaurants")
-                                    i.bi.bi-shop.me-1
-                                    | Restaurants
-
-                            // Suggestions
-                            li.nav-item
-                                a.nav-link(href="/suggest")
+                                a.nav-link.app-nav-pill(href="/suggest")
                                     i.bi.bi-shuffle.me-1
                                     | Suggest
 
-                            // Import
                             li.nav-item
-                                a.nav-link(href="/import")
-                                    i.bi.bi-upload.me-1
-                                    | Import
+                                a.nav-link.app-nav-pill(href="/restaurants")
+                                    i.bi.bi-shop.me-1
+                                    | Restaurants
 
-                            // More dropdown for secondary pages
+                            if user
+                                li.nav-item
+                                    a.nav-link.app-nav-pill(href="/users/dashboard")
+                                        i.bi.bi-speedometer2.me-1
+                                        | Dashboard
+
                             li.nav-item.dropdown
-                                a.nav-link.dropdown-toggle(href="#" id="navMore" role="button" data-bs-toggle="dropdown" aria-expanded="false")
-                                    i.bi.bi-three-dots.me-1
-                                    | More
-                                ul.dropdown-menu.dropdown-menu-dark(aria-labelledby="navMore")
+                                a.nav-link.dropdown-toggle.app-nav-pill(href="#" id="navOperations" role="button" data-bs-toggle="dropdown" aria-expanded="false")
+                                    i.bi.bi-grid-1x2.me-1
+                                    | Operations
+                                ul.dropdown-menu.dropdown-menu-dark(aria-labelledby="navOperations")
+                                    li
+                                        h6.dropdown-header Core Workflows
+                                    li
+                                        a.dropdown-item(href="/import")
+                                            i.bi.bi-upload.me-1
+                                            | Import
+                                    li
+                                        a.dropdown-item(href="/help")
+                                            i.bi.bi-question-circle.me-1
+                                            | Help
+                                    li
+                                        hr.dropdown-divider
+                                    li
+                                        h6.dropdown-header Operations
+                                    li
+                                        a.dropdown-item(href="/providers")
+                                            i.bi.bi-plug.me-1
+                                            | Providers
                                     li
                                         a.dropdown-item(href="/sync/jobs")
                                             i.bi.bi-list-check.me-1
@@ -75,28 +90,23 @@ html(lang="en")
                                         a.dropdown-item(href="/sync/alerts")
                                             i.bi.bi-bell.me-1
                                             | Sync Alerts
-                                    li
-                                        a.dropdown-item(href="/providers")
-                                            i.bi.bi-plug.me-1
-                                            | Providers
-                                    li.dropdown-divider
-                                    li
-                                        a.dropdown-item(href="/help")
-                                            i.bi.bi-question-circle.me-1
-                                            | Help
 
                         // Right side: user account
                         ul.navbar-nav.ms-auto
                             if user
                                 li.nav-item.dropdown
-                                    a.nav-link.dropdown-toggle(href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false")
+                                    a.nav-link.dropdown-toggle.app-nav-pill(href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false")
                                         i.bi.bi-person-circle.me-1
-                                        | #{user.username}
+                                        | #{user.displayName || user.username}
                                     ul.dropdown-menu.dropdown-menu-end.dropdown-menu-dark(aria-labelledby="userMenu")
                                         li
                                             a.dropdown-item(href="/users/dashboard")
                                                 i.bi.bi-speedometer2.me-1
                                                 | Your overview
+                                        li
+                                            a.dropdown-item(href="/users/profile")
+                                                i.bi.bi-person-badge.me-1
+                                                | Profile
                                         li
                                             a.dropdown-item(href="/users/settings")
                                                 i.bi.bi-gear-fill.me-1
@@ -108,18 +118,19 @@ html(lang="en")
                                                 | Logout
                             else
                                 li.nav-item.me-1
-                                    a.nav-link(href="/users/login")
+                                    a.nav-link.app-nav-pill(href="/users/login")
                                         i.bi.bi-box-arrow-in-right.me-1
                                         | Login
                                 li.nav-item
-                                    a.nav-link(href="/users/register")
+                                    a.nav-link.app-nav-pill(href="/users/register")
                                         i.bi.bi-person-plus.me-1
                                         | Register
 
         //── Main Content ───────────────────────────────────────────────
-        main.container-fluid.flex-grow-1.py-3
+        main.container-fluid.flex-grow-1.py-3.app-main
             block alert
-                include modules/module_alert
+                .app-alert-stack
+                    include modules/module_alert
 
             block body
                 .card.bg-dark.text-white.mb-3
@@ -128,7 +139,7 @@ html(lang="en")
                         block content
 
         //── Footer ────────────────────────────────────────────────────
-        footer.bg-dark.text-white.text-center.py-2.mt-auto
+        footer.text-white.text-center.py-2.mt-auto.app-footer
             small
                 |  Powered by
                 a.text-white.text-decoration-none(href="https://github.com/JulianiusM/DeliveryRoulette") &nbsp;DeliveryRoulette

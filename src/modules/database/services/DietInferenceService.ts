@@ -4,25 +4,30 @@ import {DietInferenceResult} from '../entities/diet/DietInferenceResult';
 import {DietTag} from '../entities/diet/DietTag';
 import {MenuItemDietOverride} from '../entities/diet/MenuItemDietOverride';
 import {MenuCategory} from '../entities/menu/MenuCategory';
+import {Restaurant} from '../entities/restaurant/Restaurant';
 import settings from '../../settings';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '6.6.0';
+export const ENGINE_VERSION = '8.2.0';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface MatchedItem {
     itemId: string;
     itemName: string;
+    categoryName?: string | null;
     keywords: string[];
     source?: 'heuristic' | 'manual_override';
+    signature?: string;
 }
 
 export interface ExcludedItem {
     itemId: string;
     itemName: string;
+    categoryName?: string | null;
     keywords: string[];
     excludedBy: string[];
+    signature?: string;
 }
 
 export interface InferenceReasons {
@@ -30,11 +35,26 @@ export interface InferenceReasons {
     excludedItems?: ExcludedItem[];
     totalMenuItems: number;
     matchRatio: number;
+    menuStats?: {
+        totalUniqueItems: number;
+        duplicateItemsFiltered: number;
+        matchedUniqueItems: number;
+        matchedDuplicateItemsFiltered: number;
+        excludedUniqueItems: number;
+        totalCategories: number;
+        matchedCategories: number;
+        categoryCoverageRatio: number;
+        varietyRatio: number;
+    };
     scoreBreakdown?: {
         ratioScore: number;
+        coverageScore: number;
+        varietyScore: number;
+        categoryScore: number;
         confidenceMultiplier: number;
         evidenceBoost: number;
         evidencePenalty: number;
+        varietyPenalty: number;
         finalScore: number;
     };
 }
@@ -62,11 +82,13 @@ export interface InferenceMenuItem {
     dietContext?: string | null;
     categoryName?: string | null;
     allergens?: string | null;
+    price?: number | null;
+    currency?: string | null;
 }
 
 /**
  * Tag data shape used by the inference engine.
- * Fully data-driven — no hardcoded keys or rules.
+ * Fully data-driven â€” no hardcoded keys or rules.
  */
 interface InferenceTagData {
     id: string;
@@ -87,7 +109,13 @@ interface DietOptionConfirmation {
     allergenCoverage: Set<string>;
 }
 
-// ── Cross-contamination patterns (universal, not diet-specific) ──
+interface SignatureBucket {
+    itemIds: string[];
+    primaryCategory: string | null;
+    representativeName: string;
+}
+
+// â”€â”€ Cross-contamination patterns (universal, not diet-specific) â”€â”€
 const CROSS_CONTAMINATION_PATTERNS: RegExp[] = [
     /\bmay come into contact\b/i,
     /\bprepared on (the )?same grill\b/i,
@@ -121,6 +149,19 @@ const PAIRING_CONTEXT_PATTERNS: RegExp[] = [
     /\bdippen\b/i,
     /\bam besten\b/i,
     /\bpasst (perfekt )?zu\b/i,
+];
+
+// Drinks are excluded from restaurant-level diet scoring so beverages cannot
+// inflate menu coverage or mask a low-variety food selection.
+const DRINK_CATEGORY_PATTERNS: RegExp[] = [
+    /^(alkoholfreie\s+)?(drinks?|beverages?|getranke|softdrinks?|cocktails?|mocktails?|kaffee|coffee|tee|tea|juice|juices|safte?|saft|smoothies?|shakes?|bier|biere|beer|beers|wein|wine)(\b|[\s/&-])/i,
+];
+
+const DRINK_ITEM_PATTERNS: RegExp[] = [
+    /\b(coca[-\s]?cola|cola|fanta|sprite|pepsi|mezzo\s+mix|red\s+bull|monster)\b/i,
+    /\b(water|mineralwasser|stilles?\s+wasser|sprudelwasser|sparkling\s+water|still\s+water)\b/i,
+    /\b(espresso|cappuccino|latte(\s+macchiato)?|americano|mocha|kaffee|coffee|tee|tea|eistee|iced\s+tea)\b/i,
+    /\b(cocktail|mocktail|beer|bier|wine|wein|prosecco|champagne|smoothie|milkshake|shake|juice|juices|saft|limonade|lemonade)\b/i,
 ];
 
 const COMPOUND_INGREDIENT_KEYWORDS = new Set([
@@ -270,6 +311,24 @@ function buildHeuristicContextText(item: InferenceMenuItem): string {
     ].join(' '));
 }
 
+function isDrinkLikeMenuItem(
+    name: string,
+    categoryName?: string | null,
+    description?: string | null,
+): boolean {
+    const normalizedCategory = normalizeText(categoryName ?? '');
+    const normalizedName = normalizeText(name);
+    const normalizedDescription = normalizeText(description ?? '');
+
+    if (DRINK_CATEGORY_PATTERNS.some((pattern) => pattern.test(normalizedCategory))) {
+        return true;
+    }
+
+    return DRINK_ITEM_PATTERNS.some((pattern) => (
+        pattern.test(normalizedName) || pattern.test(normalizedDescription)
+    ));
+}
+
 function getDietOptionConfirmation(
     dietContext: string | null | undefined,
     dietTagKey: string,
@@ -404,7 +463,7 @@ function hasContextFalsePositive(
 ): boolean {
     if (strongSignals.length === 0) return false;
 
-    // Check if any strong signal is in the name — if so, it's a primary claim
+    // Check if any strong signal is in the name â€” if so, it's a primary claim
     if (nameText && strongSignals.some((signal) => buildKeywordPattern(signal).test(nameText))) {
         return false;
     }
@@ -536,6 +595,207 @@ function mergeUnique(values: string[]): string[] {
     return [...new Set(values)];
 }
 
+function normalizeComparableText(value: string | null | undefined): string {
+    return normalizeText(value ?? '');
+}
+
+function formatComparablePrice(value: number | null | undefined): string {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return '';
+    }
+    return Number(value).toFixed(2);
+}
+
+function buildExactMenuItemSignature(item: InferenceMenuItem): string {
+    return [
+        normalizeComparableText(item.name),
+        normalizeComparableText(item.description),
+        formatComparablePrice(item.price),
+        (item.currency ?? '').trim().toUpperCase(),
+    ].join('|');
+}
+
+function normalizeGroupingTitle(value: string): string {
+    return normalizeText(value)
+        .replace(/\u00df/g, 'ss')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+const GROUPING_QUANTITY_VARIANT_PATTERN = /\b\d+(?:[.,]\d+)?\s*(?:stuck|stueck|pcs?|pieces?)\b/g;
+const GROUPING_MEASURE_VARIANT_PATTERN = /\b\d+(?:[.,]\d+)?\s*(?:cm|mm|ml|cl|l|g|kg)\b/g;
+const GROUPING_SIZE_VARIANT_PATTERN = /\b(?:small|medium|large|xl|xxl|mini|klein|mittel|gross|maxi|regular)\b/g;
+const GROUPING_COMBO_VARIANT_PATTERN = /\b(?:menu|meal|combo)\b/g;
+const DISPLAY_QUANTITY_VARIANT_PATTERN = /\(\s*\d+(?:[.,]\d+)?\s*(?:stuck|stueck|st\u00fcck|pcs?|pieces?)\s*\)|\b\d+(?:[.,]\d+)?\s*(?:stuck|stueck|st\u00fcck|pcs?|pieces?)\b/giu;
+const DISPLAY_MEASURE_VARIANT_PATTERN = /\b\d+(?:[.,]\d+)?\s*(?:cm|mm|ml|cl|l|g|kg)\b/giu;
+const DISPLAY_SIZE_VARIANT_PATTERN = /\b(?:small|medium|large|xl|xxl|mini|klein|mittel|gross|gro\u00df|maxi|regular)\b/giu;
+const DISPLAY_COMBO_VARIANT_PATTERN = /\b(?:menu|men\u00fc|meal|combo)\b/giu;
+
+function stripVariantTokensFromGroupingTitle(value: string): string {
+    return value
+        .replace(GROUPING_QUANTITY_VARIANT_PATTERN, ' ')
+        .replace(GROUPING_MEASURE_VARIANT_PATTERN, ' ')
+        .replace(GROUPING_SIZE_VARIANT_PATTERN, ' ')
+        .replace(GROUPING_COMBO_VARIANT_PATTERN, ' ')
+        .replace(/^\d+\s+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function stripVariantTokensFromDisplayName(value: string): string {
+    return value
+        .replace(DISPLAY_QUANTITY_VARIANT_PATTERN, ' ')
+        .replace(DISPLAY_MEASURE_VARIANT_PATTERN, ' ')
+        .replace(DISPLAY_SIZE_VARIANT_PATTERN, ' ')
+        .replace(DISPLAY_COMBO_VARIANT_PATTERN, ' ')
+        .replace(/^\s*\d+\s+/i, '')
+        .replace(/\(\s*\)/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function buildComparableSignatureLookup(items: InferenceMenuItem[]): Map<string, string> {
+    const exactTitleByItemId = new Map<string, string>();
+    const strippedTitleByItemId = new Map<string, string>();
+    const strippedTitleCounts = new Map<string, number>();
+
+    for (const item of items) {
+        const exactTitle = normalizeGroupingTitle(item.name);
+        const strippedTitle = stripVariantTokensFromGroupingTitle(exactTitle);
+
+        exactTitleByItemId.set(item.id, exactTitle);
+        strippedTitleByItemId.set(item.id, strippedTitle);
+
+        if (strippedTitle.length > 0) {
+            strippedTitleCounts.set(strippedTitle, (strippedTitleCounts.get(strippedTitle) ?? 0) + 1);
+        }
+    }
+
+    const signatureByItemId = new Map<string, string>();
+
+    for (const item of items) {
+        const exactTitle = exactTitleByItemId.get(item.id) ?? normalizeGroupingTitle(item.name);
+        const strippedTitle = strippedTitleByItemId.get(item.id) ?? exactTitle;
+        const hasSharedFamilyTitle = strippedTitle.length >= settings.value.minNormalizedTitleLength
+            && (strippedTitleCounts.get(strippedTitle) ?? 0) > 1;
+
+        signatureByItemId.set(
+            item.id,
+            hasSharedFamilyTitle
+                ? `family:${strippedTitle}`
+                : `exact:${buildExactMenuItemSignature(item)}`,
+        );
+    }
+
+    return signatureByItemId;
+}
+
+function buildRepresentativeItemName(item: InferenceMenuItem, signature: string): string {
+    if (!signature.startsWith('family:')) {
+        return item.name;
+    }
+
+    const strippedName = stripVariantTokensFromDisplayName(item.name);
+    return strippedName.length > 0 ? strippedName : item.name;
+}
+
+function buildSignatureLookup(items: InferenceMenuItem[]): {
+    itemIdToSignature: Map<string, string>;
+    bucketsBySignature: Map<string, SignatureBucket>;
+} {
+    const itemIdToSignature = buildComparableSignatureLookup(items);
+    const bucketsBySignature = new Map<string, SignatureBucket>();
+
+    for (const item of items) {
+        const signature = itemIdToSignature.get(item.id) ?? `exact:${buildExactMenuItemSignature(item)}`;
+
+        const existing = bucketsBySignature.get(signature);
+        if (existing) {
+            existing.itemIds.push(item.id);
+            if (!existing.primaryCategory && item.categoryName) {
+                existing.primaryCategory = item.categoryName;
+            }
+            const representativeName = buildRepresentativeItemName(item, signature);
+            if (representativeName.length > 0 && representativeName.length < existing.representativeName.length) {
+                existing.representativeName = representativeName;
+            }
+            continue;
+        }
+
+        bucketsBySignature.set(signature, {
+            itemIds: [item.id],
+            primaryCategory: item.categoryName ?? null,
+            representativeName: buildRepresentativeItemName(item, signature),
+        });
+    }
+
+    return {itemIdToSignature, bucketsBySignature};
+}
+
+function dedupeMatchedItems(
+    items: MatchedItem[],
+    itemIdToSignature: Map<string, string>,
+    bucketsBySignature: Map<string, SignatureBucket>,
+): MatchedItem[] {
+    const deduped = new Map<string, MatchedItem>();
+
+    for (const item of items) {
+        const signature = item.signature ?? itemIdToSignature.get(item.itemId) ?? item.itemId;
+        const existing = deduped.get(signature);
+        const bucket = bucketsBySignature.get(signature);
+
+        if (existing) {
+            existing.keywords = mergeUnique([...existing.keywords, ...item.keywords]);
+            existing.source = existing.source === 'manual_override' || item.source === 'manual_override'
+                ? 'manual_override'
+                : existing.source ?? item.source;
+            continue;
+        }
+
+        deduped.set(signature, {
+            ...item,
+            itemName: bucket?.representativeName ?? item.itemName,
+            categoryName: bucket?.primaryCategory ?? item.categoryName ?? null,
+            keywords: mergeUnique(item.keywords),
+            signature,
+        });
+    }
+
+    return [...deduped.values()];
+}
+
+function dedupeExcludedItems(
+    items: ExcludedItem[],
+    itemIdToSignature: Map<string, string>,
+    bucketsBySignature: Map<string, SignatureBucket>,
+): ExcludedItem[] {
+    const deduped = new Map<string, ExcludedItem>();
+
+    for (const item of items) {
+        const signature = item.signature ?? itemIdToSignature.get(item.itemId) ?? item.itemId;
+        const existing = deduped.get(signature);
+        const bucket = bucketsBySignature.get(signature);
+
+        if (existing) {
+            existing.keywords = mergeUnique([...existing.keywords, ...item.keywords]);
+            existing.excludedBy = mergeUnique([...existing.excludedBy, ...item.excludedBy]);
+            continue;
+        }
+
+        deduped.set(signature, {
+            ...item,
+            itemName: bucket?.representativeName ?? item.itemName,
+            categoryName: bucket?.primaryCategory ?? item.categoryName ?? null,
+            keywords: mergeUnique(item.keywords),
+            excludedBy: mergeUnique(item.excludedBy),
+            signature,
+        });
+    }
+
+    return [...deduped.values()];
+}
+
 function confidenceRank(value: Confidence): number {
     if (value === 'HIGH') return 3;
     if (value === 'MEDIUM') return 2;
@@ -548,7 +808,7 @@ function maxConfidence(a: Confidence, b: Confidence): Confidence {
 
 /**
  * Strip diacritics/accents from a string without altering case or whitespace.
- * Safe to apply to regex pattern strings — only removes combining marks.
+ * Safe to apply to regex pattern strings â€” only removes combining marks.
  */
 function stripDiacritics(text: string): string {
     return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -579,35 +839,59 @@ export function computeScoreAndConfidence(
         strongSignalCount?: number;
         manualOverrideCount?: number;
         excludedCount?: number;
+        matchedUniqueItems?: number;
+        varietyRatio?: number;
+        categoryCoverageRatio?: number;
     } = {},
 ): {
     score: number;
     confidence: Confidence;
     breakdown: {
         ratioScore: number;
+        coverageScore: number;
+        varietyScore: number;
+        categoryScore: number;
         confidenceMultiplier: number;
         evidenceBoost: number;
         evidencePenalty: number;
+        varietyPenalty: number;
         finalScore: number;
     };
 } {
     const s = settings.value;
     const safeRatio = Math.max(0, Math.min(1, matchRatio));
-    const ratioScore = Math.round(safeRatio * 100);
+    const coverageScore = Math.round(safeRatio * 100);
+    const ratioScore = coverageScore;
+    const varietyRatio = Math.max(0, Math.min(1, context.varietyRatio ?? safeRatio));
+    const categoryCoverageRatio = Math.max(0, Math.min(1, context.categoryCoverageRatio ?? safeRatio));
+    const varietyScore = Math.round(varietyRatio * 100);
+    const categoryScore = Math.round(categoryCoverageRatio * 100);
+    const matchedUniqueItems = Math.max(0, context.matchedUniqueItems ?? Math.round(safeRatio * totalMenuItems));
     const strongSignalCount = context.strongSignalCount ?? 0;
     const manualOverrideCount = context.manualOverrideCount ?? 0;
     const excludedCount = context.excludedCount ?? 0;
+    const baseScore = Math.round(
+        (coverageScore * s.inferenceCoverageWeight)
+        + (varietyScore * s.inferenceVarietyWeight)
+        + (categoryScore * s.inferenceCategoryWeight),
+    );
 
     let confidence: Confidence;
-    if (totalMenuItems === 0) {
+    if (totalMenuItems === 0 || matchedUniqueItems === 0) {
         confidence = 'LOW';
-    } else if (strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals && safeRatio >= 0.2) {
+    } else if (
+        safeRatio >= s.inferenceHighConfidenceMinRatio
+        && matchedUniqueItems >= s.inferenceHighConfidenceMinUniqueItems
+    ) {
         confidence = 'HIGH';
-    } else if (totalMenuItems < s.inferenceSmallMenuThreshold) {
-        confidence = safeRatio >= s.inferenceMediumConfidenceMinRatio ? 'MEDIUM' : 'LOW';
-    } else if (safeRatio >= s.inferenceHighConfidenceMinRatio) {
-        confidence = 'HIGH';
-    } else if (safeRatio > 0) {
+    } else if (
+        safeRatio >= s.inferenceMediumConfidenceMinRatio
+        || matchedUniqueItems >= s.inferenceMediumConfidenceMinUniqueItems
+        || (
+            strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals
+            && matchedUniqueItems >= Math.max(1, s.inferenceMediumConfidenceMinUniqueItems - 1)
+        )
+    ) {
         confidence = 'MEDIUM';
     } else {
         confidence = 'LOW';
@@ -615,15 +899,22 @@ export function computeScoreAndConfidence(
 
     const evidenceBoost = Math.min(
         s.inferenceEvidenceBoostCap,
-        Math.round((strongSignalCount * s.inferenceStrongSignalWeight) + (manualOverrideCount * s.inferenceManualOverrideWeight) + (safeRatio * s.inferenceRatioWeight)),
+        Math.round(
+            (strongSignalCount * s.inferenceStrongSignalWeight)
+            + (manualOverrideCount * s.inferenceManualOverrideWeight)
+            + (safeRatio * s.inferenceRatioWeight),
+        ),
     );
     const evidencePenalty = Math.min(s.inferenceEvidencePenaltyCap, excludedCount * s.inferencePenaltyPerExcluded);
+    const varietyPenalty = matchedUniqueItems > 0
+        ? Math.round((1 - varietyRatio) * s.inferenceVarietyPenaltyCap * (1 - (safeRatio * 0.5)))
+        : 0;
     const confidenceMultiplier = confidence === 'HIGH'
         ? 1
         : confidence === 'MEDIUM'
             ? s.inferenceConfidenceMultiplierMedium
             : s.inferenceConfidenceMultiplierLow;
-    const weighted = Math.round((ratioScore + evidenceBoost - evidencePenalty) * confidenceMultiplier);
+    const weighted = Math.round((baseScore + evidenceBoost - evidencePenalty - varietyPenalty) * confidenceMultiplier);
     const finalScore = Math.max(0, Math.min(100, weighted));
 
     return {
@@ -631,9 +922,13 @@ export function computeScoreAndConfidence(
         confidence,
         breakdown: {
             ratioScore,
+            coverageScore,
+            varietyScore,
+            categoryScore,
             confidenceMultiplier,
             evidenceBoost,
             evidencePenalty,
+            varietyPenalty,
             finalScore,
         },
     };
@@ -678,25 +973,26 @@ export function inferForTag(
     const negativeKeywords = tagNegativeKeywords;
     const strongSignals = tagStrongSignals;
     const manualOverridesByItemId = options.manualOverridesByItemId ?? new Map<string, boolean>();
+    const comparableItems = items.filter((item) => !isDrinkLikeMenuItem(item.name, item.categoryName, item.description ?? null));
+    const {itemIdToSignature, bucketsBySignature} = buildSignatureLookup(comparableItems);
 
     const matchedItems: MatchedItem[] = [];
     const excludedItems: ExcludedItem[] = [];
 
-    let positiveEvidence = 0;
-    let negativeEvidence = 0;
     let strongSignalCount = 0;
     let manualOverrideCount = 0;
 
-    for (const item of items) {
+    for (const item of comparableItems) {
         const manualOverride = manualOverridesByItemId.get(item.id);
         if (manualOverride === true) {
             matchedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: ['manual-override'],
                 source: 'manual_override',
+                signature: itemIdToSignature.get(item.id),
             });
-            positiveEvidence += 1;
             strongSignalCount += 1;
             manualOverrideCount += 1;
             continue;
@@ -706,10 +1002,11 @@ export function inferForTag(
             excludedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: [],
                 excludedBy: ['manual-override:false'],
+                signature: itemIdToSignature.get(item.id),
             });
-            negativeEvidence += 1;
             continue;
         }
 
@@ -743,10 +1040,11 @@ export function inferForTag(
             matchedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: positiveHits,
                 source: 'heuristic',
+                signature: itemIdToSignature.get(item.id),
             });
-            positiveEvidence += 1;
             strongSignalCount += 1;
             continue;
         }
@@ -755,10 +1053,11 @@ export function inferForTag(
             matchedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: [...positiveHits, 'preparation-option'],
                 source: 'heuristic',
+                signature: itemIdToSignature.get(item.id),
             });
-            positiveEvidence += 1;
             strongSignalCount += 1;
             continue;
         }
@@ -830,10 +1129,11 @@ export function inferForTag(
             excludedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: positiveHits,
                 excludedBy: penalties,
+                signature: itemIdToSignature.get(item.id),
             });
-            negativeEvidence += hasStrongSignal ? 1.2 : 1;
             continue;
         }
 
@@ -841,35 +1141,87 @@ export function inferForTag(
             matchedItems.push({
                 itemId: item.id,
                 itemName: item.name,
+                categoryName: item.categoryName ?? null,
                 keywords: [...positiveHits, 'cross-contamination'],
                 source: 'heuristic',
+                signature: itemIdToSignature.get(item.id),
             });
-            positiveEvidence += s.inferenceCrossContaminationWeight;
             continue;
         }
 
         matchedItems.push({
             itemId: item.id,
             itemName: item.name,
+            categoryName: item.categoryName ?? null,
             keywords: dietOptionConfirmation?.kind === 'choice'
                 ? [...positiveHits, 'choice-option']
                 : positiveHits,
             source: 'heuristic',
+            signature: itemIdToSignature.get(item.id),
         });
-        positiveEvidence += dishHits.length > 0 ? s.inferenceDishHitWeight : 1;
     }
 
-    const totalMenuItems = items.length;
-    const rawRatio = totalMenuItems > 0
-        ? (positiveEvidence - (negativeEvidence * s.inferenceNegativeEvidenceWeight)) / totalMenuItems
+    const totalMenuItems = comparableItems.length;
+    const matchedSignatures = new Set(
+        matchedItems
+            .map((item) => itemIdToSignature.get(item.itemId))
+            .filter((signature): signature is string => !!signature),
+    );
+    const excludedSignatures = new Set(
+        excludedItems
+            .map((item) => itemIdToSignature.get(item.itemId))
+            .filter((signature): signature is string => !!signature),
+    );
+
+    for (const signature of matchedSignatures) {
+        excludedSignatures.delete(signature);
+    }
+
+    const dedupedMatchedItems = dedupeMatchedItems(matchedItems, itemIdToSignature, bucketsBySignature);
+    const dedupedExcludedItems = dedupeExcludedItems(
+        excludedItems.filter((item) => {
+            const signature = itemIdToSignature.get(item.itemId);
+            return signature ? !matchedSignatures.has(signature) : true;
+        }),
+        itemIdToSignature,
+        bucketsBySignature,
+    );
+
+    const totalUniqueItems = bucketsBySignature.size;
+    const matchedUniqueItems = matchedSignatures.size;
+    const excludedUniqueItems = excludedSignatures.size;
+    const matchedCategories = new Set(
+        [...matchedSignatures]
+            .map((signature) => normalizeComparableText(bucketsBySignature.get(signature)?.primaryCategory))
+            .filter((category) => category.length > 0),
+    ).size;
+    const totalCategories = new Set(
+        [...bucketsBySignature.values()]
+            .map((bucket) => normalizeComparableText(bucket.primaryCategory))
+            .filter((category) => category.length > 0),
+    ).size;
+    const duplicateItemsFiltered = Math.max(0, totalMenuItems - totalUniqueItems);
+    const matchedDuplicateItemsFiltered = Math.max(0, matchedItems.length - matchedUniqueItems);
+    const coverageRatio = totalUniqueItems > 0
+        ? matchedUniqueItems / totalUniqueItems
         : 0;
-    const matchRatio = Math.max(0, Math.min(1, rawRatio));
-    const {score, confidence, breakdown} = computeScoreAndConfidence(matchRatio, totalMenuItems, {
+    const matchRatio = Math.max(0, Math.min(1, coverageRatio));
+    const categoryCoverageRatio = totalCategories > 0
+        ? matchedCategories / totalCategories
+        : (matchedUniqueItems > 0 ? 1 : 0);
+    const varietyRatio = Math.max(
+        0,
+        Math.min(1, matchedUniqueItems / Math.max(1, s.inferenceVarietyTargetItems)),
+    );
+    const {score, confidence, breakdown} = computeScoreAndConfidence(matchRatio, totalUniqueItems, {
         strongSignalCount,
         manualOverrideCount,
-        excludedCount: excludedItems.length,
+        excludedCount: excludedUniqueItems,
+        matchedUniqueItems,
+        varietyRatio,
+        categoryCoverageRatio,
     });
-    const hasMatchedItems = matchedItems.length > 0;
+    const hasMatchedItems = matchedUniqueItems > 0;
     const finalScore = hasMatchedItems ? score : 0;
     const finalConfidence: Confidence = hasMatchedItems ? confidence : 'LOW';
 
@@ -879,10 +1231,21 @@ export function inferForTag(
         score: finalScore,
         confidence: finalConfidence,
         reasons: {
-            matchedItems,
-            excludedItems: excludedItems.length > 0 ? excludedItems : undefined,
+            matchedItems: dedupedMatchedItems,
+            excludedItems: dedupedExcludedItems.length > 0 ? dedupedExcludedItems : undefined,
             totalMenuItems,
             matchRatio,
+            menuStats: {
+                totalUniqueItems,
+                duplicateItemsFiltered,
+                matchedUniqueItems,
+                matchedDuplicateItemsFiltered,
+                excludedUniqueItems,
+                totalCategories,
+                matchedCategories,
+                categoryCoverageRatio,
+                varietyRatio,
+            },
             scoreBreakdown: {
                 ...breakdown,
                 finalScore,
@@ -929,6 +1292,7 @@ export async function getActiveMenuItems(restaurantId: string): Promise<Inferenc
     for (const category of categories) {
         for (const item of category.items) {
             if (!item.isActive) continue;
+            if (isDrinkLikeMenuItem(item.name, category.name, item.description ?? null)) continue;
             items.push({
                 id: item.id,
                 name: item.name,
@@ -936,6 +1300,8 @@ export async function getActiveMenuItems(restaurantId: string): Promise<Inferenc
                 dietContext: item.dietContext ?? null,
                 categoryName: category.name,
                 allergens: item.allergens ?? null,
+                price: item.price ?? null,
+                currency: item.currency ?? null,
             });
         }
     }
@@ -948,7 +1314,8 @@ export async function getActiveMenuItems(restaurantId: string): Promise<Inferenc
  */
 function applySubdietInheritance(outputs: InferenceOutput[], tags: DietTag[]): void {
     const byKey = new Map(outputs.map((output) => [output.dietTagKey, output]));
-    const tagsByKey = new Map(tags.map((tag) => [tag.key, tag]));
+
+    const mergeKeyForMatch = (item: MatchedItem): string => item.signature ?? item.itemId;
 
     for (const tag of tags) {
         if (!tag.parentTagKey) continue;
@@ -957,12 +1324,13 @@ function applySubdietInheritance(outputs: InferenceOutput[], tags: DietTag[]): v
         if (!parent || !child) continue;
 
         const merged = new Map(
-            child.reasons.matchedItems.map((item) => [item.itemId, item]),
+            child.reasons.matchedItems.map((item) => [mergeKeyForMatch(item), item]),
         );
 
         for (const item of parent.reasons.matchedItems) {
-            if (merged.has(item.itemId)) continue;
-            merged.set(item.itemId, {
+            const mergeKey = mergeKeyForMatch(item);
+            if (merged.has(mergeKey)) continue;
+            merged.set(mergeKey, {
                 ...item,
                 keywords: mergeUnique([...item.keywords, `inherited-from:${tag.key.toLowerCase()}`]),
                 source: item.source ?? 'heuristic',
@@ -973,15 +1341,59 @@ function applySubdietInheritance(outputs: InferenceOutput[], tags: DietTag[]): v
             child.reasons.totalMenuItems,
             parent.reasons.totalMenuItems,
         );
-        const inheritedRatio = totalMenuItems > 0
-            ? merged.size / totalMenuItems
+        const totalUniqueItems = Math.max(
+            child.reasons.menuStats?.totalUniqueItems ?? totalMenuItems,
+            parent.reasons.menuStats?.totalUniqueItems ?? totalMenuItems,
+        );
+        const totalCategories = Math.max(
+            child.reasons.menuStats?.totalCategories ?? 0,
+            parent.reasons.menuStats?.totalCategories ?? 0,
+        );
+        const mergedSignatures = new Set(
+            [...merged.values()]
+                .map((item) => item.signature)
+                .filter((signature): signature is string => !!signature),
+        );
+        const matchedUniqueItems = mergedSignatures.size > 0 ? mergedSignatures.size : merged.size;
+        const matchedCategories = new Set(
+            [...merged.values()]
+                .map((item) => normalizeComparableText(item.categoryName))
+                .filter((category) => category.length > 0),
+        ).size;
+        const inheritedRatio = totalUniqueItems > 0
+            ? matchedUniqueItems / totalUniqueItems
             : 0;
-        const inherited = computeScoreAndConfidence(inheritedRatio, totalMenuItems);
+        const categoryCoverageRatio = totalCategories > 0
+            ? matchedCategories / totalCategories
+            : (matchedUniqueItems > 0 ? 1 : 0);
+        const varietyRatio = Math.max(
+            0,
+            Math.min(1, matchedUniqueItems / Math.max(1, settings.value.inferenceVarietyTargetItems)),
+        );
+        const inherited = computeScoreAndConfidence(inheritedRatio, totalUniqueItems, {
+            matchedUniqueItems,
+            varietyRatio,
+            categoryCoverageRatio,
+        });
 
         child.reasons.matchedItems = [...merged.values()];
         child.reasons.totalMenuItems = totalMenuItems;
         child.reasons.matchRatio = Math.max(child.reasons.matchRatio, inheritedRatio);
-        child.reasons.scoreBreakdown = inherited.breakdown;
+        child.reasons.menuStats = {
+            totalUniqueItems,
+            duplicateItemsFiltered: Math.max(0, totalMenuItems - totalUniqueItems),
+            matchedUniqueItems,
+            matchedDuplicateItemsFiltered: Math.max(0, merged.size - matchedUniqueItems),
+            excludedUniqueItems: child.reasons.menuStats?.excludedUniqueItems ?? parent.reasons.menuStats?.excludedUniqueItems ?? 0,
+            totalCategories,
+            matchedCategories,
+            categoryCoverageRatio,
+            varietyRatio,
+        };
+        child.reasons.scoreBreakdown = {
+            ...inherited.breakdown,
+            finalScore: Math.max(child.score, inherited.score),
+        };
         child.score = Math.max(child.score, inherited.score);
         child.confidence = maxConfidence(child.confidence, inherited.confidence);
     }
@@ -1071,6 +1483,59 @@ export async function getResultsByRestaurant(
         where.engineVersion = engineVersion;
     }
     return await repo.find({where, relations: ['dietTag']});
+}
+
+export async function listRestaurantIdsNeedingCurrentInference(): Promise<string[]> {
+    const tagRepo = AppDataSource.getRepository(DietTag);
+    const restaurantRepo = AppDataSource.getRepository(Restaurant);
+    const expectedCount = await tagRepo.count();
+
+    if (expectedCount <= 0) {
+        return [];
+    }
+
+    const rows = await restaurantRepo
+        .createQueryBuilder('restaurant')
+        .leftJoin(
+            DietInferenceResult,
+            'result',
+            'result.restaurant_id = restaurant.id AND result.engine_version = :engineVersion',
+            {engineVersion: ENGINE_VERSION},
+        )
+        .select('restaurant.id', 'restaurantId')
+        .groupBy('restaurant.id')
+        .having('COUNT(result.id) < :expectedCount', {expectedCount})
+        .getRawMany<{restaurantId: string}>();
+
+    return rows.map((row) => row.restaurantId);
+}
+
+export async function listRestaurantIdsForInference(): Promise<string[]> {
+    const repo = AppDataSource.getRepository(Restaurant);
+    const rows = await repo.find({
+        select: {
+            id: true,
+        },
+        order: {
+            name: 'ASC',
+        },
+    });
+
+    return rows.map((restaurant) => restaurant.id);
+}
+
+export async function ensureCurrentResultsForRestaurant(restaurantId: string): Promise<DietInferenceResult[]> {
+    const expectedCount = await AppDataSource.getRepository(DietTag).count();
+    if (expectedCount <= 0) {
+        return [];
+    }
+
+    const currentResults = await getResultsByRestaurant(restaurantId, ENGINE_VERSION);
+    if (currentResults.length >= expectedCount) {
+        return currentResults;
+    }
+
+    return await computeForRestaurant(restaurantId);
 }
 
 /**

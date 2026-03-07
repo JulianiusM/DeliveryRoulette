@@ -1,260 +1,396 @@
-//- views/restaurants/detail.pug - Restaurant Detail
 extends ../layout
 
 block meta
     title #{data.restaurant.name} | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-shop.me-2
-        | #{data.restaurant.name}
-
-block content
+block body
     - const r = data.restaurant
     - const categories = data.categories || []
     - const dietSuitability = data.dietSuitability || []
+    - const insightSummary = data.insightSummary || {menu: {}, diets: [], topSupportedDiets: [], supportedDietCount: 0}
+    - const menuSummary = insightSummary.menu || {}
+    - const topSupportedDiets = insightSummary.topSupportedDiets || []
     - const itemDietChips = data.itemDietChips || {}
-    - const cuisineProfile = data.cuisineProfile || null
+    - const cuisineProfile = data.cuisineProfile || {cuisines: []}
     - const providerCuisines = data.providerCuisines || []
+    - const providerRefs = data.providerRefs || []
     - const openingDayList = (r.openingDays || '').split(',').map((d) => d.trim()).filter(Boolean)
     - const openingHourLines = (r.openingHours || '').split('\n').map((l) => l.trim()).filter(Boolean)
+    - const openingHoursPresentation = data.openingHoursPresentation || {status: {state: 'unknown', isOpenNow: null, summaryLabel: 'Hours unknown', detailLabel: 'No opening hours stored for this restaurant.'}, services: []}
+    - const openingStatus = openingHoursPresentation.status || {state: 'unknown', isOpenNow: null, summaryLabel: 'Hours unknown', detailLabel: 'No opening hours stored for this restaurant.'}
+    - const openingServices = openingHoursPresentation.services || []
+    - const openingHeroDetails = [openingStatus.detailLabel, openingStatus.relativeLabel].filter(Boolean)
+    - const isFavorite = data.isFavorite || false
+    - const doNotSuggest = data.doNotSuggest || false
+    - const createdDate = new Date(r.createdAt).toLocaleDateString()
+    - const updatedDate = new Date(r.updatedAt).toLocaleDateString()
 
-    .row.g-4
-        .col-md-8
-            .card.text-bg-dark.border-secondary
-                .card-header
-                    i.bi.bi-geo-alt.me-2
-                    | Address
-                .card-body
-                    p.mb-1 #{r.addressLine1}
-                    if r.addressLine2
-                        p.mb-1 #{r.addressLine2}
-                    p.mb-0 #{r.postalCode} #{r.city}
-                    if r.country
-                        p.mb-0 #{r.country}
-                    if openingDayList.length > 0
-                        hr.border-secondary
-                        p.mb-2
-                            strong Opening Days
-                        .d-flex.flex-wrap.gap-1.mb-2
-                            each dayName in openingDayList
-                                span.badge.text-bg-secondary #{dayName}
-                    if openingHourLines.length > 0
-                        p.mb-2.mt-3
-                            strong Opening Hours
-                        ul.list-group.list-group-flush
-                            each line in openingHourLines
-                                - const separatorIndex = line.indexOf(':')
-                                li.list-group-item.bg-dark.text-light.border-secondary.small.py-2.px-2
-                                    if separatorIndex > 0
-                                        strong.me-2 #{line.slice(0, separatorIndex)}:
-                                        span.text-white-50 #{line.slice(separatorIndex + 1).trim()}
-                                    else
-                                        span.text-white-50 #{line}
-
-        .col-md-4
-            .card.text-bg-dark.border-secondary
-                .card-header
-                    i.bi.bi-info-circle.me-2
-                    | Info
-                .card-body
-                    p.mb-2
-                        | Listing:&nbsp;
-                        if r.isActive
-                            span.badge.text-bg-success Enabled
-                        else
-                            span.badge.text-bg-secondary Disabled
-                    p.mb-2
-                        | Open now:&nbsp;
-                        if data.isOpenNow === true
-                            span.badge.text-bg-success Open
-                        else if data.isOpenNow === false
-                            span.badge.text-bg-danger Closed
-                        else
-                            span.badge.text-bg-secondary Unknown
-                    p.text-white-50.small.mb-2
-                        | "Listing" controls whether this restaurant is available in the app.
-                        br
-                        | "Open now" is computed from stored opening hours and current local time.
-                    p.text-white-50.mb-1
-                        small Created: #{new Date(r.createdAt).toLocaleDateString()}
-                    p.text-white-50.mb-0
-                        small Updated: #{new Date(r.updatedAt).toLocaleDateString()}
-
-            - const isFavorite = data.isFavorite || false
-            - const doNotSuggest = data.doNotSuggest || false
-            .card.text-bg-dark.border-secondary.mt-3
-                .card-header
-                    i.bi.bi-sliders.me-2
-                    | My Preferences
-                .card-body
-                    .d-flex.flex-column.gap-2
-                        form(method="POST" action=`/restaurants/${r.id}/toggle-favorite`)
-                            +csrf
-                            button.btn.btn-sm.w-100(type="submit" class=isFavorite ? 'btn-warning' : 'btn-outline-warning')
-                                i.bi.me-1(class=isFavorite ? 'bi-star-fill' : 'bi-star')
-                                | #{isFavorite ? 'Unfavorite' : 'Favorite'}
-                        form(method="POST" action=`/restaurants/${r.id}/toggle-do-not-suggest`)
-                            +csrf
-                            button.btn.btn-sm.w-100(type="submit" class=doNotSuggest ? 'btn-danger' : 'btn-outline-danger')
-                                i.bi.me-1(class=doNotSuggest ? 'bi-x-circle-fill' : 'bi-x-circle')
-                                | #{doNotSuggest ? 'Allow Suggestions' : 'Do Not Suggest'}
-
-            .card.text-bg-dark.border-secondary.mt-3
-                .card-header
-                    i.bi.bi-globe-asia-australia.me-2
-                    | Cuisines
-                .card-body
-                    if providerCuisines.length > 0
-                        p.text-white-50.small.mb-1 Provider Cuisines
-                        .d-flex.flex-wrap.gap-1.mb-2
-                            each cuisine in providerCuisines
-                                span.badge.text-bg-info.text-dark #{cuisine}
-                    else
-                        p.text-white-50.small.mb-2 No provider cuisines saved.
-
-                    if cuisineProfile && cuisineProfile.cuisines && cuisineProfile.cuisines.length > 0
-                        p.text-white-50.small.mb-1 Heuristic Cuisines
-                        .d-flex.flex-wrap.gap-1
-                            each cuisine in cuisineProfile.cuisines
-                                span.badge(class=cuisine.source === 'provider' ? 'text-bg-info text-dark' : 'text-bg-dark border border-secondary')
-                                    | #{cuisine.label} (#{cuisine.score}% #{cuisine.confidence})
-                    else
-                        p.text-white-50.small.mb-0 No inferred cuisines yet.
-
-    include _diet_suitability
-
-    - const providerRefs = data.providerRefs || []
-    .card.text-bg-dark.border-secondary.mt-4
-        .card-header.d-flex.justify-content-between.align-items-center
-            span
-                i.bi.bi-link-45deg.me-2
-                | Provider References
-            button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addProviderForm")
-                i.bi.bi-plus-lg.me-1
-                | Add Provider
-        .card-body
-            #addProviderForm.collapse.mb-3
-                form(method="POST" action=`/restaurants/${r.id}/providers`)
-                    +csrf
-                    .row.g-2
-                        .col-md-3
-                            input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key (e.g. uber_eats)" required)
-                        .col-md-3
-                            input.form-control.form-control-sm(type="text" name="externalId" placeholder="External ID (optional)")
-                        .col-md-4
-                            input.form-control.form-control-sm(type="url" name="url" placeholder="URL" required)
-                        .col-md-2
-                            button.btn.btn-sm.btn-success.w-100(type="submit")
-                                i.bi.bi-plus-lg.me-1
-                                | Add
-
-            if providerRefs.length === 0
-                .text-center.text-white-50.py-3
-                    i.bi.bi-link-45deg.d-block.display-6.mb-2
-                    p No provider references yet.
-            else
-                .table-responsive
-                    table.table.table-dark.table-hover.mb-0
-                        thead
-                            tr
-                                th Provider
-                                th External ID
-                                th URL
-                                th Status
-                                th Actions
-                        tbody
-                            each ref in providerRefs
-                                tr
-                                    td #{ref.providerKey}
-                                    td.text-white-50 #{ref.externalId || '-'}
-                                    td
-                                        a.text-info(href=ref.url target="_blank" rel="noopener noreferrer") #{ref.url}
-                                    td
-                                        span.badge(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
-                                    td
-                                        .d-flex.gap-1
-                                            form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/sync-menu`)
-                                                +csrf
-                                                button.btn.btn-sm.btn-outline-info(type="submit" title="Sync menu from this provider reference")
-                                                    i.bi.bi-arrow-repeat
-                                            form.d-inline(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
-                                                +csrf
-                                                button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove")
-                                                    i.bi.bi-trash
-
-    .card.text-bg-dark.border-secondary.mt-4
-        .card-header.d-flex.justify-content-between.align-items-center
-            span
-                i.bi.bi-menu-button-wide.me-2
-                | Menu
-            a.btn.btn-sm.btn-success(href=`/restaurants/${r.id}/menu/categories/new`)
-                i.bi.bi-plus-lg.me-1
-                | Add Category
-        .card-body
-            if categories.length === 0
-                .text-center.text-white-50.py-3
-                    i.bi.bi-menu-button-wide.d-block.display-6.mb-2
-                    p No menu categories yet.
-            else
-                each cat in categories
-                    .card.text-bg-dark.border-secondary.mb-3
-                        .card-header.d-flex.justify-content-between.align-items-center
+    .restaurant-shell.py-3
+        section#overview.restaurant-hero.card.border-0.shadow-lg.overflow-hidden
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-start
+                    .col-lg-8
+                        .d-flex.flex-wrap.align-items-center.gap-2.mb-3.text-uppercase.small.text-white-50
+                            a.link-light.text-decoration-none(href="/restaurants")
+                                i.bi.bi-arrow-left.me-1
+                                | Back to restaurants
+                            span.restaurant-divider
                             span
-                                i.bi.bi-list-ul.me-2
-                                | #{cat.name}
-                                if !cat.isActive
-                                    span.badge.text-bg-secondary.ms-2 Inactive
-                            .d-flex.gap-1
-                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/items/new` title="Add Item")
-                                    i.bi.bi-plus-lg
-                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/edit` title="Edit Category")
-                                    i.bi.bi-pencil
-                        .card-body
-                            - const items = cat.items || []
-                            if items.length === 0
-                                p.text-white-50.mb-0 No items in this category.
+                                i.bi.bi-geo-alt.me-1
+                                | #{r.city}
+                            span.restaurant-divider
+                            if r.isActive
+                                span.badge.rounded-pill.text-bg-success Shown in app
                             else
-                                .table-responsive
-                                    table.table.table-dark.table-hover.mb-0
-                                        thead
-                                            tr
-                                                th Name
-                                                th Description
-                                                th Allergens
-                                                th Price
-                                                th Actions
-                                        tbody
-                                            each item in items
-                                                - const chips = itemDietChips[item.id] || []
-                                                tr(id=`menu-item-${item.id}`)
-                                                    td
-                                                        a.text-decoration-none.text-light(href=`#menu-item-${item.id}`) #{item.name}
-                                                        if chips.length > 0
-                                                            .d-flex.flex-wrap.gap-1.mt-1
-                                                                each chip in chips
-                                                                    span.badge(class=chip.source === 'manual' ? 'text-bg-warning text-dark' : 'text-bg-success') #{chip.label}
-                                                    td.text-white-50 #{item.description || '-'}
-                                                    td
-                                                        if item.allergens
-                                                            span.text-warning.small #{item.allergens}
-                                                        else
-                                                            span.text-white-50 -
-                                                    td
-                                                        if item.price != null
-                                                            | #{parseFloat(item.price).toFixed(2)}
-                                                            if item.currency
-                                                                |  #{item.currency}
-                                                        else
-                                                            span.text-white-50 -
-                                                    td
-                                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit` title="Edit Item")
-                                                            i.bi.bi-pencil
+                                span.badge.rounded-pill.text-bg-secondary Hidden in app
 
-    .d-flex.gap-2.mt-4
-        a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)
-            i.bi.bi-pencil.me-1
-            | Edit
-        a.btn.btn-outline-light(href="/restaurants")
-            i.bi.bi-arrow-left.me-1
-            | Back to list
+                        h1.display-5.fw-semibold.mb-2 #{r.name}
+                        p.lead.text-white-50.mb-4
+                            | #{r.addressLine1}
+                            if r.addressLine2
+                                | , #{r.addressLine2}
+                            | , #{r.postalCode} #{r.city}
+                            if r.country
+                                | , #{r.country}
+
+                        .restaurant-live-status(class=openingStatus.state === 'open' ? 'is-open' : openingStatus.state === 'closed' ? 'is-closed' : 'is-unknown')
+                            p.text-uppercase.small.mb-1.text-white-50 Availability
+                            h2.h4.mb-0 #{openingStatus.summaryLabel}
+                            if openingHeroDetails.length > 0
+                                p.mb-0.text-white-50.mt-2 #{openingHeroDetails.join(' / ')}
+
+                        if topSupportedDiets.length > 0
+                            .d-flex.flex-wrap.gap-2.mb-4
+                                each diet in topSupportedDiets
+                                    a.badge.rounded-pill.text-bg-light.text-dark.text-decoration-none.px-3.py-2(href=`#diet-${diet.dietTagId}`)
+                                        | #{diet.dietTagLabel}
+                                        span.ms-1.text-body-secondary #{diet.sharePercent}% share
+                        else
+                            p.text-white-50.mb-4 No supported diet profile has been inferred yet.
+
+                        .d-flex.flex-wrap.gap-2.restaurant-anchor-nav
+                            a.btn.btn-outline-light.btn-sm(href="#overview") Overview
+                            a.btn.btn-outline-light.btn-sm(href="#diets") Diets
+                            a.btn.btn-outline-light.btn-sm(href="#cuisines") Cuisines
+                            a.btn.btn-outline-light.btn-sm(href="#providers") Providers
+                            a.btn.btn-outline-light.btn-sm(href="#menu") Menu
+
+                    .col-lg-4
+                        .row.g-3
+                            .col-6.col-lg-12
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Unique items
+                                    strong.restaurant-stat-value #{menuSummary.totalUniqueItems || 0}
+                                    small.text-white-50 #{menuSummary.itemCountLabel || 'No menu data'}
+                            .col-6.col-lg-12
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Categories
+                                    strong.restaurant-stat-value #{menuSummary.totalCategories || 0}
+                                    small.text-white-50 #{providerRefs.length} provider #{providerRefs.length === 1 ? 'ref' : 'refs'}
+                            .col-6.col-lg-12
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Supported diets
+                                    strong.restaurant-stat-value #{insightSummary.supportedDietCount || 0}
+                                    small.text-white-50 #{insightSummary.blockedDietCount || 0} blocked
+                            .col-6.col-lg-12
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Menu duplicates
+                                    strong.restaurant-stat-value #{menuSummary.duplicatesFiltered || 0}
+                                    small.text-white-50 deduped for diet scoring
+
+        .row.g-4.mt-1
+            .col-xl-8
+                section.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm
+                    .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                        span
+                            i.bi.bi-clock-history.me-2
+                            | Location and Hours
+                        .text-white-50.small Updated #{updatedDate}
+                    .card-body
+                        .row.g-4
+                            .col-md-6
+                                h2.h5.mb-3
+                                    i.bi.bi-geo-alt.me-2
+                                    | Address
+                                .restaurant-panel
+                                    p.mb-1 #{r.addressLine1}
+                                    if r.addressLine2
+                                        p.mb-1 #{r.addressLine2}
+                                    p.mb-3 #{r.postalCode} #{r.city}
+                                    if r.country
+                                        p.text-white-50.small.mb-3 #{r.country}
+                                    if openingServices.length > 0 || openingHourLines.length > 0 || openingDayList.length > 0
+                                        p.text-uppercase.small.text-white-50.mb-2 Opening hours
+                                        button.btn.btn-sm.btn-outline-light(type="button" data-bs-toggle="collapse" data-bs-target="#openingHoursSchedule" aria-expanded="false" aria-controls="openingHoursSchedule")
+                                            i.bi.bi-calendar3.me-1
+                                            | Show weekly schedule
+                                        #openingHoursSchedule.collapse.restaurant-hours-schedule.mt-3
+                                            if openingServices.length > 0
+                                                .d-flex.flex-column.gap-3
+                                                    each service in openingServices
+                                                        .opening-hours-service
+                                                            .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2.mb-3
+                                                                .d-flex.align-items-center.gap-2
+                                                                    h3.h6.mb-0 #{service.serviceLabel}
+                                                                    if service.isPreferred
+                                                                        span.badge.rounded-pill.text-bg-info.text-dark Primary
+                                                            .d-flex.flex-column.gap-2
+                                                                each day in service.days
+                                                                    .opening-hours-row(class=day.isToday ? 'is-today' : '')
+                                                                        span.opening-hours-day #{day.dayLabel}
+                                                                        .d-flex.flex-wrap.gap-2.justify-content-md-end
+                                                                            each label in day.rangeLabels
+                                                                                span.badge.rounded-pill(class=day.isClosed ? 'text-bg-secondary' : day.isToday ? 'text-bg-light text-dark' : 'text-bg-dark border border-secondary') #{label}
+                                            else if openingHourLines.length > 0
+                                                ul.list-unstyled.mb-0
+                                                    each line in openingHourLines
+                                                        li.mb-2.small.text-white-50 #{line}
+                                            else if openingDayList.length > 0
+                                                .d-flex.flex-wrap.gap-2
+                                                    each dayName in openingDayList
+                                                        span.badge.rounded-pill.text-bg-secondary #{dayName}
+                            .col-md-6
+                                h2.h5.mb-3
+                                    i.bi.bi-stars.me-2
+                                    | Diet Snapshot
+                                if topSupportedDiets.length > 0
+                                    .d-flex.flex-column.gap-3
+                                        each diet in topSupportedDiets
+                                            .restaurant-diet-hero-card
+                                                .d-flex.justify-content-between.align-items-center.gap-3
+                                                    a.link-light.text-decoration-none.fw-semibold(href=`#diet-${diet.dietTagId}`) #{diet.dietTagLabel}
+                                                    span.badge.rounded-pill.text-bg-success #{diet.score}%
+                                                .progress.mt-2(role="progressbar" aria-label=`${diet.dietTagLabel} share` aria-valuenow=diet.sharePercent aria-valuemin="0" aria-valuemax="100")
+                                                    .progress-bar.bg-success(style=`width:${diet.sharePercent}%`)
+                                                .d-flex.justify-content-between.text-white-50.small.mt-2
+                                                    span #{diet.matchedUniqueItems} / #{diet.totalUniqueItems} scored items
+                                                    span Variety #{diet.varietyPercent}%
+                                else
+                                    .restaurant-panel
+                                        p.text-white-50.mb-0 No diet compatibility data yet. Re-run heuristics after menu updates.
+
+                section#diets.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+                    .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                        div
+                            i.bi.bi-heart-pulse.me-2
+                            | Diet Suitability
+                        button.btn.btn-sm.btn-outline-light.collapsed(type="button" data-bs-toggle="collapse" data-bs-target="#dietSuitabilityCollapse" aria-expanded="false" aria-controls="dietSuitabilityCollapse")
+                            i.bi.bi-chevron-down.me-1
+                            | Open details
+                    .card-body
+                        p.text-white-50.small.mb-1 Snapshot metrics stay above.
+                        p.text-white-50.small.mb-0 Open the detailed analysis here for manual overrides, matched-item evidence, safeguards, and score details.
+                        #dietSuitabilityCollapse.collapse.mt-4
+                            .diet-suitability-expanded
+                                include _diet_suitability
+
+                section#providers.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+                    .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                        span
+                            i.bi.bi-link-45deg.me-2
+                            | Provider References
+                        button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addProviderForm")
+                            i.bi.bi-plus-lg.me-1
+                            | Add Provider
+                    .card-body
+                        #addProviderForm.collapse.mb-4
+                            form(method="POST" action=`/restaurants/${r.id}/providers`)
+                                +csrf
+                                .row.g-2
+                                    .col-md-3
+                                        input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key" required)
+                                    .col-md-3
+                                        input.form-control.form-control-sm(type="text" name="externalId" placeholder="External ID")
+                                    .col-md-4
+                                        input.form-control.form-control-sm(type="url" name="url" placeholder="Provider URL" required)
+                                    .col-md-2
+                                        button.btn.btn-sm.btn-success.w-100(type="submit")
+                                            i.bi.bi-plus-lg.me-1
+                                            | Add
+
+                        if providerRefs.length === 0
+                            .restaurant-empty-state
+                                i.bi.bi-link-45deg
+                                p.mb-0 No provider references saved yet.
+                        else
+                            .row.g-3
+                                each ref in providerRefs
+                                    .col-lg-6
+                                        article.provider-ref-card
+                                            .d-flex.justify-content-between.align-items-start.gap-3
+                                                div
+                                                    h3.h6.mb-1 #{ref.providerKey}
+                                                    if ref.externalId
+                                                        p.text-white-50.small.mb-2 External ID: #{ref.externalId}
+                                                    a.link-info.small(href=ref.url target="_blank" rel="noopener noreferrer") #{ref.url}
+                                                span.badge.rounded-pill(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
+                                            .d-flex.gap-2.mt-3
+                                                form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/sync-menu`)
+                                                    +csrf
+                                                    button.btn.btn-sm.btn-outline-info(type="submit")
+                                                        i.bi.bi-arrow-repeat.me-1
+                                                        | Sync menu
+                                                form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
+                                                    +csrf
+                                                    button.btn.btn-sm.btn-outline-danger(type="submit")
+                                                        i.bi.bi-trash.me-1
+                                                        | Remove
+
+                section#menu.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+                    .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                        .d-flex.flex-column
+                            span
+                                i.bi.bi-menu-button-wide.me-2
+                                | Menu
+                            small.text-white-50 #{menuSummary.itemCountLabel || 'No menu data'}
+                        a.btn.btn-sm.btn-success(href=`/restaurants/${r.id}/menu/categories/new`)
+                            i.bi.bi-plus-lg.me-1
+                            | Add Category
+                    .card-body
+                        if categories.length === 0
+                            .restaurant-empty-state
+                                i.bi.bi-menu-button-wide
+                                p.mb-0 No menu categories yet.
+                        else
+                            .d-flex.flex-column.gap-4
+                                each cat in categories
+                                    - const items = cat.items || []
+                                    section.card.border-secondary.bg-black.bg-opacity-25(id=`menu-category-${cat.id}`)
+                                        .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                                            .d-flex.align-items-center.gap-2
+                                                h2.h5.mb-0 #{cat.name}
+                                                if !cat.isActive
+                                                    span.badge.rounded-pill.text-bg-secondary Inactive
+                                                span.badge.rounded-pill.text-bg-dark.border.border-secondary #{items.length} item#{items.length === 1 ? '' : 's'}
+                                            .d-flex.gap-2
+                                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/items/new`)
+                                                    i.bi.bi-plus-lg.me-1
+                                                    | Add Item
+                                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/edit`)
+                                                    i.bi.bi-pencil.me-1
+                                                    | Edit Category
+                                        .card-body
+                                            if items.length === 0
+                                                p.text-white-50.mb-0 No items in this category yet.
+                                            else
+                                                .row.g-3
+                                                    each item in items
+                                                        - const chips = itemDietChips[item.id] || []
+                                                        .col-md-6
+                                                            article.menu-item-card(id=`menu-item-${item.id}`)
+                                                                .d-flex.justify-content-between.align-items-start.gap-3.mb-3.menu-item-card-top
+                                                                    div
+                                                                        h3.h6.mb-1
+                                                                            a.link-light.text-decoration-none(href=`#menu-item-${item.id}`) #{item.name}
+                                                                        if chips.length > 0
+                                                                            .d-flex.flex-wrap.gap-1.mt-2
+                                                                                each chip in chips
+                                                                                    span.badge.rounded-pill(class=chip.source === 'manual' ? 'text-bg-warning text-dark' : 'text-bg-success') #{chip.label}
+                                                                    a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit`)
+                                                                        i.bi.bi-pencil
+                                                                if item.description
+                                                                    p.text-white-50.small.mb-3 #{item.description}
+                                                                .d-flex.flex-wrap.gap-2.small.text-white-50
+                                                                    span.menu-item-meta-pill
+                                                                        i.bi.bi-diagram-3.me-1
+                                                                        | #{cat.name}
+                                                                    if item.allergens
+                                                                        span.menu-item-meta-pill.text-warning
+                                                                            i.bi.bi-exclamation-triangle.me-1
+                                                                            | #{item.allergens}
+                                                                    else
+                                                                        span.menu-item-meta-pill
+                                                                            i.bi.bi-shield-check.me-1
+                                                                            | No allergens listed
+                                                                    if item.price != null
+                                                                        span.menu-item-meta-pill
+                                                                            i.bi.bi-cash-coin.me-1
+                                                                            | #{parseFloat(item.price).toFixed(2)} #{item.currency || ''}
+                                                                    else
+                                                                        span.menu-item-meta-pill
+                                                                            i.bi.bi-dash-circle.me-1
+                                                                            | Price not set
+                                                                if item.dietContext
+                                                                    details.mt-3
+                                                                        summary.small.text-info Heuristic context
+                                                                        pre.small.text-white-50.mt-2.mb-0.menu-item-context #{item.dietContext}
+
+            .col-xl-4
+                aside.d-flex.flex-column.gap-4
+                    .card.text-bg-dark.border-secondary.shadow-sm
+                        .card-header
+                            i.bi.bi-sliders.me-2
+                            | My Preferences
+                        .card-body
+                            if user
+                                .d-flex.flex-column.gap-2
+                                    form(method="POST" action=`/restaurants/${r.id}/toggle-favorite`)
+                                        +csrf
+                                        button.btn.w-100(type="submit" class=isFavorite ? 'btn-warning' : 'btn-outline-warning')
+                                            i.bi.me-1(class=isFavorite ? 'bi-star-fill' : 'bi-star')
+                                            | #{isFavorite ? 'Favorited' : 'Mark as Favorite'}
+                                    form(method="POST" action=`/restaurants/${r.id}/toggle-do-not-suggest`)
+                                        +csrf
+                                        button.btn.w-100(type="submit" class=doNotSuggest ? 'btn-danger' : 'btn-outline-danger')
+                                            i.bi.me-1(class=doNotSuggest ? 'bi-x-circle-fill' : 'bi-x-circle')
+                                            | #{doNotSuggest ? 'Blocked From Suggestions' : 'Do Not Suggest'}
+                            else
+                                p.text-white-50.small.mb-3 Log in to save favorites and block restaurants from suggestions.
+                                a.btn.btn-outline-light.w-100(href="/users/login")
+                                    i.bi.bi-box-arrow-in-right.me-1
+                                    | Log In
+
+                    .card.text-bg-dark.border-secondary.shadow-sm(id="cuisines")
+                        .card-header
+                            i.bi.bi-globe-asia-australia.me-2
+                            | Cuisines
+                        .card-body
+                            if providerCuisines.length > 0
+                                p.text-uppercase.small.text-white-50.mb-2 Provider cuisines
+                                .d-flex.flex-wrap.gap-2.mb-4
+                                    each cuisine in providerCuisines
+                                        span.badge.rounded-pill.text-bg-info.text-dark #{cuisine}
+                            else
+                                p.text-white-50.small.mb-4 No provider cuisines saved.
+
+                            if cuisineProfile && cuisineProfile.cuisines && cuisineProfile.cuisines.length > 0
+                                p.text-uppercase.small.text-white-50.mb-2 Heuristic cuisines
+                                .d-flex.flex-column.gap-3
+                                    each cuisine in cuisineProfile.cuisines
+                                        .restaurant-diet-hero-card
+                                            .d-flex.justify-content-between.align-items-center.gap-3
+                                                span.fw-semibold #{cuisine.label}
+                                                span.badge.rounded-pill(class=cuisine.source === 'provider' ? 'text-bg-info text-dark' : 'text-bg-dark border border-secondary') #{cuisine.score}% #{cuisine.confidence}
+                            else
+                                p.text-white-50.small.mb-0 No inferred cuisines yet.
+
+                    .card.text-bg-dark.border-secondary.shadow-sm
+                        .card-header
+                            i.bi.bi-info-circle.me-2
+                            | Metadata
+                        .card-body
+                            dl.row.mb-0.small
+                                dt.col-5.text-white-50 Created
+                                dd.col-7.mb-2 #{createdDate}
+                                dt.col-5.text-white-50 Updated
+                                dd.col-7.mb-2 #{updatedDate}
+                                dt.col-5.text-white-50 Shown in app
+                                dd.col-7.mb-0 #{r.isActive ? 'Yes' : 'No'}
+                            p.text-white-50.small.mt-3.mb-0
+                                | "Shown in app" controls whether the restaurant appears in DeliveryRoulette lists and suggestions. It is separate from the live provider status.
+
+                    .card.text-bg-dark.border-secondary.shadow-sm
+                        .card-header
+                            i.bi.bi-lightning-charge.me-2
+                            | Quick Actions
+                        .card-body
+                            .d-grid.gap-2
+                                a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)
+                                    i.bi.bi-pencil.me-1
+                                    | Edit Restaurant
+                                a.btn.btn-outline-light(href="/restaurants")
+                                    i.bi.bi-arrow-left.me-1
+                                    | Back to List
+
+block scripts
+    script(type="module" src="/js/modules/restaurant-detail.gen.js")

@@ -18,10 +18,13 @@ import {stubConnector} from '../data/unit/connectorRegistryData';
 // ── Mocks ───────────────────────────────────────────────────
 
 const mockFindOneJob = jest.fn();
+const mockFindJobs = jest.fn();
+const mockCountJob = jest.fn();
 const mockCreateJob = jest.fn();
 const mockSaveJob = jest.fn();
 const mockFindOneRef = jest.fn();
 const mockFindRef = jest.fn();
+const mockCountRef = jest.fn();
 const mockSaveRef = jest.fn();
 const mockFindOverrides = jest.fn();
 
@@ -30,10 +33,21 @@ jest.mock('../../src/modules/database/dataSource', () => ({
         getRepository: jest.fn((entity: any) => {
             const name = typeof entity === 'function' ? entity.name : entity;
             if (name === 'SyncJob') {
-                return {findOne: mockFindOneJob, create: mockCreateJob, save: mockSaveJob};
+                return {
+                    find: mockFindJobs,
+                    findOne: mockFindOneJob,
+                    count: mockCountJob,
+                    create: mockCreateJob,
+                    save: mockSaveJob,
+                };
             }
             if (name === 'RestaurantProviderRef') {
-                return {findOne: mockFindOneRef, find: mockFindRef, save: mockSaveRef};
+                return {
+                    findOne: mockFindOneRef,
+                    find: mockFindRef,
+                    count: mockCountRef,
+                    save: mockSaveRef,
+                };
             }
             if (name === 'DietManualOverride') {
                 return {find: mockFindOverrides};
@@ -45,7 +59,13 @@ jest.mock('../../src/modules/database/dataSource', () => ({
                 getRepository: (entity: any) => {
                     const name = typeof entity === 'function' ? entity.name : entity;
                     if (name === 'SyncJob') {
-                        return {findOne: mockFindOneJob, create: mockCreateJob, save: mockSaveJob};
+                        return {
+                            find: mockFindJobs,
+                            findOne: mockFindOneJob,
+                            count: mockCountJob,
+                            create: mockCreateJob,
+                            save: mockSaveJob,
+                        };
                     }
                     return {find: jest.fn().mockResolvedValue([]), findOne: jest.fn().mockResolvedValue(null), create: jest.fn(), save: jest.fn()};
                 },
@@ -90,7 +110,13 @@ import * as ConnectorRegistry from '../../src/providers/ConnectorRegistry';
 const mockResolve = ConnectorRegistry.resolve as jest.Mock;
 const mockRegisteredKeys = ConnectorRegistry.registeredKeys as jest.Mock;
 
-import {runSync, isLocked} from '../../src/modules/sync/ProviderSyncService';
+import {
+    runSync,
+    isLocked,
+    queueMenuSyncByProviderRef,
+    queueProviderRefreshIfNeeded,
+    recoverInterruptedJobs,
+} from '../../src/modules/sync/ProviderSyncService';
 import {ImportConnector} from '../../src/providers/ImportConnector';
 import type {SyncResult} from '../../src/modules/sync/ProviderSyncService';
 
@@ -98,11 +124,14 @@ describe('ProviderSyncService', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Defaults for repo mocks
+        mockFindJobs.mockResolvedValue([]);
         mockFindOneJob.mockResolvedValue(null);
+        mockCountJob.mockResolvedValue(0);
         mockCreateJob.mockImplementation((data: any) => ({id: 'job-1', restaurantsSynced: 0, ...data}));
         mockSaveJob.mockImplementation((e: any) => Promise.resolve(e));
         mockFindOneRef.mockResolvedValue(null);
         mockFindRef.mockResolvedValue([]);
+        mockCountRef.mockResolvedValue(0);
         mockSaveRef.mockImplementation((e: any) => Promise.resolve(e));
         mockFindOverrides.mockResolvedValue([]);
         // Defaults for service mocks
@@ -123,6 +152,119 @@ describe('ProviderSyncService', () => {
         test('returns true when an in-progress job exists', async () => {
             mockFindOneJob.mockResolvedValue({id: 'j', status: 'in_progress'});
             expect(await isLocked()).toBe(true);
+        });
+    });
+
+    describe('queueProviderRefreshIfNeeded', () => {
+        test('queues a maintenance job when provider refs exist and no completed refresh exists for the version', async () => {
+            mockCountRef.mockResolvedValue(2);
+            mockFindOneJob.mockResolvedValue(null);
+
+            const job = await queueProviderRefreshIfNeeded();
+
+            expect(job).not.toBeNull();
+            expect(mockCreateJob).toHaveBeenCalledWith(expect.objectContaining({
+                providerKey: 'maintenance',
+                status: 'pending',
+                syncQuery: expect.stringContaining('maintenance:provider-refresh:'),
+            }));
+            expect(mockSaveJob).toHaveBeenCalled();
+        });
+
+        test('does not queue a maintenance job when the current refresh version already completed', async () => {
+            mockCountRef.mockResolvedValue(3);
+            mockFindOneJob.mockResolvedValue({
+                id: 'job-maintenance',
+                providerKey: 'maintenance',
+                syncQuery: 'maintenance:provider-refresh:1.0.0',
+                status: 'completed',
+                createdAt: new Date('2026-03-07T10:00:00Z'),
+            });
+
+            const job = await queueProviderRefreshIfNeeded();
+
+            expect(job).toBeNull();
+            expect(mockCreateJob).not.toHaveBeenCalled();
+            expect(mockSaveJob).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('recovery and deduplication', () => {
+        test('requeues interrupted in-progress jobs on startup recovery', async () => {
+            mockFindJobs.mockResolvedValue([
+                {
+                    id: 'job-stuck',
+                    providerKey: ProviderKey.UBER_EATS,
+                    syncQuery: 'menu-ref:rest-1:ref-1',
+                    status: 'in_progress',
+                    restaurantsSynced: 1,
+                    errorMessage: null,
+                    createdAt: new Date('2026-03-07T10:00:00Z'),
+                    startedAt: new Date('2026-03-07T10:01:00Z'),
+                    finishedAt: null,
+                },
+            ]);
+
+            const recovered = await recoverInterruptedJobs();
+
+            expect(recovered).toBe(1);
+            expect(mockSaveJob).toHaveBeenCalledWith(expect.objectContaining({
+                id: 'job-stuck',
+                status: 'pending',
+                startedAt: null,
+                finishedAt: null,
+                restaurantsSynced: 0,
+                errorMessage: expect.stringContaining('Recovered after interrupted execution'),
+            }));
+        });
+
+        test('marks interrupted direct import jobs as failed when they cannot be replayed automatically', async () => {
+            mockFindJobs.mockResolvedValue([
+                {
+                    id: 'job-import',
+                    providerKey: ProviderKey.IMPORT,
+                    syncQuery: null,
+                    status: 'in_progress',
+                    restaurantsSynced: 0,
+                    errorMessage: null,
+                    createdAt: new Date('2026-03-07T11:00:00Z'),
+                    startedAt: new Date('2026-03-07T11:01:00Z'),
+                    finishedAt: null,
+                },
+            ]);
+
+            await recoverInterruptedJobs();
+
+            expect(mockSaveJob).toHaveBeenCalledWith(expect.objectContaining({
+                id: 'job-import',
+                status: 'failed',
+                errorMessage: expect.stringContaining('could not be retried automatically'),
+            }));
+        });
+
+        test('reuses an existing active menu-ref job instead of queueing a duplicate', async () => {
+            mockGetProviderRefByIdForRestaurant.mockResolvedValue({
+                id: 'ref-1',
+                restaurantId: 'rest-1',
+                providerKey: ProviderKey.UBER_EATS,
+                externalId: 'ext-ref-1',
+                url: 'https://example.com/menu',
+            });
+            mockFindJobs.mockResolvedValue([
+                {
+                    id: 'job-existing',
+                    providerKey: ProviderKey.UBER_EATS,
+                    syncQuery: 'menu-ref:rest-1:ref-1',
+                    status: 'pending',
+                    createdAt: new Date('2026-03-07T10:00:00Z'),
+                },
+            ]);
+
+            const job = await queueMenuSyncByProviderRef('rest-1', 'ref-1');
+
+            expect(job.jobId).toBe('job-existing');
+            expect(mockCreateJob).not.toHaveBeenCalled();
+            expect(mockSaveJob).not.toHaveBeenCalled();
         });
     });
 

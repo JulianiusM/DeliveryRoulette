@@ -4,15 +4,27 @@ import * as userDietPrefService from "../modules/database/services/UserDietPrefe
 import * as userPrefService from "../modules/database/services/UserPreferenceService";
 import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {APIError} from "../modules/lib/errors";
-import {SuggestionFilters, SuggestionResult} from "../modules/database/services/SuggestionService";
-
-// ── Types ───────────────────────────────────────────────────
+import {
+    SuggestionFavoriteMode,
+    SuggestionFilters,
+    SuggestionResult,
+} from "../modules/database/services/SuggestionService";
+import settings from "../modules/settings";
+import {getOpeningHoursPresentation} from "../modules/lib/openingHours";
 
 export interface SuggestionFormData {
     dietTags: Array<{id: string; key: string; label: string}>;
     selectedDietTagIds: string[];
     cuisineIncludes: string;
     cuisineExcludes: string;
+    excludeAllergens: string;
+    openOnly: boolean;
+    excludeRecentlySuggested: boolean;
+    respectDoNotSuggest: boolean;
+    minDietScore: number;
+    favoriteMode: SuggestionFavoriteMode;
+    recentSuggestionCount: number;
+    deliveryArea: string;
 }
 
 export interface SuggestionResultData {
@@ -24,6 +36,12 @@ export interface SuggestionResultData {
         city: string;
         postalCode: string;
         country: string;
+        openingStatus: {
+            state: 'open' | 'closed' | 'unknown';
+            summaryLabel: string;
+            detailLabel: string;
+            relativeLabel?: string;
+        };
     };
     reason: {
         matchedDiets: Array<{
@@ -31,6 +49,9 @@ export interface SuggestionResultData {
             dietTagLabel: string;
             supported: boolean | null;
             source: 'override' | 'inference' | 'none';
+            score?: number | null;
+            confidence?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
+            meetsScoreThreshold?: boolean;
         }>;
         matchedCuisines: Array<{
             key: string;
@@ -40,30 +61,60 @@ export interface SuggestionResultData {
             source: 'provider' | 'heuristic';
         }>;
         totalCandidates: number;
+        filters: {
+            minDietScore: number;
+            favoriteMode: SuggestionFavoriteMode;
+            openOnly: boolean;
+            excludeRecentlySuggested: boolean;
+            respectDoNotSuggest: boolean;
+        };
     };
 }
 
-// ── Helpers ─────────────────────────────────────────────────
-
-/**
- * Parse comma-separated string into trimmed non-empty array.
- */
 function parseCsvList(value?: string | null): string[] {
     if (!value || !value.trim()) return [];
-    return value.split(',').map(s => s.trim()).filter(Boolean);
+    return value.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
 
-// ── Form data ───────────────────────────────────────────────
+function parseBooleanLike(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'string') {
+        if (/^(1|true|yes|on)$/i.test(value)) return true;
+        if (/^(0|false|no|off)$/i.test(value)) return false;
+    }
+    return fallback;
+}
 
-/**
- * Get form data for the suggestion page.
- * Pre-populates with user's diet preferences and cuisine filters.
- */
+function normalizeFavoriteMode(value: unknown): SuggestionFavoriteMode {
+    if (value === 'only' || value === 'ignore' || value === 'prefer') {
+        return value;
+    }
+
+    const fallback = settings.value.suggestionDefaultFavoriteMode;
+    if (fallback === 'only' || fallback === 'ignore' || fallback === 'prefer') {
+        return fallback;
+    }
+
+    return 'prefer';
+}
+
+function normalizeMinDietScore(value: unknown): number {
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numeric)) {
+        return settings.value.suggestionDefaultMinDietScore;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
 export async function getSuggestionFormData(userId?: number): Promise<SuggestionFormData> {
     const allTags = await userDietPrefService.getAllDietTags();
     let selectedDietTagIds: string[] = [];
     let cuisineIncludes = '';
     let cuisineExcludes = '';
+    let deliveryArea = '';
 
     if (userId) {
         selectedDietTagIds = await userDietPrefService.getEffectiveDietFilterIds(userId);
@@ -71,47 +122,63 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
         if (pref) {
             cuisineIncludes = pref.cuisineIncludes || '';
             cuisineExcludes = pref.cuisineExcludes || '';
+            deliveryArea = pref.deliveryArea || '';
         }
     }
 
     return {
-        dietTags: allTags.map(t => ({id: t.id, key: t.key, label: t.label})),
+        dietTags: allTags.map((tag) => ({id: tag.id, key: tag.key, label: tag.label})),
         selectedDietTagIds,
         cuisineIncludes,
         cuisineExcludes,
+        excludeAllergens: '',
+        openOnly: settings.value.suggestionDefaultOpenOnly,
+        excludeRecentlySuggested: settings.value.suggestionDefaultExcludeRecent,
+        respectDoNotSuggest: settings.value.suggestionDefaultRespectDoNotSuggest,
+        minDietScore: settings.value.suggestionDefaultMinDietScore,
+        favoriteMode: normalizeFavoriteMode(undefined),
+        recentSuggestionCount: settings.value.suggestionExcludeRecentCount,
+        deliveryArea,
     };
 }
 
-// ── Suggest ─────────────────────────────────────────────────
-
-/**
- * Process a suggestion request from form data.
- * Returns the suggestion result or throws if no match found.
- * Records the suggestion in history for future exclusion.
- */
 export async function processSuggestion(body: {
     dietTagIds?: string | string[];
     excludeAllergens?: string;
     cuisineIncludes?: string;
     cuisineExcludes?: string;
     openOnly?: boolean | string;
+    excludeRecentlySuggested?: boolean | string;
+    respectDoNotSuggest?: boolean | string;
+    favoriteMode?: string;
+    minDietScore?: number | string;
 }, userId?: number | null): Promise<SuggestionResultData> {
-    // Normalize dietTagIds to array
     let dietTagIds: string[] = [];
     if (body.dietTagIds) {
         dietTagIds = Array.isArray(body.dietTagIds) ? body.dietTagIds : [body.dietTagIds];
     }
     dietTagIds = dietTagIds.filter(Boolean);
 
-    // Get recently suggested restaurant IDs to exclude
-    const excludeRestaurantIds = await suggestionHistoryService.getRecentRestaurantIds(userId);
+    const openOnly = parseBooleanLike(body.openOnly, settings.value.suggestionDefaultOpenOnly);
+    const excludeRecentlySuggested = parseBooleanLike(
+        body.excludeRecentlySuggested,
+        settings.value.suggestionDefaultExcludeRecent,
+    );
+    const respectDoNotSuggest = parseBooleanLike(
+        body.respectDoNotSuggest,
+        settings.value.suggestionDefaultRespectDoNotSuggest,
+    );
+    const favoriteMode = normalizeFavoriteMode(body.favoriteMode);
+    const minDietScore = normalizeMinDietScore(body.minDietScore);
 
-    // Get do-not-suggest restaurant IDs for this user (hard exclude)
-    const doNotSuggestIds = userId
+    const excludeRestaurantIds = excludeRecentlySuggested
+        ? await suggestionHistoryService.getRecentRestaurantIds(userId)
+        : [];
+
+    const doNotSuggestIds = userId && respectDoNotSuggest
         ? await userRestaurantPrefService.getDoNotSuggestRestaurantIds(userId)
         : [];
 
-    // Get favorite restaurant IDs for this user (boost in selection)
     const favoriteIds = userId
         ? await userRestaurantPrefService.getFavoriteRestaurantIds(userId)
         : [];
@@ -124,7 +191,9 @@ export async function processSuggestion(body: {
         excludeRestaurantIds,
         doNotSuggestIds,
         favoriteIds,
-        openOnly: body.openOnly === true || body.openOnly === 'true',
+        favoriteMode,
+        openOnly,
+        minDietScore,
     };
 
     const result = await suggestionService.suggest(filters);
@@ -137,18 +206,25 @@ export async function processSuggestion(body: {
         );
     }
 
-    // Record suggestion in history
     await suggestionHistoryService.recordSuggestion(result.restaurant.id, userId);
 
-    return formatResult(result);
+    return formatResult(result, {
+        minDietScore,
+        favoriteMode,
+        openOnly,
+        excludeRecentlySuggested,
+        respectDoNotSuggest,
+    });
 }
 
-/**
- * Format a SuggestionResult into the view-friendly result data.
- */
-function formatResult(result: SuggestionResult): SuggestionResultData {
+function formatResult(
+    result: SuggestionResult,
+    filters: SuggestionResultData['reason']['filters'],
+): SuggestionResultData {
     const r = result.restaurant;
     const matchedCuisines = result.reason.matchedCuisines ?? [];
+    const openingStatus = getOpeningHoursPresentation(r.openingHours).status;
+
     return {
         restaurant: {
             id: r.id,
@@ -158,13 +234,22 @@ function formatResult(result: SuggestionResult): SuggestionResultData {
             city: r.city,
             postalCode: r.postalCode,
             country: r.country,
+            openingStatus: {
+                state: openingStatus.state,
+                summaryLabel: openingStatus.summaryLabel,
+                detailLabel: openingStatus.detailLabel,
+                relativeLabel: openingStatus.relativeLabel,
+            },
         },
         reason: {
-            matchedDiets: result.reason.matchedDiets.map(d => ({
-                dietTagKey: d.dietTagKey,
-                dietTagLabel: d.dietTagLabel,
-                supported: d.supported,
-                source: d.source,
+            matchedDiets: result.reason.matchedDiets.map((diet) => ({
+                dietTagKey: diet.dietTagKey,
+                dietTagLabel: diet.dietTagLabel,
+                supported: diet.supported,
+                source: diet.source,
+                score: diet.score ?? null,
+                confidence: diet.confidence ?? null,
+                meetsScoreThreshold: diet.meetsScoreThreshold,
             })),
             matchedCuisines: matchedCuisines.map((entry) => ({
                 key: entry.key,
@@ -174,6 +259,7 @@ function formatResult(result: SuggestionResult): SuggestionResultData {
                 source: entry.source,
             })),
             totalCandidates: result.reason.totalCandidates,
+            filters,
         },
     };
 }

@@ -19,6 +19,23 @@ router.get('/', requireAuth, asyncHandler(async (req: Request, res: Response) =>
     renderer.renderWithData(res, 'providers/index', data);
 }));
 
+router.post('/maintenance/heuristics', requireAuth, asyncHandler(async (_req: Request, res: Response) => {
+    const result = providerController.triggerHeuristicRefresh();
+    if (result.started) {
+        _req.flash('info', 'Heuristic refresh started in the background for all restaurants.');
+    } else {
+        _req.flash('info', 'A heuristic refresh is already running.');
+    }
+
+    res.redirect('/providers');
+}));
+
+router.post('/maintenance/reimport', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const result = await providerController.triggerProviderRefresh();
+    req.flash('info', `Provider refresh job queued (${result.jobId}). Track progress on Sync Jobs.`);
+    res.redirect('/sync/jobs');
+}));
+
 /**
  * POST /providers/:providerKey/sync
  * Trigger sync from listing URL for any provider.

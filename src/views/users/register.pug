@@ -1,4 +1,3 @@
-//- views/auth/register.pug – Facelift
 extends ../layout
 
 block meta
@@ -7,86 +6,105 @@ block meta
 block scripts
     script(type="module" src="/js/verify_password.gen.js")
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-person-plus-fill.me-2
-        | Register
+block body
+    - const hasLocalLogin = !!settings.localLoginEnabled
+    - const hasOidcLogin = !!settings.oidcEnabled
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-success
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 New account
+                        h1.display-5.fw-semibold.mb-2 Register
+                        p.lead.text-white-50.mb-0 Create a DeliveryRoulette account to keep favorites, suggestion defaults, and restaurant preferences attached to you.
+                    .col-lg-4
+                        .app-chip-row.justify-content-lg-end
+                            if hasLocalLogin
+                                span.app-chip Local account
+                            if hasOidcLogin
+                                span.app-chip #{settings.oidcName} single sign-on
 
-block content
-    form#form.row.gy-3.justify-content-center(action="/users/register" method="post")
-        +csrf
-        if settings.localLoginEnabled
-            //── Username ────────────────────────────────────────
-            .col-md-6
-                label.form-label.mb-1(for="username")
-                    i.bi.bi-person-circle.me-1
-                    | Username&nbsp;*
-                input#username.form-control.text-bg-dark(
-                    type="text"
-                    name="username"
-                    maxlength="100"
-                    value= (data && data.username) ? data.username : ''
-                    placeholder="choose a login name"
-                    required)
-
-            //── Username ────────────────────────────────────────
-            .col-md-6
-                label.form-label.mb-1(for="displayname")
-                    i.bi.bi-person-circle.me-1
-                    | Display name&nbsp;*
-                input#username.form-control.text-bg-dark(
-                    type="text"
-                    name="displayname"
-                    maxlength="100"
-                    value= (data && data.displayname) ? data.displayname : ''
-                    placeholder="choose a display name"
-                    required)
-
-            //── E-Mail ───────────────────────────────────────────
-            .col-md-6
-                label.form-label.mb-1(for="email")
-                    i.bi.bi-envelope.me-1
-                    | E-mail&nbsp;*
-                input#email.form-control.text-bg-dark(
-                    type="email"
-                    name="email"
-                    maxlength="100"
-                    placeholder="you@example.com"
-                    required)
-
-            //── Passwort ─────────────────────────────────────────
-            .col-md-6
-                label.form-label.mb-1(for="password")
-                    i.bi.bi-shield-lock.me-1
-                    | Password&nbsp;*
-                input#password.form-control.text-bg-dark(
-                    type="password"
-                    name="password"
-                    minlength="8"
-                    placeholder="min. 8 characters"
-                    required)
-                small#password-info.form-text
-
-            //── Wiederholen ──────────────────────────────────────
-            .col-md-6
-                label.form-label.mb-1(for="password_repeat")
-                    i.bi.bi-shield-lock.me-1
-                    | Repeat password&nbsp;*
-                input#password_repeat.form-control.text-bg-dark(
-                    type="password"
-                    name="password_repeat"
-                    minlength="8"
-                    required)
-                div#password_repeat-info.invalid-feedback Passwords do not match!
-
-            //── Submit ───────────────────────────────────────────
-            .col-6.d-grid.mt-2
-                button.btn.btn-success(type="submit")
-                    i.bi.bi-check-lg.me-1
-                    | Register
-
-        if settings.oidcEnabled
-            .col-6.d-grid.mt-2
-                a.btn.btn-primary(href="/users/oidc/login")
-                    i.bi.bi-person-vcard.me-1
-                    | Login using #{settings.oidcName}
+        section.card.app-section-card
+            .card-body
+                .row.g-4.justify-content-center
+                    .col-xl-7
+                        .app-panel.h-100
+                            if hasLocalLogin
+                                form#form.row.g-3(action="/users/register" method="post")
+                                    +csrf
+                                    .col-md-6
+                                        label.form-label(for="username")
+                                            i.bi.bi-person-circle.me-1
+                                            | Username
+                                        input#username.form-control.text-bg-dark(
+                                            type="text"
+                                            name="username"
+                                            maxlength="100"
+                                            value=(data && data.username) ? data.username : ''
+                                            placeholder="choose a login name"
+                                            required
+                                        )
+                                    .col-md-6
+                                        label.form-label(for="displayname")
+                                            i.bi.bi-person-badge.me-1
+                                            | Display name
+                                        input#displayname.form-control.text-bg-dark(
+                                            type="text"
+                                            name="displayname"
+                                            maxlength="100"
+                                            value=(data && data.displayname) ? data.displayname : ''
+                                            placeholder="choose a display name"
+                                            required
+                                        )
+                                    .col-md-6
+                                        label.form-label(for="email")
+                                            i.bi.bi-envelope.me-1
+                                            | E-mail
+                                    input#email.form-control.text-bg-dark(
+                                        type="email"
+                                        name="email"
+                                        maxlength="100"
+                                        value=(data && data.email) ? data.email : ''
+                                        placeholder="you@example.com"
+                                        required
+                                    )
+                                    .col-md-6
+                                        label.form-label(for="password")
+                                            i.bi.bi-shield-lock.me-1
+                                            | Password
+                                        input#password.form-control.text-bg-dark(
+                                            type="password"
+                                            name="password"
+                                            minlength="8"
+                                            placeholder="min. 8 characters"
+                                            required
+                                        )
+                                        small#password-info.form-text
+                                    .col-md-6
+                                        label.form-label(for="password_repeat")
+                                            i.bi.bi-shield-lock.me-1
+                                            | Repeat password
+                                        input#password_repeat.form-control.text-bg-dark(
+                                            type="password"
+                                            name="password_repeat"
+                                            minlength="8"
+                                            required
+                                        )
+                                        div#password_repeat-info.invalid-feedback Passwords do not match.
+                                    .col-12
+                                        button.btn.btn-success(type="submit")
+                                            i.bi.bi-check-lg.me-1
+                                            | Register
+                            else
+                                p.text-white-50.mb-0 Local registration is disabled.
+                    .col-xl-4
+                        .app-panel.h-100
+                            h2.h6.text-uppercase.text-white-50.mb-3 Next steps
+                            ul.text-white-50.small.mb-3
+                                li Save default diets and cuisine filters after sign-up.
+                                li Mark favorites directly on restaurant detail pages.
+                                li Use the suggestion page with your saved defaults immediately.
+                            if hasOidcLogin
+                                a.btn.btn-primary.w-100(href="/users/oidc/login")
+                                    i.bi.bi-person-vcard.me-1
+                                    | Login using #{settings.oidcName}

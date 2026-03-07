@@ -96,17 +96,17 @@ export const scoreAndConfidenceData = [
         expectedConfidence: 'LOW',
     },
     {
-        description: 'low ratio with many items yields MEDIUM confidence',
+        description: 'low ratio with many items yields LOW confidence',
         matchRatio: 0.1,
         totalMenuItems: 20,
-        expectedScore: 9,
-        expectedConfidence: 'MEDIUM',
+        expectedScore: 0,
+        expectedConfidence: 'LOW',
     },
     {
         description: 'high ratio with many items yields HIGH confidence',
         matchRatio: 0.5,
         totalMenuItems: 10,
-        expectedScore: 52,
+        expectedScore: 47,
         expectedConfidence: 'HIGH',
     },
     {
@@ -120,22 +120,22 @@ export const scoreAndConfidenceData = [
         description: 'small menu with half matches yields MEDIUM',
         matchRatio: 0.5,
         totalMenuItems: 4,
-        expectedScore: 48,
+        expectedScore: 43,
         expectedConfidence: 'MEDIUM',
     },
     {
         description: 'small menu with low ratio yields LOW',
         matchRatio: 0.25,
         totalMenuItems: 4,
-        expectedScore: 21,
+        expectedScore: 15,
         expectedConfidence: 'LOW',
     },
     {
-        description: 'threshold ratio 0.3 with many items yields HIGH',
+        description: 'threshold ratio 0.3 with many items yields MEDIUM',
         matchRatio: 0.3,
         totalMenuItems: 10,
-        expectedScore: 31,
-        expectedConfidence: 'HIGH',
+        expectedScore: 22,
+        expectedConfidence: 'MEDIUM',
     },
 ];
 
@@ -215,8 +215,8 @@ export const inferForTagData = [
         description: 'matches keywords in description only',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Smoothie', description: 'Dairy-free, made with oat beverage'},
-            {id: 'item-2', name: 'Regular Latte', description: 'Whole milk'},
+            {id: 'item-1', name: 'Veggie Bowl', description: 'Dairy-free with herb sauce'},
+            {id: 'item-2', name: 'Creamy Pasta', description: 'Whole milk'},
         ],
         expectedMatchCount: 1,
         expectedMatchedItemIds: ['item-1'],
@@ -267,7 +267,7 @@ export const inferForTagData = [
         description: 'detects German lactose-free keywords (laktosefrei, milchfrei)',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Hafermilch Latte', description: 'Laktosefrei'},
+            {id: 'item-1', name: 'Kartoffelpfanne', description: 'Laktosefrei'},
             {id: 'item-2', name: 'Sorbet', description: 'Milchfrei und erfrischend'},
             {id: 'item-3', name: 'Käsekuchen', description: 'Mit Frischkäse'},
         ],
@@ -547,7 +547,7 @@ export const inferForTagData = [
         description: 'explicit lactose-free item names override milk allergen signal',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
-            {id: 'item-1', name: 'Dairy-Free Latte', description: 'Made with oat beverage', allergens: null},
+            {id: 'item-1', name: 'Dairy-Free Flatbread', description: 'Made with oat cream', allergens: 'Milk'},
             {id: 'item-2', name: 'Lactose-Free Cheese Pizza', description: 'Special cheese', allergens: 'Milk, Gluten'},
         ],
         expectedMatchCount: 2,
@@ -594,7 +594,7 @@ export const inferForTagData = [
         items: [
             {
                 id: 'item-1',
-                name: 'Hauslimonade',
+                name: 'Fruit Bowl',
                 categoryName: 'Laktosefrei',
                 description: '-',
                 allergens: 'Milk',
@@ -678,7 +678,7 @@ export const inferForTagData = [
         expectedMatchedItemIds: ['item-1'],
     },
     {
-        description: 'vegan dish whitelist detects fries and churros without explicit vegan keyword',
+        description: 'vegan dish whitelist detects potato side dishes without explicit vegan keyword',
         tag: buildTestTag('VEGAN', 'tag-vegan'),
         items: [
             {
@@ -699,8 +699,8 @@ export const inferForTagData = [
                 allergens: 'Gluten, Wheat',
             },
         ],
-        expectedMatchCount: 3,
-        expectedMatchedItemIds: ['item-1', 'item-2', 'item-3'],
+        expectedMatchCount: 2,
+        expectedMatchedItemIds: ['item-1', 'item-2'],
     },
     {
         description: 'side-dish wording in descriptions does not make non-vegan mains vegan',
@@ -796,6 +796,130 @@ export const inferForTagData = [
     },
 ];
 
+export const heuristicCoverageCases = [
+    {
+        description: 'dedupes identical menu rows when computing coverage stats',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Pommes', description: '-', categoryName: 'Sides'},
+            {id: 'item-2', name: 'Pommes', description: '-', categoryName: 'Snacks'},
+            {id: 'item-3', name: 'Vegan Salad', description: 'Fresh greens', categoryName: 'Salads'},
+            {id: 'item-4', name: 'Beef Burger', description: 'Classic burger', categoryName: 'Mains'},
+        ],
+        expected: {
+            matchedUniqueItems: 2,
+            totalUniqueItems: 3,
+            duplicateItemsFiltered: 1,
+            matchedDuplicateItemsFiltered: 1,
+            sharePercent: 67,
+        },
+    },
+    {
+        description: 'penalizes low-variety support on large menus',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Pommes', description: '-', categoryName: 'Sides'},
+            {id: 'item-2', name: 'Vegan Salad', description: 'Fresh greens', categoryName: 'Salads'},
+            {id: 'item-3', name: 'Beef Burger', description: 'Classic burger', categoryName: 'Mains'},
+            {id: 'item-4', name: 'Chicken Wrap', description: 'Spicy', categoryName: 'Mains'},
+            {id: 'item-5', name: 'Fish Tacos', description: 'Fresh fish', categoryName: 'Mains'},
+            {id: 'item-6', name: 'Cheese Pizza', description: 'Mozzarella', categoryName: 'Pizza'},
+            {id: 'item-7', name: 'Pork Ribs', description: 'BBQ', categoryName: 'Grill'},
+            {id: 'item-8', name: 'Turkey Club', description: 'Bacon and turkey', categoryName: 'Sandwiches'},
+            {id: 'item-9', name: 'Shrimp Pasta', description: 'Seafood', categoryName: 'Pasta'},
+            {id: 'item-10', name: 'Steak Frites', description: 'Butter sauce', categoryName: 'Grill'},
+        ],
+        expected: {
+            matchedUniqueItems: 2,
+            totalUniqueItems: 10,
+            score: 23,
+            confidence: 'MEDIUM',
+            varietyPercent: 33,
+        },
+    },
+    {
+        description: 'collapses size variants into one comparable choice for scoring and evidence',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: '6 Vegan Nuggets', description: '-', categoryName: 'Sides'},
+            {id: 'item-2', name: '9 Vegan Nuggets', description: '-', categoryName: 'Sides'},
+            {id: 'item-3', name: '20 Vegan Nuggets', description: '-', categoryName: 'Combos'},
+            {id: 'item-4', name: 'Fries Small', description: '-', categoryName: 'Sides'},
+            {id: 'item-5', name: 'Fries Large', description: '-', categoryName: 'Snacks'},
+            {id: 'item-6', name: 'Beef Burger', description: 'Classic burger', categoryName: 'Mains'},
+        ],
+        expected: {
+            matchedUniqueItems: 2,
+            totalUniqueItems: 3,
+            duplicateItemsFiltered: 3,
+            matchedDuplicateItemsFiltered: 3,
+            sharePercent: 67,
+            varietyPercent: 33,
+            dedupedMatchedNames: ['Vegan Nuggets', 'Fries'],
+        },
+    },
+    {
+        description: 'groups parenthesized quantities and menu variants into one comparable choice',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'King Nuggets\u00ae Plant-based (9 St\u00fcck)', description: '-', categoryName: 'Nuggets'},
+            {id: 'item-2', name: 'Plant-based* Long Chicken', description: '-', categoryName: 'Burgers'},
+            {id: 'item-3', name: 'King Nuggets\u00ae Plant-based (20 St\u00fcck)', description: '-', categoryName: 'Nuggets'},
+            {id: 'item-4', name: 'Plant-based* Hamburger', description: '-', categoryName: 'Burgers'},
+            {id: 'item-5', name: 'Plant-based* Long Chicken Men\u00fc', description: '-', categoryName: 'Menus'},
+            {id: 'item-6', name: 'King Nuggets\u00ae Plant-based (6 St\u00fcck)', description: '-', categoryName: 'Nuggets'},
+        ],
+        expected: {
+            matchedUniqueItems: 3,
+            totalUniqueItems: 3,
+            duplicateItemsFiltered: 3,
+            matchedDuplicateItemsFiltered: 3,
+            sharePercent: 100,
+            varietyPercent: 50,
+            dedupedMatchedNames: [
+                'King Nuggets\u00ae Plant-based',
+                'Plant-based* Long Chicken',
+                'Plant-based* Hamburger',
+            ],
+        },
+    },
+    {
+        description: 'groups size variants for fries while keeping distinct side families separate',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Curly Fries', description: '-', categoryName: 'Sides'},
+            {id: 'item-2', name: 'McPlant\u00ae Nuggets', description: 'plant-based', categoryName: 'Sides'},
+            {id: 'item-3', name: 'Pommes Frites Gro\u00df', description: '-', categoryName: 'Sides'},
+            {id: 'item-4', name: 'Pommes Frites', description: '-', categoryName: 'Snacks'},
+        ],
+        expected: {
+            matchedUniqueItems: 3,
+            totalUniqueItems: 3,
+            duplicateItemsFiltered: 1,
+            matchedDuplicateItemsFiltered: 1,
+            sharePercent: 100,
+            varietyPercent: 50,
+            dedupedMatchedNames: ['Curly Fries', 'McPlant\u00ae Nuggets', 'Pommes Frites'],
+        },
+    },
+    {
+        description: 'ignores drinks when building comparable menu counts',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Vegan Burger', description: 'Plant-based patty', categoryName: 'Mains'},
+            {id: 'item-2', name: 'Coca-Cola', description: '0.33l', categoryName: 'Drinks'},
+            {id: 'item-3', name: 'Still Water', description: '0.5l', categoryName: 'Drinks'},
+        ],
+        expected: {
+            matchedUniqueItems: 1,
+            totalUniqueItems: 1,
+            score: 71,
+            confidence: 'MEDIUM',
+            varietyPercent: 17,
+        },
+    },
+];
+
 // ── German keyword rules expected data ─────────────────────
 
 export const germanKeywordExpectations = [
@@ -809,6 +933,8 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '6.6.0',
+    expectedCurrent: '8.2.0',
 };
+
+
 

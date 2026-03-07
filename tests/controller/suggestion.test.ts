@@ -61,6 +61,7 @@ describe('SuggestionController', () => {
             setupMock(mockGetAllDietTags, sampleDietTags);
             setupMock(mockGetEffectiveDietFilterIds, ['tag-vegan', 'tag-vegetarian']);
             setupMock(mockGetByUserId, {
+                deliveryArea: 'Downtown',
                 cuisineIncludes: 'Italian, Sushi',
                 cuisineExcludes: 'Fast Food',
             });
@@ -71,6 +72,12 @@ describe('SuggestionController', () => {
             expect(result.selectedDietTagIds).toHaveLength(formDataDefaults.expectedSelectedCount);
             expect(result.cuisineIncludes).toBe('Italian, Sushi');
             expect(result.cuisineExcludes).toBe('Fast Food');
+            expect(result.deliveryArea).toBe('Downtown');
+            expect(result.openOnly).toBe(true);
+            expect(result.excludeRecentlySuggested).toBe(true);
+            expect(result.respectDoNotSuggest).toBe(true);
+            expect(result.minDietScore).toBe(formDataDefaults.expectedMinDietScore);
+            expect(result.favoriteMode).toBe('prefer');
         });
 
         test('returns empty defaults for anonymous user', async () => {
@@ -82,6 +89,7 @@ describe('SuggestionController', () => {
             expect(result.selectedDietTagIds).toHaveLength(0);
             expect(result.cuisineIncludes).toBe('');
             expect(result.cuisineExcludes).toBe('');
+            expect(result.excludeAllergens).toBe('');
             expect(mockGetEffectiveDietFilterIds).not.toHaveBeenCalled();
             expect(mockGetByUserId).not.toHaveBeenCalled();
         });
@@ -212,6 +220,7 @@ describe('SuggestionController', () => {
             expect(mockSuggest).toHaveBeenCalledWith(
                 expect.objectContaining({
                     favoriteIds: ['r-fav-1', 'r-fav-2'],
+                    favoriteMode: 'prefer',
                 })
             );
         });
@@ -228,8 +237,35 @@ describe('SuggestionController', () => {
             expect(mockSuggest).toHaveBeenCalledWith(
                 expect.objectContaining({
                     favoriteIds: [],
+                    openOnly: true,
+                    minDietScore: 10,
                 })
             );
+        });
+
+        test('honors advanced threshold and toggle filters', async () => {
+            setupMock(mockSuggest, {
+                restaurant: {id: 'r1', name: 'Test'},
+                reason: {matchedDiets: [], totalCandidates: 1},
+            });
+
+            await suggestionController.processSuggestion({
+                minDietScore: '25',
+                openOnly: 'false',
+                excludeRecentlySuggested: 'false',
+                respectDoNotSuggest: 'false',
+                favoriteMode: 'only',
+            }, 9);
+
+            expect(mockGetRecentRestaurantIds).not.toHaveBeenCalled();
+            expect(mockGetDoNotSuggestRestaurantIds).not.toHaveBeenCalled();
+            expect(mockSuggest).toHaveBeenCalledWith(expect.objectContaining({
+                minDietScore: 25,
+                openOnly: false,
+                favoriteMode: 'only',
+                excludeRestaurantIds: [],
+                doNotSuggestIds: [],
+            }));
         });
     });
 });

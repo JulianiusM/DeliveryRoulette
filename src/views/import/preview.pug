@@ -1,104 +1,119 @@
-//- views/import/preview.pug – Import Preview / Diff Page
 extends ../layout
 
 block meta
     title Import Preview | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-eye.me-2
-        | Import Preview
-
-block content
+block body
     - const diff = (data && data.diff) || { restaurants: [], totalNew: 0, totalUpdated: 0, totalUnchanged: 0 }
     - const payloadJson = (data && data.payloadJson) || ''
 
-    //── Summary badges ──────────────────────────────────
-    .d-flex.gap-3.mb-4.flex-wrap
-        span.badge.text-bg-success.fs-6
-            i.bi.bi-plus-circle.me-1
-            | #{diff.totalNew} New
-        span.badge.text-bg-warning.text-dark.fs-6
-            i.bi.bi-pencil.me-1
-            | #{diff.totalUpdated} Updated
-        span.badge.text-bg-secondary.fs-6
-            i.bi.bi-check-circle.me-1
-            | #{diff.totalUnchanged} Unchanged
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-warning
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Review before apply
+                        h1.display-5.fw-semibold.mb-2 Import Preview
+                        p.lead.text-white-50.mb-0 Inspect what will be created, updated, or left untouched before applying the import payload.
+                    .col-lg-4
+                        .row.g-3
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label New
+                                    strong.app-stat-value #{diff.totalNew}
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label Updated
+                                    strong.app-stat-value #{diff.totalUpdated}
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label Unchanged
+                                    strong.app-stat-value #{diff.totalUnchanged}
 
-    //── Restaurant details ──────────────────────────────
-    if diff.restaurants.length === 0
-        .text-center.text-white-50.py-4
-            p No restaurants in the import file.
-    else
-        each r in diff.restaurants
-            .card.bg-dark.border.mb-3(class=(r.action === 'new' ? 'border-success' : r.action === 'updated' ? 'border-warning' : 'border-secondary'))
-                .card-header.d-flex.justify-content-between.align-items-center
+        .app-chip-row
+            span.app-chip
+                i.bi.bi-check2-square
+                | Review all changed restaurants before applying
+            span.app-chip
+                i.bi.bi-file-earmark-text
+                | Payload stays staged until you confirm
+
+        if diff.restaurants.length === 0
+            .app-empty-state
+                i.bi.bi-inbox
+                p.mb-0 No restaurants were found in the import file.
+        else
+            section.card.app-section-card
+                .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
                     span
-                        strong #{r.name}
-                    if r.action === 'new'
-                        span.badge.text-bg-success New
-                    else if r.action === 'updated'
-                        span.badge.text-bg-warning.text-dark Updated
-                    else
-                        span.badge.text-bg-secondary Unchanged
-
+                        i.bi.bi-list-ul.me-2
+                        | Restaurant Diff
+                    .d-flex.gap-2
+                        a.btn.btn-outline-light.btn-sm(href="/import")
+                            i.bi.bi-arrow-left.me-1
+                            | Back
+                        form(method="POST" action="/import/apply")
+                            +csrf
+                            input(type="hidden" name="payloadJson" value=payloadJson)
+                            button.btn.btn-success.btn-sm(type="submit")
+                                i.bi.bi-check-lg.me-1
+                                | Apply Import
                 .card-body
-                    //── Field changes ─────────────────────
-                    if r.fieldChanges && r.fieldChanges.length > 0
-                        h6.text-white-50 Field Changes
-                        .table-responsive.mb-3
-                            table.table.table-dark.table-sm
-                                thead
-                                    tr
-                                        th Field
-                                        th Old Value
-                                        th New Value
-                                tbody
-                                    each change in r.fieldChanges
-                                        tr
-                                            td #{change.field}
-                                            td.text-danger #{change.oldValue || '(empty)'}
-                                            td.text-success #{change.newValue || '(empty)'}
-
-                    //── Menu categories ───────────────────
-                    if r.categories && r.categories.length > 0
-                        h6.text-white-50 Menu Categories
-                        ul.list-group.list-group-flush.mb-3
-                            each cat in r.categories
-                                li.list-group-item.bg-dark.text-white.d-flex.justify-content-between
-                                    span #{cat.name} (#{cat.itemCount} items)
-                                    if cat.action === 'new'
+                    .d-flex.flex-column.gap-3
+                        each r in diff.restaurants
+                            article.app-list-card
+                                .d-flex.justify-content-between.align-items-start.flex-wrap.gap-3.mb-3
+                                    div
+                                        h2.h5.mb-1 #{r.name}
+                                        if r.addressLine1 || r.city
+                                            p.text-white-50.small.mb-0 #{[r.addressLine1, r.city].filter(Boolean).join(', ')}
+                                    if r.action === 'new'
                                         span.badge.text-bg-success New
+                                    else if r.action === 'updated'
+                                        span.badge.text-bg-warning.text-dark Updated
                                     else
-                                        span.badge.text-bg-warning.text-dark Update
+                                        span.badge.text-bg-secondary Unchanged
 
-                    //── Provider refs ────────────────────
-                    if r.providerRefs && r.providerRefs.length > 0
-                        h6.text-white-50 Provider References
-                        ul.list-group.list-group-flush.mb-3
-                            each ref in r.providerRefs
-                                li.list-group-item.bg-dark.text-white.d-flex.justify-content-between
-                                    span #{ref.providerKey}: #{ref.url}
-                                    if ref.action === 'new'
-                                        span.badge.text-bg-success New
-                                    else
-                                        span.badge.text-bg-warning.text-dark Update
+                                if r.fieldChanges && r.fieldChanges.length > 0
+                                    .mb-3
+                                        h3.h6.text-uppercase.text-white-50.mb-2 Field changes
+                                        .app-table-shell.table-responsive
+                                            table.table.table-dark.table-sm.align-middle
+                                                thead
+                                                    tr
+                                                        th Field
+                                                        th Old value
+                                                        th New value
+                                                tbody
+                                                    each change in r.fieldChanges
+                                                        tr
+                                                            td #{change.field}
+                                                            td.text-danger #{change.oldValue || '(empty)'}
+                                                            td.text-success #{change.newValue || '(empty)'}
 
-                    //── Diet tags ────────────────────────
-                    if r.dietTags && r.dietTags.length > 0
-                        h6.text-white-50 Diet Tags
-                        .mb-3
-                            each tag in r.dietTags
-                                span.badge.text-bg-info.me-1 #{tag}
-
-    //── Actions ─────────────────────────────────────────
-    .d-flex.justify-content-between.mt-4
-        a.btn.btn-secondary(href="/import")
-            i.bi.bi-arrow-left.me-1
-            | Back
-        form(method="POST" action="/import/apply")
-            +csrf
-            input(type="hidden" name="payloadJson" value=payloadJson)
-            button.btn.btn-success(type="submit")
-                i.bi.bi-check-lg.me-1
-                | Apply Import
+                                .row.g-3
+                                    if r.categories && r.categories.length > 0
+                                        .col-lg-4
+                                            .app-panel.h-100
+                                                h3.h6.text-uppercase.text-white-50.mb-2 Menu categories
+                                                .d-flex.flex-column.gap-2
+                                                    each cat in r.categories
+                                                        .d-flex.justify-content-between.align-items-center.gap-2
+                                                            span #{cat.name} (#{cat.itemCount} items)
+                                                            span.badge(class=cat.action === 'new' ? 'text-bg-success' : 'text-bg-warning text-dark') #{cat.action === 'new' ? 'New' : 'Update'}
+                                    if r.providerRefs && r.providerRefs.length > 0
+                                        .col-lg-4
+                                            .app-panel.h-100
+                                                h3.h6.text-uppercase.text-white-50.mb-2 Provider references
+                                                .d-flex.flex-column.gap-2
+                                                    each ref in r.providerRefs
+                                                        .d-flex.justify-content-between.align-items-center.gap-2
+                                                            span #{ref.providerKey}: #{ref.url}
+                                                            span.badge(class=ref.action === 'new' ? 'text-bg-success' : 'text-bg-warning text-dark') #{ref.action === 'new' ? 'New' : 'Update'}
+                                    if r.dietTags && r.dietTags.length > 0
+                                        .col-lg-4
+                                            .app-panel.h-100
+                                                h3.h6.text-uppercase.text-white-50.mb-2 Diet tags
+                                                .app-chip-row
+                                                    each tag in r.dietTags
+                                                        span.app-chip #{tag}

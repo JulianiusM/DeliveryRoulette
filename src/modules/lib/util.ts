@@ -34,6 +34,10 @@ export function resolveActorLabel(session: Request['session'] | undefined | null
     return 'an organizer';
 }
 
+export function getSessionUserId(session: Request['session'] | undefined | null): number | undefined {
+    return session?.user?.id;
+}
+
 // Sanitize text for use in email content to prevent injection attacks
 export function sanitizeForEmail(text: string): string {
     // Remove control characters and limit to printable characters
@@ -169,7 +173,7 @@ export function maskEmail(email?: string | null) {
 export async function performAPIAction(req: Request, action: {
     actionUser: (body: any, userId: number) => Promise<void>,
 }) {
-    const userId = req.session.user?.id;
+    const userId = getSessionUserId(req.session);
     if (userId) await action.actionUser(req.body, userId);
     else throw new APIError('Unknown user', {}, 401);
 }

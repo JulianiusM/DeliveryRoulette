@@ -1,29 +1,39 @@
-//- views/error.pug – überarbeitete Fehlerseite
 extends layout
 
 block meta
     title Error | DeliveryRoulette
 
-block title
-    h1.card-header.text-center.bg-danger.text-light
-        i.bi.bi-exclamation-triangle-fill.me-2
-        | Oops! Something went wrong
+block alert
 
-block content
-    //── Error Message ────────────────────────────────────
-    .alert.alert-danger.d-flex.align-items-center
-        i.bi.bi-x-circle-fill.me-2.fs-3
-        div
-            strong= message || 'An internal server error has occurred!'
-            if code
-                |  (Status #{code})
+block body
+    - const errorCode = code || (error && error.status) || 500
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-danger
+            .card-body.p-4.p-lg-5
+                p.app-eyebrow.mb-2 Failure state
+                h1.display-5.fw-semibold.mb-2 Something went wrong
+                p.lead.text-white-50.mb-0 #{message || 'An internal server error has occurred.'}
 
-    //── Stack Trace (nur in Entwicklung) ─────────────────
-    if error && error.stack
-        details.mb-0
-            summary.text-warning
-                i.bi.bi-code-slash.me-1
-                | View stack trace
-            pre.bg-black.text-light.p-2.rounded
-                code= error.stack
-
+        section.card.app-section-card
+            .card-body
+                .app-status-card.is-danger
+                    .d-flex.align-items-start.gap-3
+                        i.bi.bi-exclamation-triangle-fill.fs-2
+                        div
+                            h2.h4.mb-2 Request failed
+                            p.mb-2 Status #{errorCode}
+                            p.text-white-50.mb-0 Use the navigation to return to a stable area of the app. If this page appeared during a sync or import flow, check the relevant jobs or alerts pages afterwards.
+                .d-flex.flex-wrap.gap-2.mt-4
+                    a.btn.btn-outline-light(href="/")
+                        i.bi.bi-house.me-1
+                        | Home
+                    a.btn.btn-outline-light(href="/sync/jobs")
+                        i.bi.bi-list-check.me-1
+                        | Sync Jobs
+                if error && error.stack
+                    details.mt-4
+                        summary.text-warning
+                            i.bi.bi-code-slash.me-1
+                            | View stack trace
+                        pre.bg-black.text-light.p-3.rounded.mt-2.mb-0
+                            code= error.stack

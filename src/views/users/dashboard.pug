@@ -1,97 +1,110 @@
-//- views/users/dashboard.pug – DeliveryRoulette User Dashboard
 extends ../layout
 
 block meta
     title Dashboard | DeliveryRoulette
 
-block title
-    h1.card-header.text-center.py-3
-        i.bi.bi-speedometer2.me-2
-        | Welcome, #{user.name || user.username}!
-
-block content
+block body
     - const restaurantCount = (data && data.restaurantCount) || 0
     - const suggestionCount = (data && data.suggestionCount) || 0
     - const syncAlertCount = (data && data.syncAlertCount) || 0
     - const dietTagCount = (data && data.dietTagCount) || 0
     - const preferences = (data && data.preferences) || {}
+    - const displayName = user ? (user.displayName || user.name || user.username) : 'User'
 
-    //- Stats cards
-    .row.row-cols-2.row-cols-md-4.g-3.mb-4
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body.text-center
-                    h2.display-4.mb-1 #{restaurantCount}
-                    p.text-white-50.mb-0
-                        i.bi.bi-shop.me-1
-                        | Restaurants
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body.text-center
-                    h2.display-4.mb-1 #{suggestionCount}
-                    p.text-white-50.mb-0
-                        i.bi.bi-shuffle.me-1
-                        | Suggestions
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body.text-center
-                    h2.display-4.mb-1 #{dietTagCount}
-                    p.text-white-50.mb-0
-                        i.bi.bi-heart-pulse.me-1
-                        | Diet Tags
-        .col
-            .card.h-100.text-bg-dark.border-secondary(class=syncAlertCount > 0 ? 'border-warning' : '')
-                .card-body.text-center
-                    h2.display-4.mb-1(class=syncAlertCount > 0 ? 'text-warning' : '') #{syncAlertCount}
-                    p.mb-0(class=syncAlertCount > 0 ? 'text-warning' : 'text-white-50')
-                        i.bi.bi-bell.me-1
-                        | Sync Alerts
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-success
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Personal workspace
+                        h1.display-5.fw-semibold.mb-2 Welcome, #{displayName}
+                        p.lead.text-white-50.mb-0 Your defaults, favorites, and operational shortcuts live here. This is the fastest place to branch into restaurants, suggestions, imports, and sync follow-up.
+                    .col-lg-4
+                        .row.g-3
+                            .col-6.col-xl-3.col-lg-6
+                                .app-stat-card
+                                    span.app-stat-label Restaurants
+                                    strong.app-stat-value #{restaurantCount}
+                            .col-6.col-xl-3.col-lg-6
+                                .app-stat-card
+                                    span.app-stat-label Suggestions
+                                    strong.app-stat-value #{suggestionCount}
+                            .col-6.col-xl-3.col-lg-6
+                                .app-stat-card
+                                    span.app-stat-label Diet tags
+                                    strong.app-stat-value #{dietTagCount}
+                            .col-6.col-xl-3.col-lg-6
+                                .app-stat-card
+                                    span.app-stat-label Alerts
+                                    strong.app-stat-value #{syncAlertCount}
+                                    small.text-white-50 #{syncAlertCount > 0 ? 'Needs review' : 'Clear'}
 
-    //- Quick actions
-    .d-flex.flex-wrap.justify-content-center.gap-2.mb-4
-        a.btn.btn-primary.d-inline-flex.align-items-center.gap-2(href="/restaurants")
-            i.bi.bi-shop
-            | Restaurants
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/suggest")
-            i.bi.bi-shuffle
-            | Get Suggestion
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/import")
-            i.bi.bi-upload
-            | Import
-        a.btn.btn-outline-light.d-inline-flex.align-items-center.gap-2(href="/providers")
-            i.bi.bi-plug
-            | Providers
+        section.card.app-section-card
+            .card-header
+                i.bi.bi-lightning-charge.me-2
+                | Quick Actions
+            .card-body
+                .row.g-4
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/restaurants")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-primary
+                                    i.bi.bi-shop
+                                div
+                                    h2.h5.mb-1 Restaurants
+                                    p.text-white-50.small.mb-0 Review visibility, providers, and menu quality.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/suggest")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-success
+                                    i.bi.bi-shuffle
+                                div
+                                    h2.h5.mb-1 Suggest
+                                    p.text-white-50.small.mb-0 Draw from your current defaults or refine the pool.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/users/settings")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-info
+                                    i.bi.bi-gear-fill
+                                div
+                                    h2.h5.mb-1 Settings
+                                    p.text-white-50.small.mb-0 Tune suggestion defaults and personal diet filters.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/providers")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-warning
+                                    i.bi.bi-plug
+                                div
+                                    h2.h5.mb-1 Providers
+                                    p.text-white-50.small.mb-0 Monitor imports, jobs, and refresh maintenance.
 
-    //- User preferences summary
-    if preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
-        .card.text-bg-dark.border-secondary.mb-4
-            .card-header.d-flex.justify-content-between.align-items-center
+        section.card.app-section-card
+            .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
                 span
-                    i.bi.bi-gear.me-2
-                    | Your Preferences
+                    i.bi.bi-person-circle.me-2
+                    | Your Defaults
                 a.btn.btn-sm.btn-outline-light(href="/users/settings")
                     i.bi.bi-pencil.me-1
-                    | Edit
+                    | Edit Settings
             .card-body
-                .row
-                    if preferences.deliveryArea
-                        .col-md-4
-                            strong.text-white-50
-                                i.bi.bi-geo-alt.me-1
-                                | Delivery Area
-                            p.mb-0 #{preferences.deliveryArea}
-                    if preferences.cuisineIncludes
-                        .col-md-4
-                            strong.text-white-50
-                                i.bi.bi-hand-thumbs-up.me-1
-                                | Preferred Cuisines
-                            p.mb-0 #{preferences.cuisineIncludes}
-                    if preferences.cuisineExcludes
-                        .col-md-4
-                            strong.text-white-50
-                                i.bi.bi-hand-thumbs-down.me-1
-                                | Excluded Cuisines
-                            p.mb-0 #{preferences.cuisineExcludes}
-
-block scripts
-    //- No custom JS needed for dashboard
+                if preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
+                    .row.g-4
+                        if preferences.deliveryArea
+                            .col-md-4
+                                .app-panel.h-100
+                                    h2.h6.text-uppercase.text-white-50.mb-2 Delivery area
+                                    p.mb-0 #{preferences.deliveryArea}
+                        if preferences.cuisineIncludes
+                            .col-md-4
+                                .app-panel.h-100
+                                    h2.h6.text-uppercase.text-white-50.mb-2 Preferred cuisines
+                                    p.mb-0 #{preferences.cuisineIncludes}
+                        if preferences.cuisineExcludes
+                            .col-md-4
+                                .app-panel.h-100
+                                    h2.h6.text-uppercase.text-white-50.mb-2 Excluded cuisines
+                                    p.mb-0 #{preferences.cuisineExcludes}
+                else
+                    .app-empty-state
+                        i.bi.bi-sliders
+                        p.mb-0 You have not saved personal suggestion defaults yet.

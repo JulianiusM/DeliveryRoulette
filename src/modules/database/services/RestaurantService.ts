@@ -2,6 +2,7 @@ import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
 import {RestaurantCuisine} from '../entities/restaurant/RestaurantCuisine';
 import {ProviderRestaurant} from '../../../providers/ProviderTypes';
+import {filterRestaurantsBySearch} from '../../lib/restaurantSearch';
 
 export interface ListRestaurantsOptions {
     search?: string;
@@ -55,25 +56,17 @@ export async function getRestaurantById(id: string): Promise<Restaurant | null> 
 
 export async function listRestaurants(options: ListRestaurantsOptions = {}): Promise<Restaurant[]> {
     const repo = AppDataSource.getRepository(Restaurant);
-    const qb = repo.createQueryBuilder('r');
-
-    if (options.search) {
-        const like = `%${options.search}%`;
-        qb.where('r.name LIKE :like', {like})
-            .orWhere('r.city LIKE :like', {like});
-    }
+    const qb = repo.createQueryBuilder('r')
+        .leftJoinAndSelect('r.providerCuisines', 'providerCuisine');
 
     if (options.isActive !== undefined) {
-        if (options.search) {
-            qb.andWhere('r.is_active = :isActive', {isActive: options.isActive ? 1 : 0});
-        } else {
-            qb.where('r.is_active = :isActive', {isActive: options.isActive ? 1 : 0});
-        }
+        qb.where('r.is_active = :isActive', {isActive: options.isActive ? 1 : 0});
     }
 
     qb.orderBy('r.name', 'ASC');
 
-    return await qb.getMany();
+    const restaurants = await qb.getMany();
+    return filterRestaurantsBySearch(restaurants, options.search);
 }
 
 /**

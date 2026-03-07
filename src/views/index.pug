@@ -1,8 +1,7 @@
-//- views/index.pug – Landing Page for DeliveryRoulette
 extends layout
 
 block meta
-    title DeliveryRoulette – Discover your next favorite delivery
+    title DeliveryRoulette - Discover your next favorite delivery
     meta(
         name="description"
         content="DeliveryRoulette helps you discover restaurants, manage dietary preferences, and get random delivery suggestions."
@@ -12,7 +11,7 @@ block meta
         content="restaurants, delivery, food, suggestions, diet, preferences, lieferando"
     )
     meta(name="author" content="DeliveryRoulette")
-    meta(property="og:title" content="DeliveryRoulette – Discover your next favorite delivery")
+    meta(property="og:title" content="DeliveryRoulette - Discover your next favorite delivery")
     meta(
         property="og:description"
         content="Manage restaurants, sync menus from delivery providers, track dietary preferences, and get random suggestions for your team."
@@ -21,210 +20,176 @@ block meta
     meta(property="og:url" content=settings.rootUrl)
     meta(name="twitter:card" content="summary_large_image")
 
-block title
-    //- Card header
-    h1.card-header.text-center.py-3.mb-0
-        i.bi.bi-shuffle.me-2
-        | DeliveryRoulette
+block body
+    - const displayName = user ? (user.displayName || user.name || user.username) : null
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-7
+                        p.app-eyebrow.mb-2 Delivery decision system
+                        h1.display-4.fw-semibold.mb-3 DeliveryRoulette
+                        if user
+                            p.lead.text-white-50.mb-4
+                                | Welcome back, 
+                                span.text-white #{displayName}
+                                | . Your restaurant data, menu intelligence, and suggestion tools are all in one place.
+                            .d-flex.flex-wrap.gap-2
+                                a.btn.btn-success.btn-lg(href="/suggest")
+                                    i.bi.bi-shuffle.me-2
+                                    | Suggest A Restaurant
+                                a.btn.btn-outline-light.btn-lg(href="/restaurants")
+                                    i.bi.bi-shop.me-2
+                                    | Browse Restaurants
+                        else
+                            p.lead.text-white-50.mb-4
+                                | Manage restaurant data, sync provider menus, track diet suitability, and generate suggestions that fit the group instead of guessing.
+                            .d-flex.flex-wrap.gap-2
+                                a.btn.btn-success.btn-lg(href="/users/register")
+                                    i.bi.bi-person-plus.me-2
+                                    | Create Account
+                                a.btn.btn-outline-light.btn-lg(href="/users/login")
+                                    i.bi.bi-box-arrow-in-right.me-2
+                                    | Log In
+                    .col-lg-5
+                        .row.g-3
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Core Areas
+                                    strong.app-stat-value 6
+                                    small.text-white-50 Restaurants, suggestions, imports, sync, diets, docs
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Visibility
+                                    strong.app-stat-value Live
+                                    small.text-white-50 Availability, favorites, and diet fit stay visible
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Menu Depth
+                                    strong.app-stat-value Smart
+                                    small.text-white-50 Dedupe, inference, and manual overrides work together
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Workflow
+                                    strong.app-stat-value Fast
+                                    small.text-white-50 Import, sync, review, and suggest without switching tools
 
-block content
-    //- Hero section
-    if user
-        .text-center.mb-4
-            p.lead.mb-3
-                | Welcome back, 
-                span.text-info #{user.name || user.username}
-                | !
-            p.text-white-50.mb-4 Your team's delivery restaurant management and suggestion system.
+        section.card.app-section-card
+            .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                span
+                    i.bi.bi-lightning-charge.me-2
+                    | Main Routes
+                if user
+                    a.btn.btn-sm.btn-outline-light(href="/users/dashboard")
+                        i.bi.bi-speedometer2.me-1
+                        | Your Overview
+            .card-body
+                .row.g-4
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/restaurants")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-primary
+                                    i.bi.bi-shop
+                                div
+                                    h2.h5.mb-1 Restaurants
+                                    p.text-white-50.small.mb-0 Inspect menus, diet fit, providers, and visibility.
+                            .app-chip-row
+                                span.app-chip Shown in app
+                                span.app-chip Availability
+                                span.app-chip Favorites
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/suggest")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-success
+                                    i.bi.bi-shuffle
+                                div
+                                    h2.h5.mb-1 Suggest
+                                    p.text-white-50.small.mb-0 Draw from the filtered restaurant pool with real diet thresholds.
+                            .app-chip-row
+                                span.app-chip Diet thresholds
+                                span.app-chip Open now
+                                span.app-chip History-aware
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/import")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-info
+                                    i.bi.bi-upload
+                                div
+                                    h2.h5.mb-1 Import
+                                    p.text-white-50.small.mb-0 Preview bulk data changes before applying them.
+                            .app-chip-row
+                                span.app-chip JSON and CSV
+                                span.app-chip Diff preview
+                                span.app-chip Result audit
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/providers")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-warning
+                                    i.bi.bi-plug
+                                div
+                                    h2.h5.mb-1 Providers
+                                    p.text-white-50.small.mb-0 Run syncs, imports, and maintenance from one place.
+                            .app-chip-row
+                                span.app-chip Listing discovery
+                                span.app-chip Menu import
+                                span.app-chip Maintenance jobs
 
-        //- Quick action buttons for logged-in users
-        .row.g-3.mb-5
-            .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-primary.h-100.text-decoration-none.hover-lift(href="/restaurants")
-                    .card-body.text-center.py-4
-                        i.bi.bi-shop.fs-1.text-primary.mb-3
-                        h3.h5.mb-2 Restaurants
-                        p.small.text-white-50.mb-0 View & manage restaurants
-            .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-success.h-100.text-decoration-none.hover-lift(href="/suggest")
-                    .card-body.text-center.py-4
-                        i.bi.bi-shuffle.fs-1.text-success.mb-3
-                        h3.h5.mb-2 Suggest
-                        p.small.text-white-50.mb-0 Get a random restaurant pick
-            .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-info.h-100.text-decoration-none.hover-lift(href="/import")
-                    .card-body.text-center.py-4
-                        i.bi.bi-upload.fs-1.text-info.mb-3
-                        h3.h5.mb-2 Import
-                        p.small.text-white-50.mb-0 Bulk import restaurants
-            .col-md-3.col-sm-6
-                a.card.text-bg-dark.border-warning.h-100.text-decoration-none.hover-lift(href="/providers")
-                    .card-body.text-center.py-4
-                        i.bi.bi-plug.fs-1.text-warning.mb-3
-                        h3.h5.mb-2 Providers
-                        p.small.text-white-50.mb-0 Sync from Lieferando
+        section.card.app-section-card
+            .card-header
+                i.bi.bi-grid-1x2-fill.me-2
+                | Platform Coverage
+            .card-body
+                .row.g-4
+                    .col-lg-4
+                        .app-panel.h-100
+                            .d-flex.align-items-center.gap-3.mb-3
+                                span.app-icon-badge.is-primary
+                                    i.bi.bi-diagram-3
+                                div
+                                    h2.h5.mb-1 Restaurant Intelligence
+                                    p.text-white-50.small.mb-0 Manage real menu data instead of flat restaurant rows.
+                            ul.text-white-50.small.mb-0
+                                li Search restaurants with fuzzy matching
+                                li Inspect provider refs, cuisines, and availability
+                                li Review diet suitability from deduped menu items
+                                li Edit restaurants, categories, and menu items directly
+                    .col-lg-4
+                        .app-panel.h-100
+                            .d-flex.align-items-center.gap-3.mb-3
+                                span.app-icon-badge.is-success
+                                    i.bi.bi-heart-pulse
+                                div
+                                    h2.h5.mb-1 Diet Workflow
+                                    p.text-white-50.small.mb-0 Keep diet defaults and heuristic rules aligned.
+                            ul.text-white-50.small.mb-0
+                                li Per-user diet defaults feed the suggestion page
+                                li Global heuristic keyword lists stay editable
+                                li Manual item overrides remain possible when heuristics miss
+                                li Low-quality matches can be filtered out with score thresholds
+                    .col-lg-4
+                        .app-panel.h-100
+                            .d-flex.align-items-center.gap-3.mb-3
+                                span.app-icon-badge.is-info
+                                    i.bi.bi-arrow-repeat
+                                div
+                                    h2.h5.mb-1 Sync And Import
+                                    p.text-white-50.small.mb-0 Provider changes and bulk imports stay reviewable.
+                            ul.text-white-50.small.mb-0
+                                li Listing syncs and direct URL imports
+                                li Sync jobs and alerts pages for operational follow-up
+                                li Maintenance reruns for heuristics and provider refreshes
+                                li Import preview and results for bulk updates
 
-    else
-        .text-center.mb-4
-            p.lead.mb-3 
-                | Your team's 
-                span.text-info delivery restaurant
-                |  suggestion system
-            p.text-white-50.mb-4
-                | Manage restaurants, sync menus from delivery providers, track dietary preferences, and get random suggestions.
-
-        .d-flex.flex-wrap.justify-content-center.gap-3.mb-5
-            a.btn.btn-primary.btn-lg.px-4.d-inline-flex.align-items-center.gap-2(href="/users/register")
-                i.bi.bi-person-plus
-                | Create Account
-            a.btn.btn-outline-light.btn-lg.px-4.d-inline-flex.align-items-center.gap-2(href="/users/login")
-                i.bi.bi-box-arrow-in-right
-                | Log In
-
-    //- Divider
-    .position-relative.text-center.my-5
-        hr
-        span.position-absolute.top-50.start-50.translate-middle.px-3.bg-dark.rounded-pill.border.border-secondary.text-info.small
-            i.bi.bi-stars.me-1
-            | All Features
-
-    //- Main feature grid
-    .row.row-cols-1.row-cols-md-2.row-cols-xl-3.g-4.mb-5
-        //- Restaurants
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-primary.rounded-circle.p-3.me-3
-                            i.bi.bi-shop.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Restaurants
-                            p.small.text-white-50.mb-0 Full restaurant management
-                    ul.small.mb-0.text-white-50
-                        li Name, address, city, active status
-                        li Favorite and exclude restaurants
-                        li Provider references (Lieferando)
-                        li Diet suitability per restaurant
-                        li Search and filter by name or city
-                    if user
-                        a.btn.btn-sm.btn-outline-primary.mt-3(href="/restaurants") View Restaurants →
-
-        //- Suggestions
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-success.rounded-circle.p-3.me-3
-                            i.bi.bi-shuffle.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Random Suggestions
-                            p.small.text-white-50.mb-0 Can't decide where to order?
-                    ul.small.mb-0.text-white-50
-                        li Diet-aware random picks
-                        li Cuisine include/exclude filters
-                        li Respects favorites & exclusions
-                        li Shows candidate count
-                        li Suggestion history tracking
-                    if user
-                        a.btn.btn-sm.btn-outline-success.mt-3(href="/suggest") Get Suggestion →
-
-        //- Diet Preferences
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-info.rounded-circle.p-3.me-3
-                            i.bi.bi-heart-pulse.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Diet Preferences
-                            p.small.text-white-50.mb-0 Dietary tracking per user
-                    ul.small.mb-0.text-white-50
-                        li Vegetarian, vegan, gluten-free, etc.
-                        li Auto-detect from menu keywords
-                        li Manual overrides when needed
-                        li Per-user diet tag selections
-                        li Group-compatible suggestions
-                    if user
-                        a.btn.btn-sm.btn-outline-info.mt-3(href="/users/settings") Set Preferences →
-
-        //- Provider Sync
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-warning.rounded-circle.p-3.me-3
-                            i.bi.bi-plug.fs-4.text-dark
-                        div
-                            h2.h5.mb-0 Provider Sync
-                            p.small.text-white-50.mb-0 Lieferando integration
-                    ul.small.mb-0.text-white-50
-                        li Sync restaurants from listing URLs
-                        li Import single restaurant by URL
-                        li Auto-import menus and prices
-                        li Stale restaurant detection
-                        li Diet override conflict alerts
-                    if user
-                        a.btn.btn-sm.btn-outline-warning.mt-3(href="/providers") Manage Providers →
-
-        //- Import
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-danger.rounded-circle.p-3.me-3
-                            i.bi.bi-upload.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Bulk Import
-                            p.small.text-white-50.mb-0 JSON & CSV upload
-                    ul.small.mb-0.text-white-50
-                        li Upload restaurant data files
-                        li Preview with diff badges
-                        li New/Updated/Unchanged status
-                        li Apply or discard changes
-                        li Per-restaurant result reporting
-                    if user
-                        a.btn.btn-sm.btn-outline-danger.mt-3(href="/import") Import Data →
-
-        //- Help & Documentation
-        .col
-            .card.h-100.text-bg-dark.border-secondary
-                .card-body
-                    .d-flex.align-items-center.mb-3
-                        .bg-secondary.rounded-circle.p-3.me-3
-                            i.bi.bi-question-circle.fs-4.text-white
-                        div
-                            h2.h5.mb-0 Help & Docs
-                            p.small.text-white-50.mb-0 Complete user guides
-                    ul.small.mb-0.text-white-50
-                        li Getting started guides
-                        li Feature documentation
-                        li Diet detection explained
-                        li Tips & best practices
-                        li Troubleshooting help
-                    a.btn.btn-sm.btn-outline-secondary.mt-3(href="/help") View Documentation →
-
-    if !user
-        //- Call to action for non-logged users
-        .text-center.mt-5.mb-4
-            .card.text-bg-dark.border-primary.p-4
-                h3.h4.mb-3
-                    i.bi.bi-rocket-takeoff.me-2
-                    | Ready to find your next meal?
-                p.text-white-50.mb-4 Join now and start managing your team's delivery restaurants.
-                .d-flex.flex-wrap.justify-content-center.gap-3
-                    a.btn.btn-primary.btn-lg.px-4(href="/users/register")
-                        i.bi.bi-person-plus.me-2
-                        | Create Free Account
-                    a.btn.btn-outline-light.btn-lg.px-4(href="/help")
-                        i.bi.bi-book.me-2
-                        | Learn More
-
-block scripts
-    style.
-        .hover-lift {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .hover-lift:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-        }
+        if !user
+            section.card.app-section-card
+                .card-body.p-4.p-lg-5.text-center
+                    p.app-eyebrow.mb-2 Ready to get started
+                    h2.h3.mb-3 Build a restaurant pool your team can actually use
+                    p.text-white-50.mb-4 Sign in to save preferences, mark favorites, sync menus, and make suggestions based on real menu coverage.
+                    .d-flex.flex-wrap.justify-content-center.gap-2
+                        a.btn.btn-success.btn-lg(href="/users/register")
+                            i.bi.bi-person-plus.me-2
+                            | Create Account
+                        a.btn.btn-outline-light.btn-lg(href="/help")
+                            i.bi.bi-question-circle.me-2
+                            | Read The Guides

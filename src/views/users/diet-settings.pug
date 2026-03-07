@@ -1,64 +1,83 @@
-//- views/users/diet-settings.pug - Global Diet Heuristic Settings
 extends ../layout
 
 block meta
     title Diet Heuristic Settings | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-sliders.me-2
-        | Diet Heuristic Settings
-
-block content
+block body
     - const d = data || {}
     - const configs = d.configs || []
 
-    .alert.alert-info.py-2
-        i.bi.bi-info-circle.me-1
-        | These settings are global and affect heuristic scoring for all users.
-
-    form(action="/users/settings/diets" method="post")
-        +csrf
-
-        if configs.length === 0
-            p.text-white-50 No diet tags are configured.
-        else
-            each cfg in configs
-                .card.text-bg-dark.border-secondary.mb-3
-                    .card-header
-                        strong #{cfg.label}
-                        span.text-white-50.ms-2.small #{cfg.key}
-                    .card-body
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-warning
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Global inference controls
+                        h1.display-5.fw-semibold.mb-2 Diet Heuristic Settings
+                        p.lead.text-white-50.mb-0 These settings are global. Changes here affect heuristic scoring across all restaurants and all users.
+                    .col-lg-4
                         .row.g-3
-                            .col-md-6
-                                label.form-label(for=`kw-${cfg.id}`)
-                                    i.bi.bi-tags.me-1
-                                    | Keyword Whitelist
-                                .form-text.text-white-50.mb-1
-                                    | One entry per line (English/German/other languages supported).
-                                textarea.form-control.text-bg-dark(
-                                    id=`kw-${cfg.id}`
-                                    name=`dietConfig[${cfg.id}][keywordWhitelist]`
-                                    rows="6"
-                                    maxlength="6000"
-                                )= cfg.keywordWhitelist || ''
-                            .col-md-6
-                                label.form-label(for=`dish-${cfg.id}`)
-                                    i.bi.bi-list-stars.me-1
-                                    | Common Dish Whitelist
-                                .form-text.text-white-50.mb-1
-                                    | One dish per line.
-                                textarea.form-control.text-bg-dark(
-                                    id=`dish-${cfg.id}`
-                                    name=`dietConfig[${cfg.id}][dishWhitelist]`
-                                    rows="6"
-                                    maxlength="6000"
-                                )= cfg.dishWhitelist || ''
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Diet configs
+                                    strong.app-stat-value #{configs.length}
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Scope
+                                    strong.app-stat-value Global
 
-        .d-flex.gap-2.mt-2
-            button.btn.btn-success(type="submit")
-                i.bi.bi-check-lg.me-1
-                | Save Diet Heuristics
-            a.btn.btn-outline-light(href="/users/settings")
-                i.bi.bi-arrow-left.me-1
-                | Back To Settings
+        section.card.app-section-card
+            .card-body
+                .app-status-card.is-info.mb-4
+                    .d-flex.align-items-start.gap-3
+                        i.bi.bi-info-circle.fs-4
+                        div
+                            h2.h5.mb-2 Heuristic updates are system-wide
+                            p.text-white-50.mb-0 Adjust keyword and dish whitelists carefully. After major rule changes, re-run heuristics from the Providers page so stored inference results match the new engine behavior.
+
+                form(action="/users/settings/diets" method="post")
+                    +csrf
+                    if configs.length === 0
+                        .app-empty-state
+                            i.bi.bi-heart-pulse
+                            p.mb-0 No diet tags are configured.
+                    else
+                        .d-flex.flex-column.gap-3
+                            each cfg in configs
+                                article.app-list-card
+                                    .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2.mb-3
+                                        div
+                                            h2.h5.mb-1 #{cfg.label}
+                                            p.text-white-50.small.mb-0 #{cfg.key}
+                                    .row.g-3
+                                        .col-lg-6
+                                            .app-panel.h-100
+                                                label.form-label(for=`kw-${cfg.id}`)
+                                                    i.bi.bi-tags.me-1
+                                                    | Keyword Whitelist
+                                                .form-text.text-white-50.mb-2 One entry per line. Multiple languages are supported.
+                                                textarea.form-control.text-bg-dark(
+                                                    id=`kw-${cfg.id}`
+                                                    name=`dietConfig[${cfg.id}][keywordWhitelist]`
+                                                    rows="8"
+                                                    maxlength="6000"
+                                                )= cfg.keywordWhitelist || ''
+                                        .col-lg-6
+                                            .app-panel.h-100
+                                                label.form-label(for=`dish-${cfg.id}`)
+                                                    i.bi.bi-list-stars.me-1
+                                                    | Common Dish Whitelist
+                                                .form-text.text-white-50.mb-2 One dish per line.
+                                                textarea.form-control.text-bg-dark(
+                                                    id=`dish-${cfg.id}`
+                                                    name=`dietConfig[${cfg.id}][dishWhitelist]`
+                                                    rows="8"
+                                                    maxlength="6000"
+                                                )= cfg.dishWhitelist || ''
+                    .d-flex.flex-wrap.gap-2.mt-4
+                        button.btn.btn-success(type="submit")
+                            i.bi.bi-check-lg.me-1
+                            | Save Diet Heuristics
+                        a.btn.btn-outline-light(href="/users/settings")
+                            i.bi.bi-arrow-left.me-1
+                            | Back To Settings

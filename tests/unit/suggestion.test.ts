@@ -139,6 +139,48 @@ describe('SuggestionService', () => {
             const result = await suggestionService.checkDietCompatibility('r1', ['tag-vegan']);
             expect(result.compatible).toBe(false);
         });
+
+        test('rejects inferred diets below the minimum score threshold', async () => {
+            mockComputeEffectiveSuitability.mockResolvedValue([
+                {
+                    dietTagId: 'tag-vegan',
+                    dietTagKey: 'VEGAN',
+                    dietTagLabel: 'Vegan',
+                    supported: true,
+                    source: 'inference',
+                    inference: {score: 8, confidence: 'LOW'},
+                },
+            ]);
+
+            const result = await suggestionService.checkDietCompatibility('r1', ['tag-vegan'], 10);
+            expect(result.compatible).toBe(false);
+            expect(result.matchedDiets[0]).toMatchObject({
+                score: 8,
+                confidence: 'LOW',
+                meetsScoreThreshold: false,
+            });
+        });
+
+        test('keeps manual overrides compatible even below the minimum score threshold', async () => {
+            mockComputeEffectiveSuitability.mockResolvedValue([
+                {
+                    dietTagId: 'tag-vegan',
+                    dietTagKey: 'VEGAN',
+                    dietTagLabel: 'Vegan',
+                    supported: true,
+                    source: 'override',
+                    inference: {score: 3, confidence: 'LOW'},
+                },
+            ]);
+
+            const result = await suggestionService.checkDietCompatibility('r1', ['tag-vegan'], 50);
+            expect(result.compatible).toBe(true);
+            expect(result.matchedDiets[0]).toMatchObject({
+                source: 'override',
+                score: 3,
+                meetsScoreThreshold: true,
+            });
+        });
     });
 
     describe('findActiveRestaurants', () => {
@@ -427,6 +469,87 @@ describe('SuggestionService', () => {
             expect(result!.restaurant.id).toBe('r1');
             // r2 should never be checked for diet compatibility
             expect(mockComputeEffectiveSuitability).toHaveBeenCalledTimes(2);
+        });
+
+        test('favoriteMode=only restricts the candidate pool to favorite restaurants', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            const result = await suggestionService.suggest({
+                favoriteIds: ['r2'],
+                favoriteMode: 'only',
+            });
+
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r2');
+            expect(result!.reason.totalCandidates).toBe(1);
+        });
+
+        test('favoriteMode=only returns null when no favorite restaurant remains', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            const result = await suggestionService.suggest({
+                favoriteIds: ['does-not-exist'],
+                favoriteMode: 'only',
+            });
+
+            expect(result).toBeNull();
+        });
+
+        test('minDietScore removes low-scoring inferred matches from the pool', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            mockComputeEffectiveSuitability
+                .mockResolvedValueOnce([
+                    {
+                        dietTagId: 'tag-vegan',
+                        dietTagKey: 'VEGAN',
+                        dietTagLabel: 'Vegan',
+                        supported: true,
+                        source: 'inference',
+                        inference: {score: 5, confidence: 'LOW'},
+                    },
+                ])
+                .mockResolvedValueOnce([
+                    {
+                        dietTagId: 'tag-vegan',
+                        dietTagKey: 'VEGAN',
+                        dietTagLabel: 'Vegan',
+                        supported: true,
+                        source: 'inference',
+                        inference: {score: 42, confidence: 'MEDIUM'},
+                    },
+                ])
+                .mockResolvedValueOnce([
+                    {
+                        dietTagId: 'tag-vegan',
+                        dietTagKey: 'VEGAN',
+                        dietTagLabel: 'Vegan',
+                        supported: false,
+                        source: 'none',
+                    },
+                ]);
+
+            const result = await suggestionService.suggest({
+                dietTagIds: ['tag-vegan'],
+                minDietScore: 10,
+            });
+
+            expect(result).not.toBeNull();
+            expect(result!.restaurant.id).toBe('r2');
+            expect(result!.reason.matchedDiets[0]).toMatchObject({
+                score: 42,
+                confidence: 'MEDIUM',
+                meetsScoreThreshold: true,
+            });
         });
     });
 });

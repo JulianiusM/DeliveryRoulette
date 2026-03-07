@@ -21,7 +21,7 @@ export async function getSyncJobsPageData(query: {
         ? query.status as JobStatusFilter
         : 'all';
 
-    const providerKeys = Object.values(ProviderKey) as string[];
+    const providerKeys = [...Object.values(ProviderKey), 'maintenance'] as string[];
     const filterProvider = query.provider && providerKeys.includes(query.provider)
         ? query.provider
         : '';

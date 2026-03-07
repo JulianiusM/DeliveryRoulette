@@ -12,27 +12,39 @@ export function setCurrentNavLocation(): void {
 
     // Map path prefixes to nav link selectors
     const navMappings: [string, string][] = [
-        ['/items', 'a.nav-link[href="/items"]'],
-        ['/locations', 'a.nav-link[href="/locations"]'],
-        ['/games', 'a.nav-link[href="/games"]'],
-        ['/loans', 'a.nav-link[href="/loans"]'],
-        ['/scan', 'a.dropdown-item[href="/scan"]'],
-        ['/wizard', 'a.dropdown-item[href="/wizard"]'],
+        ['/suggest', 'a.nav-link[href="/suggest"]'],
+        ['/restaurants', 'a.nav-link[href="/restaurants"]'],
+        ['/users/dashboard', 'a.nav-link[href="/users/dashboard"]'],
+        ['/users/profile', 'a.dropdown-item[href="/users/profile"]'],
+        ['/users/settings', 'a.dropdown-item[href="/users/settings"]'],
+        ['/import', 'a.dropdown-item[href="/import"]'],
+        ['/providers', 'a.dropdown-item[href="/providers"]'],
+        ['/sync/jobs', 'a.dropdown-item[href="/sync/jobs"]'],
+        ['/sync/alerts', 'a.dropdown-item[href="/sync/alerts"]'],
         ['/help', 'a.dropdown-item[href="/help"]'],
-        ['/users/dashboard', 'a.dropdown-item[href="/users/dashboard"]'],
-        ['/users/manage-dashboard', 'a.dropdown-item[href="/users/manage-dashboard"]'],
         ['/users/login', 'a.nav-link[href="/users/login"]'],
         ['/users/register', 'a.nav-link[href="/users/register"]'],
-        ['/survey', 'a.nav-link[href*="/survey"]'],
-        ['/packing', 'a.nav-link[href*="/packing"]'],
-        ['/activity', 'a.nav-link[href*="/activity"]'],
-        ['/drivers', 'a.nav-link[href*="/drivers"]'],
     ];
+
+    if (path === '/') {
+        const brandLink = document.querySelector('a.navbar-brand');
+        if (brandLink) {
+            brandLink.classList.add('active');
+        }
+        return;
+    }
 
     for (const [prefix, selector] of navMappings) {
         if (path === prefix || path.startsWith(prefix + '/')) {
             const link = document.querySelector(selector);
-            if (link) link.classList.add('active');
+            if (link) {
+                link.classList.add('active');
+
+                const parentDropdownToggle = link.closest('.dropdown')?.querySelector('.nav-link.dropdown-toggle');
+                if (parentDropdownToggle) {
+                    parentDropdownToggle.classList.add('active');
+                }
+            }
             return;
         }
     }

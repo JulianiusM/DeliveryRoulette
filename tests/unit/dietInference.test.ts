@@ -7,6 +7,7 @@ import {
     normalizeTextData,
     scoreAndConfidenceData,
     inferForTagData,
+    heuristicCoverageCases,
     germanKeywordExpectations,
     engineVersionData,
 } from '../data/unit/dietInferenceData';
@@ -90,6 +91,17 @@ describe('DietInferenceService', () => {
                     expect(kw).toBe(kw.toLowerCase());
                 }
             }
+        });
+
+        test('VEGAN includes common non-vegan cheese names in the blacklist', () => {
+            const veganTag = DEFAULT_DIET_TAGS.find((tag) => tag.key === 'VEGAN');
+            expect(veganTag).toBeDefined();
+            expect(veganTag!.negativeKeywords).toEqual(expect.arrayContaining([
+                'halloumi',
+                'haloumi',
+                'camembert',
+                'brie',
+            ]));
         });
     });
 
@@ -240,6 +252,69 @@ describe('DietInferenceService', () => {
             expect(result.score).toBe(0);
             expect(result.confidence).toBe('LOW');
             expect(result.reasons.scoreBreakdown?.finalScore).toBe(0);
+        });
+
+        test('excludes halloumi-based falafel items from VEGAN matches', () => {
+            const veganTag = DEFAULT_DIET_TAGS.find((t) => t.key === 'VEGAN')!;
+            const result = inferForTag(
+                {
+                    id: 'tag-vegan',
+                    key: 'VEGAN',
+                    parentTagKey: veganTag.parentTagKey ?? null,
+                    keywords: veganTag.keywordWhitelist.map((value) => ({value})),
+                    dishes: veganTag.dishWhitelist.map((value) => ({value})),
+                    allergenExclusions: veganTag.allergenExclusions.map((value) => ({value})),
+                    negativeKeywords: veganTag.negativeKeywords.map((value) => ({value})),
+                    strongSignals: veganTag.strongSignals.map((value) => ({value})),
+                    contradictionPatterns: veganTag.contradictionPatterns.map((value) => ({value})),
+                    qualifiedNegExceptions: veganTag.qualifiedNegExceptions.map((value) => ({value})),
+                },
+                [
+                    {
+                        id: 'item-1',
+                        name: 'Halloumi Falafel Wrap',
+                        description: 'Falafel wrap with salad and sauce',
+                        dietContext: null,
+                        allergens: null,
+                    },
+                ],
+            );
+
+            expect(result.score).toBe(0);
+            expect(result.reasons.matchedItems).toHaveLength(0);
+            expect(result.reasons.excludedItems).toHaveLength(1);
+            expect(result.reasons.excludedItems?.[0].excludedBy.join(' ')).toContain('negative:halloumi');
+        });
+
+        test.each(heuristicCoverageCases)('$description', (testCase) => {
+            const result = inferForTag(testCase.tag, testCase.items);
+
+            expect(result.reasons.menuStats?.matchedUniqueItems).toBe(testCase.expected.matchedUniqueItems);
+            expect(result.reasons.menuStats?.totalUniqueItems).toBe(testCase.expected.totalUniqueItems);
+
+            if (testCase.expected.duplicateItemsFiltered !== undefined) {
+                expect(result.reasons.menuStats?.duplicateItemsFiltered).toBe(testCase.expected.duplicateItemsFiltered);
+            }
+            if (testCase.expected.matchedDuplicateItemsFiltered !== undefined) {
+                expect(result.reasons.menuStats?.matchedDuplicateItemsFiltered).toBe(testCase.expected.matchedDuplicateItemsFiltered);
+            }
+            if (testCase.expected.sharePercent !== undefined) {
+                expect(Math.round(result.reasons.matchRatio * 100)).toBe(testCase.expected.sharePercent);
+            }
+            if (testCase.expected.score !== undefined) {
+                expect(result.score).toBe(testCase.expected.score);
+            }
+            if (testCase.expected.confidence !== undefined) {
+                expect(result.confidence).toBe(testCase.expected.confidence);
+            }
+            if (testCase.expected.varietyPercent !== undefined) {
+                expect(Math.round((result.reasons.menuStats?.varietyRatio ?? 0) * 100)).toBe(testCase.expected.varietyPercent);
+            }
+            if ((testCase.expected as {dedupedMatchedNames?: string[]}).dedupedMatchedNames) {
+                expect(result.reasons.matchedItems.map((item) => item.itemName)).toEqual(
+                    (testCase.expected as {dedupedMatchedNames: string[]}).dedupedMatchedNames,
+                );
+            }
         });
     });
 });

@@ -1,168 +1,247 @@
-//- views/suggest/index.pug – Suggestion Wizard (single-page AJAX)
 extends ../layout
 
 block meta
     title Suggest a Restaurant | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-dice-5.me-2
-        | Suggest a Restaurant
-
-block content
+block body
     - const d = data || {}
     - const dietTags = d.dietTags || []
     - const selectedDietTagIds = d.selectedDietTagIds || []
+    - const selectedDietLabels = dietTags.filter((tag) => selectedDietTagIds.includes(tag.id)).map((tag) => tag.label)
+    - const favoriteMode = d.favoriteMode || 'prefer'
 
-    //── Step 1: Quick Suggest (primary action) ────────────
-    .text-center.mb-4
-        p.text-white-50.mb-3 Not sure what to eat? Let us pick for you!
-        button#suggestBtn.btn.btn-lg.btn-success.px-5.py-3
-            i.bi.bi-dice-5.me-2
-            | Suggest!
+    form#suggestionForm.suggestion-page.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.restaurant-list-hero.suggestion-hero-card
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.text-uppercase.small.text-white-50.mb-2 Suggestion Engine
+                        h1.display-5.fw-semibold.mb-2 Suggest A Restaurant
+                        p.lead.text-white-50.mb-0
+                            | Draw from your real restaurant pool without losing diet coverage, availability, or personal preference rules.
+                    .col-lg-4
+                        .row.g-3
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Diets
+                                    strong.restaurant-stat-value #{selectedDietLabels.length}
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Min score
+                                    strong.restaurant-stat-value #{d.minDietScore}%
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Favorites
+                                    strong.restaurant-stat-value #{favoriteMode === 'only' ? 'Only' : favoriteMode === 'ignore' ? 'Off' : 'Boost'}
 
-    //── Loading Spinner ───────────────────────────────────
-    #suggestionSpinner.text-center.d-none.my-4
-        .spinner-border.text-success(role="status")
-            span.visually-hidden Loading...
+                .d-flex.flex-wrap.gap-2.mt-4
+                    span.badge.rounded-pill.text-bg-success #{d.openOnly ? 'Open now default' : 'Open and closed'}
+                    span.badge.rounded-pill.text-bg-dark.border.border-secondary #{d.excludeRecentlySuggested ? `Avoid last ${d.recentSuggestionCount}` : 'Recent repeats allowed'}
+                    if d.respectDoNotSuggest
+                        span.badge.rounded-pill.text-bg-dark.border.border-secondary Respect blocked restaurants
+                    if d.deliveryArea
+                        span.badge.rounded-pill.text-bg-dark.border.border-secondary
+                            i.bi.bi-geo-alt.me-1
+                            | #{d.deliveryArea}
 
-    //── Result Section (hidden until AJAX returns) ────────
-    #suggestionResult.d-none
-        .text-center.mb-3
-            h2.text-white
-                i.bi.bi-shop.me-2
-                span#resultName
-        .row.g-4
-            .col-md-6
-                .card.text-bg-dark.border-secondary
-                    .card-header
-                        i.bi.bi-geo-alt.me-2
-                        | Address
-                    .card-body
-                        pre#resultAddress.text-white.mb-0(style="white-space:pre-line; font-family:inherit;")
+        section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+            .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                span
+                    i.bi.bi-compass.me-2
+                    | Current Defaults
+                button.btn.btn-sm.btn-outline-light(type="button" data-bs-toggle="collapse" data-bs-target="#advancedFilters" aria-expanded="false" aria-controls="advancedFilters")
+                    i.bi.bi-sliders.me-1
+                    | Advanced Filters
+            .card-body
+                .row.g-4.align-items-start
+                    .col-lg-8
+                        p.text-white-50.mb-3
+                            | Use your saved defaults for a fast draw, or open the advanced controls when you need to tighten the pool for group diets, allergens, favorites, or recent-history rules.
 
-            .col-md-6
-                .card.text-bg-dark.border-secondary
-                    .card-header
-                        i.bi.bi-info-circle.me-2
-                        | Why This Restaurant?
-                    .card-body
-                        #resultDiets.mb-2
-                        #resultCuisines.mb-2
-                        p.text-white-50.mb-0
-                            small#resultCandidates
+                        if selectedDietLabels.length > 0
+                            .d-flex.flex-wrap.gap-2.mb-3
+                                each label in selectedDietLabels
+                                    span.badge.rounded-pill.text-bg-light.text-dark #{label}
+                        else
+                            p.text-white-50.small.mb-3 No default diet filters selected.
 
-        .d-flex.justify-content-center.gap-2.mt-4
-            a#resultLink.btn.btn-primary(href="#")
-                i.bi.bi-eye.me-1
-                | View Restaurant
-            button#rerollBtn.btn.btn-success
-                i.bi.bi-dice-5.me-1
-                | Try Again
+                        .d-flex.flex-wrap.gap-2
+                            span.badge.rounded-pill.text-bg-dark.border.border-secondary Min diet score #{d.minDietScore}%
+                            span.badge.rounded-pill.text-bg-dark.border.border-secondary #{favoriteMode === 'only' ? 'Favorites only' : favoriteMode === 'ignore' ? 'Favorites ignored' : 'Favorites preferred'}
+                            if d.cuisineIncludes
+                                span.badge.rounded-pill.text-bg-dark.border.border-secondary Include #{d.cuisineIncludes}
+                            if d.cuisineExcludes
+                                span.badge.rounded-pill.text-bg-dark.border.border-secondary Exclude #{d.cuisineExcludes}
 
-    //── Empty State (shown before first suggestion) ───────
-    #emptyState
+                    .col-lg-4
+                        .suggestion-launch-panel
+                            .d-grid.gap-2
+                                button#suggestBtn.btn.btn-success.btn-lg.py-3(type="submit")
+                                    i.bi.bi-dice-5.me-2
+                                    | Suggest With Current Defaults
+                                button#rerollBtn.btn.btn-outline-light(type="button")
+                                    i.bi.bi-arrow-repeat.me-2
+                                    | Try Another
 
-    //── Optional Filters (collapsible) ────────────────────
-    .mt-4
-        .d-flex.justify-content-center
-            button.btn.btn-sm.btn-outline-secondary(
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#advancedFilters"
-                aria-expanded="false"
-                aria-controls="advancedFilters"
-            )
-                i.bi.bi-sliders.me-1
-                | Advanced Filters
+        #advancedFilters.collapse.mt-4
+            section.card.text-bg-dark.border-secondary.shadow-sm
+                .card-header
+                    i.bi.bi-funnel.me-2
+                    | Advanced Filters
+                .card-body
+                    .row.g-4
+                        .col-xl-4
+                            .restaurant-panel.h-100
+                                h2.h5.mb-3
+                                    i.bi.bi-heart-pulse.me-2
+                                    | Diet Rules
+                                .mb-4
+                                    label.form-label(for="minDietScore")
+                                        i.bi.bi-speedometer2.me-1
+                                        | Minimum Diet Score
+                                    input#minDietScore.form-range(type="range" name="minDietScore" min="0" max="100" step="1" value=(d.minDietScore || 0))
+                                    .d-flex.justify-content-between.align-items-center.small
+                                        span.text-white-50 0%
+                                        strong#minDietScoreValue #{d.minDietScore || 0}%
+                                        span.text-white-50 100%
+                                    .form-text.text-white-50 Restaurants only pass inferred diets when their heuristic score reaches this threshold. Manual overrides still count as explicit support.
 
-        #advancedFilters.collapse.mt-3
-            //── Open Now Filter ───────────────────────
-            .mb-3
-                .form-check.form-switch.d-flex.justify-content-center
-                    input#openOnly.form-check-input(
-                        type="checkbox"
-                        name="openOnly"
-                        role="switch"
-                        checked
-                    )
-                    label.form-check-label.ms-2(for="openOnly")
-                        i.bi.bi-clock.me-1
-                        | Only open restaurants
+                                if dietTags.length === 0
+                                    p.text-white-50.mb-0 No diet tags available.
+                                else
+                                    .suggestion-checkbox-grid
+                                        each tag in dietTags
+                                            label.suggestion-check-tile(for=`diet-${tag.key}`)
+                                                input.form-check-input(
+                                                    type="checkbox"
+                                                    name="dietTagIds"
+                                                    value=tag.id
+                                                    id=`diet-${tag.key}`
+                                                    checked=selectedDietTagIds.includes(tag.id)
+                                                )
+                                                span
+                                                    strong.d-block #{tag.label}
+                                                    small.text-white-50 Require this diet to pass the score threshold.
 
-            .row.g-4
-                //── Diet Filters ──────────────────────────
-                .col-md-6
-                    .card.text-bg-dark.border-secondary
-                        .card-header
-                            i.bi.bi-heart-pulse.me-2
-                            | Diet Requirements
-                            small.text-white-50.ms-2 (for group dining)
-                        .card-body
-                            if dietTags.length === 0
-                                p.text-white-50.mb-0 No diet tags available.
-                            else
-                                p.text-white-50.small.mb-2 Select diets that the restaurant must support — great for groups with mixed dietary needs.
-                                each tag in dietTags
-                                    .form-check.mb-2
-                                        input.form-check-input(
-                                            type="checkbox"
-                                            name="dietTagIds"
-                                            value=tag.id
-                                            id=`diet-${tag.key}`
-                                            checked=selectedDietTagIds.includes(tag.id)
-                                        )
-                                        label.form-check-label(for=`diet-${tag.key}`) #{tag.label}
+                        .col-xl-4
+                            .restaurant-panel.h-100
+                                h2.h5.mb-3
+                                    i.bi.bi-toggles2.me-2
+                                    | Pool Controls
+                                .row.g-3
+                                    .col-12
+                                        label.form-label(for="favoriteMode")
+                                            i.bi.bi-star.me-1
+                                            | Favorites
+                                        select#favoriteMode.form-select.text-bg-dark(name="favoriteMode")
+                                            option(value="prefer" selected=(favoriteMode === 'prefer')) Prefer favorites
+                                            option(value="only" selected=(favoriteMode === 'only')) Only favorites
+                                            option(value="ignore" selected=(favoriteMode === 'ignore')) Ignore favorites
+                                        .form-text.text-white-50 Control whether favorites are boosted, required, or ignored.
 
-                //── Cuisine Filters ───────────────────────
-                .col-md-6
-                    .card.text-bg-dark.border-secondary
-                        .card-header
-                            i.bi.bi-cup-hot.me-2
-                            | Cuisine Filters
-                        .card-body
-                            .mb-3
-                                label.form-label.mb-1(for="cuisineIncludes")
-                                    i.bi.bi-plus-circle.me-1
-                                    | Include Cuisines
-                                input#cuisineIncludes.form-control.text-bg-dark(
-                                    type="text"
-                                    name="cuisineIncludes"
-                                    value=(d.cuisineIncludes || '')
-                                    placeholder="e.g. Italian, Sushi, Thai"
-                                )
-                                .form-text.text-white-50 Comma-separated. Only restaurants matching these names.
+                                    .col-12
+                                        label.form-label(for="openOnly")
+                                            i.bi.bi-clock.me-1
+                                            | Availability
+                                        .suggestion-toggle-stack
+                                            label.suggestion-switch(for="openOnly")
+                                                input#openOnly.form-check-input(type="checkbox" name="openOnly" checked=!!d.openOnly)
+                                                span Only restaurants that are open right now
+                                            label.suggestion-switch(for="excludeRecentlySuggested")
+                                                input#excludeRecentlySuggested.form-check-input(type="checkbox" name="excludeRecentlySuggested" checked=!!d.excludeRecentlySuggested)
+                                                span Avoid the last #{d.recentSuggestionCount || 0} suggestions
+                                            label.suggestion-switch(for="respectDoNotSuggest")
+                                                input#respectDoNotSuggest.form-check-input(type="checkbox" name="respectDoNotSuggest" checked=!!d.respectDoNotSuggest)
+                                                span Respect restaurants you blocked from suggestions
 
-                            .mb-0
-                                label.form-label.mb-1(for="cuisineExcludes")
-                                    i.bi.bi-dash-circle.me-1
-                                    | Exclude Cuisines
-                                input#cuisineExcludes.form-control.text-bg-dark(
-                                    type="text"
-                                    name="cuisineExcludes"
-                                    value=(d.cuisineExcludes || '')
-                                    placeholder="e.g. Fast Food, Burger"
-                                )
-                                .form-text.text-white-50 Comma-separated. Restaurants matching these names will be excluded.
+                        .col-xl-4
+                            .restaurant-panel.h-100
+                                h2.h5.mb-3
+                                    i.bi.bi-cup-hot.me-2
+                                    | Menu And Cuisine Filters
+                                .mb-3
+                                    label.form-label(for="cuisineIncludes")
+                                        i.bi.bi-plus-circle.me-1
+                                        | Include Cuisines
+                                    input#cuisineIncludes.form-control.text-bg-dark(type="text" name="cuisineIncludes" value=(d.cuisineIncludes || '') placeholder="e.g. Italian, Thai, Sushi")
+                                    .form-text.text-white-50 Comma-separated cuisine names or aliases that must match.
 
-            //── Allergen Exclusion ────────────────────────
-            .row.g-4.mt-2
-                .col-12
-                    .card.text-bg-dark.border-secondary
-                        .card-header
-                            i.bi.bi-exclamation-triangle.me-2
-                            | Allergen Exclusion
-                        .card-body
-                            .mb-0
-                                label.form-label.mb-1(for="excludeAllergens")
-                                    i.bi.bi-shield-exclamation.me-1
-                                    | Exclude Allergens
-                                input#excludeAllergens.form-control.text-bg-dark(
-                                    type="text"
-                                    name="excludeAllergens"
-                                    placeholder="e.g. Gluten, Eggs, Milk"
-                                )
-                                .form-text.text-white-50 Comma-separated. Restaurants where all menu items contain these allergens will be excluded. Works alongside diet filters for comprehensive dietary safety.
+                                .mb-3
+                                    label.form-label(for="cuisineExcludes")
+                                        i.bi.bi-dash-circle.me-1
+                                        | Exclude Cuisines
+                                    input#cuisineExcludes.form-control.text-bg-dark(type="text" name="cuisineExcludes" value=(d.cuisineExcludes || '') placeholder="e.g. Burger, Fast Food")
+                                    .form-text.text-white-50 Comma-separated cuisine names or aliases to remove from the pool.
+
+                                .mb-0
+                                    label.form-label(for="excludeAllergens")
+                                        i.bi.bi-shield-exclamation.me-1
+                                        | Exclude Allergens
+                                    input#excludeAllergens.form-control.text-bg-dark(type="text" name="excludeAllergens" value=(d.excludeAllergens || '') placeholder="e.g. Gluten, Eggs, Milk")
+                                    .form-text.text-white-50 Restaurants are removed when no safe menu item remains after allergen exclusion.
+
+        #suggestionAlerts.mt-4
+
+        #suggestionSpinner.text-center.d-none.my-4
+            .spinner-border.text-success(role="status")
+                span.visually-hidden Loading...
+
+        section#emptyState.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+            .card-body.text-center.py-5
+                i.bi.bi-compass.display-4.text-white-50.d-block.mb-3
+                h2.h4.mb-2 No suggestion generated yet
+                p.text-white-50.mb-0 Run the defaults or open the advanced filters to refine the draw.
+
+        section#suggestionResult.d-none.mt-4
+            .card.text-bg-dark.border-secondary.shadow-sm.suggestion-result-card
+                .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                    span
+                        i.bi.bi-stars.me-2
+                        | Suggestion Result
+                    .text-white-50.small The current pick stays visible while rerolling.
+                .card-body.p-4.p-lg-5
+                    .d-flex.flex-column.flex-lg-row.justify-content-between.align-items-start.gap-4.mb-4
+                        div
+                            p.text-uppercase.small.text-white-50.mb-2 Suggested Restaurant
+                            h2#resultName.display-6.mb-2
+                            #resultAvailability
+                        .d-flex.flex-wrap.gap-2
+                            a#resultLink.btn.btn-primary(href="#")
+                                i.bi.bi-eye.me-1
+                                | View Restaurant
+                            button#resultRerollBtn.btn.btn-success(type="button")
+                                i.bi.bi-arrow-repeat.me-1
+                                | Try Another
+
+                    .row.g-4
+                        .col-lg-4
+                            .suggestion-result-panel
+                                h3.h5.mb-3
+                                    i.bi.bi-geo-alt.me-2
+                                    | Address
+                                pre#resultAddress.suggestion-address.mb-0
+                        .col-lg-4
+                            .suggestion-result-panel
+                                h3.h5.mb-3
+                                    i.bi.bi-heart-pulse.me-2
+                                    | Diet Fit
+                                #resultDiets
+                        .col-lg-4
+                            .suggestion-result-panel
+                                h3.h5.mb-3
+                                    i.bi.bi-cup-hot.me-2
+                                    | Cuisine Signals
+                                #resultCuisines
+
+                    .row.g-4.mt-1
+                        .col-lg-7
+                            .suggestion-result-panel
+                                h3.h6.text-uppercase.text-white-50.mb-2 Active Filters
+                                #resultFilterSummary.d-flex.flex-wrap.gap-2
+                        .col-lg-5
+                            .suggestion-result-panel
+                                h3.h6.text-uppercase.text-white-50.mb-2 Candidate Pool
+                                p#resultCandidates.mb-0
 
 block scripts
     script(type="module" src="/js/modules/suggest.gen.js")

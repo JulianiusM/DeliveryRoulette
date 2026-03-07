@@ -1,33 +1,39 @@
-//- views/status.pug
 extends layout
 
 block meta
-    //─ Status-Label berechnen ────────────────────────────────────────
-    - var statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
-    title= statusLabel + ' | ControlPanel'
-
-block title
-    h1.card-header.text-center.bg-dark.text-light
-        if status === 'error'
-            i.bi.bi-exclamation-triangle-fill.me-2
-        else if status === 'warning'
-            i.bi.bi-exclamation-circle-fill.me-2
-        else if status === 'success'
-            i.bi.bi-check-circle-fill.me-2
-        else
-            i.bi.bi-info-circle-fill.me-2
-        | #{statusLabel}
+    - var currentStatus = status || 'info'
+    - var statusLabel = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)
+    title= statusLabel + ' | DeliveryRoulette'
 
 block alert
-    //- Moved alerts
 
-block content
-    include modules/module_alert
-    .d-flex.justify-content-center.gap-3.mt-4
-        a.btn.btn-primary(href="/")
-            i.bi.bi-house-door-fill.me-1
-            | Home
-        //-if status === 'error'
-            a.btn.btn-outline-danger(href="/support")
-                i.bi.bi-envelope-at-fill.me-1
-                | Contact Support
+block body
+    - var currentStatus = status || 'info'
+    - var statusLabel = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)
+    - var heroClass = currentStatus === 'error' ? 'is-danger' : currentStatus === 'warning' ? 'is-warning' : currentStatus === 'success' ? 'is-success' : 'is-info'
+    - var statusCardClass = currentStatus === 'error' ? 'is-danger' : currentStatus === 'warning' ? 'is-warning' : currentStatus === 'success' ? 'is-success' : 'is-info'
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card(class=heroClass)
+            .card-body.p-4.p-lg-5
+                p.app-eyebrow.mb-2 Status message
+                h1.display-5.fw-semibold.mb-2 #{statusLabel}
+                p.lead.text-white-50.mb-0 Review the current app message and continue with the next action.
+
+        section.card.app-section-card
+            .card-body
+                .app-status-card(class=statusCardClass)
+                    .d-flex.align-items-start.gap-3
+                        if currentStatus === 'error'
+                            i.bi.bi-exclamation-triangle-fill.fs-2
+                        else if currentStatus === 'warning'
+                            i.bi.bi-exclamation-circle-fill.fs-2
+                        else if currentStatus === 'success'
+                            i.bi.bi-check-circle-fill.fs-2
+                        else
+                            i.bi.bi-info-circle-fill.fs-2
+                        div.w-100
+                            include modules/module_alert
+                .d-flex.flex-wrap.gap-2.mt-4
+                    a.btn.btn-primary(href="/")
+                        i.bi.bi-house-door-fill.me-1
+                        | Home

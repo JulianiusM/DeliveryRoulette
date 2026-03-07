@@ -67,3 +67,45 @@ export const resolveTimeZoneData = [
         expected: 'UTC',
     },
 ];
+
+export const openingHoursPresentationData = [
+    {
+        description: 'formats an open status with close time and remaining duration',
+        openingHours: 'delivery: Monday 11:00-22:00; Tuesday closed',
+        nowIso: '2026-03-02T10:30:00Z',
+        timeZone: 'Europe/Berlin',
+        expected: {
+            state: 'open',
+            summaryLabel: 'Open now',
+            detailLabel: 'Delivery until 22:00 today',
+            relativeLabel: '10h 30m left',
+            firstServiceKey: 'delivery',
+            firstDayLabel: 'Monday',
+            firstDayRange: '11:00-22:00',
+        },
+    },
+    {
+        description: 'formats a closed status with next opening time',
+        openingHours: 'delivery: Monday 11:00-22:00; Tuesday closed',
+        nowIso: '2026-03-02T08:30:00Z',
+        timeZone: 'Europe/Berlin',
+        expected: {
+            state: 'closed',
+            summaryLabel: 'Closed now',
+            detailLabel: 'Delivery opens today at 11:00',
+            relativeLabel: 'in 1h 30m',
+        },
+    },
+    {
+        description: 'formats overnight hours without losing the next-day close time',
+        openingHours: 'delivery: Monday 18:00-01:00; Tuesday closed',
+        nowIso: '2026-03-02T23:30:00Z',
+        timeZone: 'Europe/Berlin',
+        expected: {
+            state: 'open',
+            summaryLabel: 'Open now',
+            detailLabel: 'Delivery until 01:00 today',
+            relativeLabel: '30m left',
+        },
+    },
+];

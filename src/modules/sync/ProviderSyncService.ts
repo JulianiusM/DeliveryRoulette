@@ -13,6 +13,7 @@ import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
 import {ProviderKey} from '../../providers/ProviderKey';
 import type {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
 import settings from '../settings';
+import logger from '../logger';
 
 /**
  * Unified provider sync pipeline.
@@ -158,6 +159,8 @@ interface ImportUrlSyncQuery {
 }
 
 const IMPORT_URL_QUERY_PREFIX = 'import-url:';
+const MAINTENANCE_PROVIDER_KEY = 'maintenance';
+const PROVIDER_REFRESH_QUERY_PREFIX = 'maintenance:provider-refresh:';
 
 // -- Queue API --------------------------------------------------------
 
@@ -196,13 +199,19 @@ export async function queueMenuSyncByProviderRef(
         throw new Error(`Unknown provider key for provider reference: ${ref.providerKey}`);
     }
 
+    const syncQuery = encodeMenuRefSyncQuery({
+        restaurantId,
+        providerRefId,
+    });
+    const existing = await findActiveQueuedJob(providerKey, syncQuery);
+    if (existing) {
+        return toQueuedJob(existing);
+    }
+
     const repo = AppDataSource.getRepository(SyncJob);
     const job = repo.create({
         providerKey,
-        syncQuery: encodeMenuRefSyncQuery({
-            restaurantId,
-            providerRefId,
-        }),
+        syncQuery,
         status: 'pending',
     });
     const saved = await repo.save(job);
@@ -233,6 +242,51 @@ export async function queueImportFromUrl(
     return toQueuedJob(saved);
 }
 
+export async function queueProviderRefreshIfNeeded(): Promise<QueuedSyncJob | null> {
+    const autoQuery = encodeProviderRefreshQuery(settings.value.providerRefreshVersion);
+    const existing = await findExistingMaintenanceJob(autoQuery);
+
+    if (existing) {
+        if (existing.status === 'completed') {
+            return null;
+        }
+        if (existing.status === 'pending' || existing.status === 'in_progress') {
+            return toQueuedJob(existing);
+        }
+    }
+
+    const refCount = await AppDataSource.getRepository(RestaurantProviderRef).count({
+        where: {status: 'active'},
+    });
+    if (refCount <= 0) {
+        return null;
+    }
+
+    const repo = AppDataSource.getRepository(SyncJob);
+    const job = repo.create({
+        providerKey: MAINTENANCE_PROVIDER_KEY,
+        syncQuery: autoQuery,
+        status: 'pending',
+    });
+    const saved = await repo.save(job);
+
+    startSyncQueueWorker();
+    return toQueuedJob(saved);
+}
+
+export async function queueProviderRefresh(force: boolean = false): Promise<QueuedSyncJob> {
+    const repo = AppDataSource.getRepository(SyncJob);
+    const job = repo.create({
+        providerKey: MAINTENANCE_PROVIDER_KEY,
+        syncQuery: encodeProviderRefreshQuery(settings.value.providerRefreshVersion, force),
+        status: 'pending',
+    });
+    const saved = await repo.save(job);
+
+    startSyncQueueWorker();
+    return toQueuedJob(saved);
+}
+
 /**
  * Start the queue worker (idempotent).
  * Safe to call from bootstrap and when enqueuing new jobs.
@@ -240,13 +294,43 @@ export async function queueImportFromUrl(
 export function startSyncQueueWorker(): void {
     if (queueWorkerRunning) return;
     queueWorkerRunning = true;
-    void processQueue().finally(async () => {
-        queueWorkerRunning = false;
-        // If jobs were queued during shutdown window, continue processing.
-        if (await hasPendingJobs()) {
-            setTimeout(() => startSyncQueueWorker(), 1_000);
-        }
+    void processQueue()
+        .catch((err) => {
+            logger.error({err}, 'Sync queue worker crashed unexpectedly');
+        })
+        .finally(async () => {
+            queueWorkerRunning = false;
+            // If jobs were queued during shutdown window, continue processing.
+            if (await hasPendingJobs()) {
+                setTimeout(() => startSyncQueueWorker(), 1_000);
+            }
+        });
+}
+
+export async function recoverInterruptedJobs(): Promise<number> {
+    const repo = AppDataSource.getRepository(SyncJob);
+    const jobs = await repo.find({
+        order: {createdAt: 'ASC'},
     });
+
+    const interrupted = jobs.filter((job) => job.status === 'in_progress');
+    for (const job of interrupted) {
+        job.startedAt = null;
+        job.finishedAt = null;
+        job.restaurantsSynced = 0;
+
+        if (canAutomaticallyRetryJob(job)) {
+            job.status = 'pending';
+            job.errorMessage = buildInterruptedRecoveryMessage(job.errorMessage);
+        } else {
+            job.status = 'failed';
+            job.errorMessage = buildUnrecoverableInterruptionMessage(job.errorMessage);
+        }
+
+        await repo.save(job);
+    }
+
+    return interrupted.length;
 }
 
 export async function listSyncJobs(options: SyncJobListOptions = {}): Promise<SyncJob[]> {
@@ -311,6 +395,14 @@ async function processQueue(): Promise<void> {
             return;
         }
 
+        const providerRefreshQuery = decodeProviderRefreshQuery(job.syncQuery ?? null);
+        if (providerRefreshQuery) {
+            await executeSyncJob(job, {
+                query: job.syncQuery ?? undefined,
+            });
+            continue;
+        }
+
         const parsedProviderKey = parseProviderKey(job.providerKey ?? null);
         if (job.providerKey && !parsedProviderKey) {
             const repo = AppDataSource.getRepository(SyncJob);
@@ -334,10 +426,95 @@ async function hasPendingJobs(): Promise<boolean> {
     return pending > 0;
 }
 
+function buildInterruptedRecoveryMessage(previousError?: string | null): string {
+    const message = 'Recovered after interrupted execution; retry queued automatically.';
+    if (!previousError || previousError.trim().length === 0) {
+        return message;
+    }
+    if (previousError.includes(message)) {
+        return previousError;
+    }
+    return `${message} Previous state: ${previousError}`;
+}
+
+function buildUnrecoverableInterruptionMessage(previousError?: string | null): string {
+    const message = 'Interrupted execution could not be retried automatically; start the job again manually.';
+    if (!previousError || previousError.trim().length === 0) {
+        return message;
+    }
+    if (previousError.includes(message)) {
+        return previousError;
+    }
+    return `${message} Previous state: ${previousError}`;
+}
+
+function canAutomaticallyRetryJob(job: SyncJob): boolean {
+    return !(job.providerKey === ProviderKey.IMPORT && !(job.syncQuery ?? '').trim());
+}
+
+async function findActiveQueuedJob(
+    providerKey: string | null,
+    syncQuery: string | null,
+): Promise<SyncJob | null> {
+    const repo = AppDataSource.getRepository(SyncJob);
+    const jobs = await repo.find({
+        order: {createdAt: 'DESC'},
+    });
+
+    return jobs.find((job) => {
+        const isActive = job.status === 'pending' || job.status === 'in_progress';
+        return isActive
+            && (job.providerKey ?? null) === providerKey
+            && (job.syncQuery ?? null) === syncQuery;
+    }) ?? null;
+}
+
 function parseProviderKey(value: string | null): ProviderKey | null {
     if (!value) return null;
     if (!Object.values(ProviderKey).includes(value as ProviderKey)) return null;
     return value as ProviderKey;
+}
+
+function encodeProviderRefreshQuery(version: string, force: boolean = false): string {
+    if (!force) {
+        return `${PROVIDER_REFRESH_QUERY_PREFIX}${version}`;
+    }
+
+    return `${PROVIDER_REFRESH_QUERY_PREFIX}${version}:force:${Date.now()}`;
+}
+
+function decodeProviderRefreshQuery(query: string | null): {version: string; force: boolean} | null {
+    if (!query || !query.startsWith(PROVIDER_REFRESH_QUERY_PREFIX)) {
+        return null;
+    }
+
+    const raw = query.slice(PROVIDER_REFRESH_QUERY_PREFIX.length);
+    if (!raw) {
+        return null;
+    }
+
+    const parts = raw.split(':');
+    if (parts.length === 0 || !parts[0]) {
+        return null;
+    }
+
+    return {
+        version: parts[0],
+        force: parts[1] === 'force',
+    };
+}
+
+async function findExistingMaintenanceJob(syncQuery: string): Promise<SyncJob | null> {
+    const repo = AppDataSource.getRepository(SyncJob);
+    return await repo.findOne({
+        where: {
+            providerKey: MAINTENANCE_PROVIDER_KEY,
+            syncQuery,
+        },
+        order: {
+            createdAt: 'DESC',
+        },
+    });
 }
 
 function encodeMenuRefSyncQuery(query: MenuRefSyncQuery): string {
@@ -399,6 +576,11 @@ async function executeSyncJob(
     const jobRepo = AppDataSource.getRepository(SyncJob);
 
     try {
+        const providerRefreshQuery = decodeProviderRefreshQuery(syncQuery ?? null);
+        if (providerRefreshQuery) {
+            return await executeProviderRefreshMaintenanceJob(job);
+        }
+
         const menuRefQuery = decodeMenuRefSyncQuery(syncQuery ?? null);
         if (menuRefQuery) {
             return await executeMenuRefSyncJob(job, menuRefQuery);
@@ -483,6 +665,60 @@ async function executeSyncJob(
 }
 
 // -- Helpers ----------------------------------------------------------
+
+async function executeProviderRefreshMaintenanceJob(job: SyncJob): Promise<SyncResult> {
+    const jobRepo = AppDataSource.getRepository(SyncJob);
+    const refRepo = AppDataSource.getRepository(RestaurantProviderRef);
+    const refs = await refRepo.find({
+        where: {status: 'active'},
+        order: {updatedAt: 'ASC'},
+    });
+
+    const queuedResults: RestaurantSyncResult[] = [];
+    let queuedCount = 0;
+    let failedCount = 0;
+    let firstError: string | null = null;
+
+    for (const ref of refs) {
+        const providerKey = parseProviderKey(ref.providerKey);
+        if (!providerKey || !ConnectorRegistry.resolve(providerKey)) {
+            continue;
+        }
+
+        try {
+            await queueMenuSyncByProviderRef(ref.restaurantId, ref.id);
+            queuedResults.push({
+                name: `${ref.providerKey}:${ref.restaurantId}`,
+                success: true,
+            });
+            queuedCount += 1;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            queuedResults.push({
+                name: `${ref.providerKey}:${ref.restaurantId}`,
+                success: false,
+                error: message,
+            });
+            failedCount += 1;
+            if (!firstError) {
+                firstError = message;
+            }
+        }
+    }
+
+    job.status = queuedCount > 0 || failedCount === 0 ? 'completed' : 'failed';
+    job.restaurantsSynced = queuedCount;
+    job.errorMessage = failedCount > 0
+        ? `${failedCount} provider refresh job(s) could not be queued.${firstError ? ` First error: ${firstError}` : ''}`
+        : null;
+    job.finishedAt = new Date();
+    await jobRepo.save(job);
+
+    return {
+        ...toResult(job),
+        restaurants: queuedResults,
+    };
+}
 
 async function executeMenuRefSyncJob(
     job: SyncJob,

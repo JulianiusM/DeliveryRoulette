@@ -2,7 +2,12 @@ import http from 'http';
 import settings from './modules/settings';
 import {initDataSource} from "./modules/database/dataSource";
 import {startScheduler} from "./modules/sync/SyncScheduler";
-import {startSyncQueueWorker} from "./modules/sync/ProviderSyncService";
+import {
+    queueProviderRefreshIfNeeded,
+    recoverInterruptedJobs,
+    startSyncQueueWorker,
+} from "./modules/sync/ProviderSyncService";
+import {startHeuristicRefresh} from './modules/sync/HeuristicRefreshService';
 import {registerConnectors} from './providers/ConnectorBootstrap';
 import {ensureDefaultDietTags} from './modules/database/services/DietTagService';
 import logger from './modules/logger';
@@ -19,7 +24,16 @@ async function bootstrap() {
 
         // Register delivery provider connectors
         registerConnectors();
+        const recoveredSyncJobs = await recoverInterruptedJobs();
+        if (recoveredSyncJobs > 0) {
+            logger.warn({recoveredSyncJobs}, 'Recovered interrupted sync jobs and queued them for retry');
+        }
         startSyncQueueWorker();
+        startHeuristicRefresh({source: 'startup'});
+        const providerRefreshJob = await queueProviderRefreshIfNeeded();
+        if (providerRefreshJob) {
+            logger.info({jobId: providerRefreshJob.jobId}, 'Queued provider refresh maintenance job');
+        }
 
         const {default: app} = await import('./app');
         const server = http.createServer(app);

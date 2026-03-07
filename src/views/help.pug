@@ -1,38 +1,52 @@
 extends layout
 
-block title
-    .card-header.d-flex.justify-content-between.align-items-center
-        h1.card-title.mb-0
-            i.bi.bi-question-circle.me-2
-            | #{title}
-        a.btn.btn-sm.btn-outline-light(href="/")
-            i.bi.bi-house.me-1
-            | Home
-
-block content
-    .row
-        //- Sidebar navigation for documentation
-        .col-md-3.mb-3
-            .card.bg-dark.text-white
-                .card-header
-                    h5.mb-0
-                        i.bi.bi-list-ul.me-2
-                        | Documentation
-                .list-group.list-group-flush
-                    each doc in docsList
-                        - const isActive = currentDoc === doc.path.toLowerCase() || (currentDoc === 'readme' && doc.path === 'readme')
-                        - const docUrl = doc.path === 'readme' || doc.path === 'README' ? '/help' : `/help/${doc.path.toLowerCase()}`
-                        a.list-group-item.list-group-item-action(
-                            href=docUrl,
-                            class=isActive ? 'active bg-primary' : 'bg-dark text-white border-secondary'
-                        )= doc.title
-
-        //- Main content area
-        .col-md-9
-            .card.bg-dark.text-white
-                .card-body.help-content
-                    //- Render the markdown content as HTML
-                    != content
+block meta
+    title #{title} | DeliveryRoulette
 
 block link
     link(rel="stylesheet" href="/style/help.css")
+
+block body
+    - const docs = docsList || []
+    - const currentTitle = title || 'Help'
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-info
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Documentation
+                        h1.display-5.fw-semibold.mb-2 #{currentTitle}
+                        p.lead.text-white-50.mb-0 Read the product docs in the same workspace as the operational views. The documentation should feel like part of the product, not a separate theme.
+                    .col-lg-4
+                        .row.g-3
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Documents
+                                    strong.app-stat-value #{docs.length}
+                                    small.text-white-50 Guides, architecture notes, and testing docs
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Current
+                                    strong.app-stat-value #{currentDoc === 'readme' ? 'Index' : currentTitle}
+                                    small.text-white-50 The active document stays visible in the left navigation
+
+        section.card.app-section-card
+            .card-body
+                .row.g-4
+                    .col-lg-3
+                        .app-panel.h-100
+                            .d-flex.justify-content-between.align-items-center.gap-2.mb-3
+                                h2.h5.mb-0
+                                    i.bi.bi-list-ul.me-2
+                                    | Documentation
+                                a.btn.btn-sm.btn-outline-light(href="/")
+                                    i.bi.bi-house.me-1
+                                    | Home
+                            .list-group.app-sidebar-list
+                                each doc in docs
+                                    - const isActive = currentDoc === doc.path.toLowerCase() || (currentDoc === 'readme' && doc.path === 'readme')
+                                    - const docUrl = doc.path === 'readme' || doc.path === 'README' ? '/help' : `/help/${doc.path.toLowerCase()}`
+                                    a.list-group-item.list-group-item-action(class=isActive ? 'active' : '' href=docUrl)= doc.title
+                    .col-lg-9
+                        .app-rich-content.help-content
+                            != content

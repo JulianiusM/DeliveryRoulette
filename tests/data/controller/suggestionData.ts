@@ -16,6 +16,7 @@ export const sampleRestaurant = {
     city: 'Springfield',
     postalCode: '12345',
     country: 'USA',
+    openingHours: 'delivery: Mon 10:00-22:00',
     isActive: true,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -100,4 +101,5 @@ export const formDataDefaults = {
     userId: 1,
     expectedDietTagCount: 3,
     expectedSelectedCount: 2,
+    expectedMinDietScore: 10,
 };

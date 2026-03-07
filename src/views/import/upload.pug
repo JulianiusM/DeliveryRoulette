@@ -1,29 +1,57 @@
-//- views/import/upload.pug – Import Upload Page
 extends ../layout
 
 block meta
     title Import | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-upload.me-2
-        | Import Restaurants
+block body
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-info
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Bulk data flow
+                        h1.display-5.fw-semibold.mb-2 Import Restaurants
+                        p.lead.text-white-50.mb-0 Upload JSON or CSV data, validate it, inspect the diff, and only then apply it. The import flow should feel as deliberate as the rest of the app.
+                    .col-lg-4
+                        .row.g-3
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label Step 1
+                                    strong.app-stat-value Upload
+                                    small.text-white-50 Provide JSON or CSV source data
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label Step 2
+                                    strong.app-stat-value Review
+                                    small.text-white-50 Inspect the computed diff before changing data
+                            .col-4
+                                .app-stat-card
+                                    span.app-stat-label Step 3
+                                    strong.app-stat-value Apply
+                                    small.text-white-50 Persist only the reviewed changes
 
-block content
-    .row.justify-content-center
-        .col-md-8
-            p.text-white-50.mb-4
-                | Upload a JSON or CSV file to import restaurants, menus, and provider references.
-                | The file will be validated and a preview of changes will be shown before applying.
-
-            form(method="POST" action="/import/upload" enctype="multipart/form-data")
-                +csrf
-                .mb-3
-                    label.form-label(for="file") Import File (JSON or CSV)
-                    input.form-control.text-bg-dark(type="file" name="file" id="file" accept=".json,.csv,application/json,text/csv" required)
-                    .form-text.text-white-50 Accepted formats: JSON (full import) or CSV (restaurant list only). See #[a.text-info(href="/help") documentation] for details.
-
-                .d-grid
-                    button.btn.btn-primary(type="submit")
-                        i.bi.bi-cloud-upload.me-1
-                        | Upload &amp; Validate
+        section.card.app-section-card
+            .card-header
+                i.bi.bi-cloud-upload.me-2
+                | Upload Import File
+            .card-body
+                .row.g-4
+                    .col-lg-8
+                        .app-panel.h-100
+                            p.text-white-50.mb-4 Upload a JSON or CSV file to import restaurants, menus, and provider references. The file is validated first and then shown in a preview with new, updated, and unchanged entries.
+                            form(method="POST" action="/import/upload" enctype="multipart/form-data")
+                                +csrf
+                                .mb-3
+                                    label.form-label(for="file") Import File (JSON or CSV)
+                                    input.form-control.text-bg-dark(type="file" name="file" id="file" accept=".json,.csv,application/json,text/csv" required)
+                                    .form-text.text-white-50 Accepted formats: JSON for full imports or CSV for restaurant lists. See the help pages for import format details.
+                                button.btn.btn-primary(type="submit")
+                                    i.bi.bi-cloud-upload.me-1
+                                    | Upload And Validate
+                    .col-lg-4
+                        .app-panel.h-100
+                            h2.h6.text-uppercase.text-white-50.mb-3 What the importer keeps visible
+                            ul.text-white-50.small.mb-0
+                                li New, updated, and unchanged entities are counted separately.
+                                li Menu categories, provider refs, and diet tags remain reviewable.
+                                li The apply step stays explicit so imports are never silent.

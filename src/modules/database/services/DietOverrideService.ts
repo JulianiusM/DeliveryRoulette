@@ -2,7 +2,7 @@ import {AppDataSource} from '../dataSource';
 import {DietManualOverride} from '../entities/diet/DietManualOverride';
 import {DietInferenceResult} from '../entities/diet/DietInferenceResult';
 import {DietTag} from '../entities/diet/DietTag';
-import {ENGINE_VERSION} from './DietInferenceService';
+import {ENGINE_VERSION, ensureCurrentResultsForRestaurant} from './DietInferenceService';
 
 // ── Override CRUD ──────────────────────────────────────────
 
@@ -88,22 +88,41 @@ export interface EffectiveSuitability {
             matchedItems: Array<{
                 itemId: string;
                 itemName: string;
+                categoryName?: string | null;
                 keywords: string[];
                 source?: 'heuristic' | 'manual_override';
+                signature?: string;
             }>;
             excludedItems?: Array<{
                 itemId: string;
                 itemName: string;
+                categoryName?: string | null;
                 keywords: string[];
                 excludedBy: string[];
+                signature?: string;
             }>;
             totalMenuItems: number;
             matchRatio: number;
+            menuStats?: {
+                totalUniqueItems: number;
+                duplicateItemsFiltered: number;
+                matchedUniqueItems: number;
+                matchedDuplicateItemsFiltered: number;
+                excludedUniqueItems: number;
+                totalCategories: number;
+                matchedCategories: number;
+                categoryCoverageRatio: number;
+                varietyRatio: number;
+            };
             scoreBreakdown?: {
                 ratioScore: number;
+                coverageScore: number;
+                varietyScore: number;
+                categoryScore: number;
                 confidenceMultiplier: number;
                 evidenceBoost: number;
                 evidencePenalty: number;
+                varietyPenalty: number;
                 finalScore: number;
             };
         };
@@ -114,22 +133,41 @@ interface InferenceReasons {
     matchedItems: Array<{
         itemId: string;
         itemName: string;
+        categoryName?: string | null;
         keywords: string[];
         source?: 'heuristic' | 'manual_override';
+        signature?: string;
     }>;
     excludedItems?: Array<{
         itemId: string;
         itemName: string;
+        categoryName?: string | null;
         keywords: string[];
         excludedBy: string[];
+        signature?: string;
     }>;
     totalMenuItems: number;
     matchRatio: number;
+    menuStats?: {
+        totalUniqueItems: number;
+        duplicateItemsFiltered: number;
+        matchedUniqueItems: number;
+        matchedDuplicateItemsFiltered: number;
+        excludedUniqueItems: number;
+        totalCategories: number;
+        matchedCategories: number;
+        categoryCoverageRatio: number;
+        varietyRatio: number;
+    };
     scoreBreakdown?: {
         ratioScore: number;
+        coverageScore: number;
+        varietyScore: number;
+        categoryScore: number;
         confidenceMultiplier: number;
         evidenceBoost: number;
         evidencePenalty: number;
+        varietyPenalty: number;
         finalScore: number;
     };
 }
@@ -148,6 +186,7 @@ function parseReasons(reasonsJson: string | undefined | null): InferenceReasons 
                 excludedItems: Array.isArray(parsed.excludedItems) ? parsed.excludedItems : undefined,
                 totalMenuItems: parsed.totalMenuItems ?? 0,
                 matchRatio: parsed.matchRatio ?? 0,
+                menuStats: parsed.menuStats ?? undefined,
                 scoreBreakdown: parsed.scoreBreakdown ?? undefined,
             };
         }
@@ -175,17 +214,12 @@ export async function computeEffectiveSuitability(
 ): Promise<EffectiveSuitability[]> {
     const tagRepo = AppDataSource.getRepository(DietTag);
     const overrideRepo = AppDataSource.getRepository(DietManualOverride);
-    const inferenceRepo = AppDataSource.getRepository(DietInferenceResult);
 
-    const dietTags = await tagRepo.find({order: {key: 'ASC'}});
-    const overrides = await overrideRepo.find({where: {restaurantId}});
-    const inferences = await inferenceRepo.find({
-        where: {
-            restaurantId,
-            engineVersion: ENGINE_VERSION,
-        },
-        order: {computedAt: 'DESC'},
-    });
+    const [dietTags, overrides, inferences] = await Promise.all([
+        tagRepo.find({order: {key: 'ASC'}}),
+        overrideRepo.find({where: {restaurantId}}),
+        ensureCurrentResultsForRestaurant(restaurantId),
+    ]);
 
     const overrideMap = new Map(overrides.map(o => [o.dietTagId, o]));
     const inferenceMap = new Map<string, DietInferenceResult>();

@@ -4,6 +4,7 @@ import * as restaurantController from "../controller/restaurantController";
 import * as menuController from "../controller/menuController";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
+import {getSessionUserId} from '../modules/lib/util';
 import {handleValidationError} from '../middleware/validationErrorHandler';
 import {
     validateRestaurant, validateProviderRef, validateDietOverride,
@@ -16,9 +17,11 @@ const app = express.Router();
 app.get('/', asyncHandler(async (req: Request, res: Response) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const activeFilter = typeof req.query.active === 'string' ? req.query.active : undefined;
-    const favoritesOnly = req.query.favorites === 'true';
-    const userId = (req.session as any)?.userId ?? undefined;
-    const data = await restaurantController.listRestaurants({search, activeFilter, favoritesOnly, userId});
+    const favoriteFilter = typeof req.query.favorite === 'string' ? req.query.favorite : undefined;
+    const suggestionFilter = typeof req.query.suggestion === 'string' ? req.query.suggestion : undefined;
+    const openFilter = typeof req.query.open === 'string' ? req.query.open : undefined;
+    const userId = getSessionUserId(req.session);
+    const data = await restaurantController.listRestaurants({search, activeFilter, favoriteFilter, suggestionFilter, openFilter, userId});
     renderer.renderWithData(res, 'restaurants/index', data);
 }));
 
@@ -35,7 +38,7 @@ app.post('/new', validateRestaurant, handleValidationError, asyncHandler(async (
 
 // GET /restaurants/:id - Show detail page
 app.get('/:id', asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId ?? undefined;
+    const userId = getSessionUserId(req.session);
     const data = await restaurantController.getRestaurantDetail(req.params.id, userId);
     renderer.renderWithData(res, 'restaurants/detail', data);
 }));
@@ -84,7 +87,7 @@ app.post('/:id/diet/recompute', asyncHandler(async (req: Request, res: Response)
 
 // POST /restaurants/:id/diet-overrides - Add/update diet override
 app.post('/:id/diet-overrides', validateDietOverride, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId ?? 0;
+    const userId = getSessionUserId(req.session) ?? 0;
     await restaurantController.addDietOverride(req.params.id, req.body, userId);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -99,23 +102,27 @@ app.post('/:id/diet-overrides/:overrideId/delete', asyncHandler(async (req: Requ
 
 // POST /restaurants/:id/toggle-favorite - Toggle favorite flag
 app.post('/:id/toggle-favorite', asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId;
+    const userId = getSessionUserId(req.session);
     if (!userId) {
+        req.flash('info', 'Log in to save favorite restaurants.');
         res.redirect(`/restaurants/${req.params.id}`);
         return;
     }
-    await restaurantController.toggleFavorite(req.params.id, userId);
+    const preference = await restaurantController.toggleFavorite(req.params.id, userId);
+    req.flash('success', preference.isFavorite ? 'Restaurant added to favorites.' : 'Restaurant removed from favorites.');
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // POST /restaurants/:id/toggle-do-not-suggest - Toggle do-not-suggest flag
 app.post('/:id/toggle-do-not-suggest', asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId;
+    const userId = getSessionUserId(req.session);
     if (!userId) {
+        req.flash('info', 'Log in to save restaurant suggestion preferences.');
         res.redirect(`/restaurants/${req.params.id}`);
         return;
     }
-    await restaurantController.toggleDoNotSuggest(req.params.id, userId);
+    const preference = await restaurantController.toggleDoNotSuggest(req.params.id, userId);
+    req.flash('success', preference.doNotSuggest ? 'Restaurant blocked from suggestions.' : 'Restaurant allowed in suggestions again.');
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 

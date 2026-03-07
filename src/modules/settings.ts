@@ -66,6 +66,11 @@ export type Settings = {
 
     // Suggestion history
     suggestionExcludeRecentCount: number;
+    suggestionDefaultOpenOnly: boolean;
+    suggestionDefaultExcludeRecent: boolean;
+    suggestionDefaultRespectDoNotSuggest: boolean;
+    suggestionDefaultMinDietScore: number;
+    suggestionDefaultFavoriteMode: string;
 
     // Import configuration
     importMaxFileSizeBytes: number;
@@ -83,17 +88,25 @@ export type Settings = {
     // Provider fetch cache TTL (seconds)
     providerCacheListingTtlSeconds: number;
     providerCacheMenuTtlSeconds: number;
+    providerRefreshVersion: string;
 
     // Diet inference engine configuration
     inferenceHighConfidenceMinRatio: number;
     inferenceHighConfidenceMinStrongSignals: number;
+    inferenceHighConfidenceMinUniqueItems: number;
     inferenceMediumConfidenceMinRatio: number;
+    inferenceMediumConfidenceMinUniqueItems: number;
     inferenceSmallMenuThreshold: number;
     inferenceEvidenceBoostCap: number;
     inferenceEvidencePenaltyCap: number;
     inferenceStrongSignalWeight: number;
     inferenceManualOverrideWeight: number;
     inferenceRatioWeight: number;
+    inferenceCoverageWeight: number;
+    inferenceVarietyWeight: number;
+    inferenceCategoryWeight: number;
+    inferenceVarietyTargetItems: number;
+    inferenceVarietyPenaltyCap: number;
     inferencePenaltyPerExcluded: number;
     inferenceConfidenceMultiplierMedium: number;
     inferenceConfidenceMultiplierLow: number;
@@ -166,6 +179,11 @@ const defaults: Settings = {
 
     // Suggestion history
     suggestionExcludeRecentCount: 3,
+    suggestionDefaultOpenOnly: true,
+    suggestionDefaultExcludeRecent: true,
+    suggestionDefaultRespectDoNotSuggest: true,
+    suggestionDefaultMinDietScore: 10,
+    suggestionDefaultFavoriteMode: "prefer",
 
     // Import configuration
     importMaxFileSizeBytes: 25 * 1024 * 1024, // 25 MB
@@ -183,17 +201,25 @@ const defaults: Settings = {
     // Provider fetch cache TTL (seconds)
     providerCacheListingTtlSeconds: 6 * 60 * 60,    // 6 hours
     providerCacheMenuTtlSeconds: 24 * 60 * 60,      // 24 hours
+    providerRefreshVersion: "1.0.0",
 
     // Diet inference engine configuration
     inferenceHighConfidenceMinRatio: 0.3,
     inferenceHighConfidenceMinStrongSignals: 2,
+    inferenceHighConfidenceMinUniqueItems: 5,
     inferenceMediumConfidenceMinRatio: 0.5,
+    inferenceMediumConfidenceMinUniqueItems: 3,
     inferenceSmallMenuThreshold: 5,
     inferenceEvidenceBoostCap: 20,
     inferenceEvidencePenaltyCap: 18,
     inferenceStrongSignalWeight: 3,
     inferenceManualOverrideWeight: 5,
     inferenceRatioWeight: 4,
+    inferenceCoverageWeight: 0.55,
+    inferenceVarietyWeight: 0.30,
+    inferenceCategoryWeight: 0.15,
+    inferenceVarietyTargetItems: 6,
+    inferenceVarietyPenaltyCap: 12,
     inferencePenaltyPerExcluded: 2,
     inferenceConfidenceMultiplierMedium: 0.92,
     inferenceConfidenceMultiplierLow: 0.82,
@@ -243,6 +269,11 @@ const keyMap: Record<string, keyof Settings> = {
     MIN_NORMALIZED_TITLE_LENGTH: "minNormalizedTitleLength",
     MIN_SIMILARITY_SCORE: "minSimilarityScore",
     SUGGESTION_EXCLUDE_RECENT_COUNT: "suggestionExcludeRecentCount",
+    SUGGESTION_DEFAULT_OPEN_ONLY: "suggestionDefaultOpenOnly",
+    SUGGESTION_DEFAULT_EXCLUDE_RECENT: "suggestionDefaultExcludeRecent",
+    SUGGESTION_DEFAULT_RESPECT_DO_NOT_SUGGEST: "suggestionDefaultRespectDoNotSuggest",
+    SUGGESTION_DEFAULT_MIN_DIET_SCORE: "suggestionDefaultMinDietScore",
+    SUGGESTION_DEFAULT_FAVORITE_MODE: "suggestionDefaultFavoriteMode",
     IMPORT_MAX_FILE_SIZE_BYTES: "importMaxFileSizeBytes",
     SYNC_INTERVAL_MS: "syncIntervalMs",
     CREDENTIAL_ENCRYPTION_KEY: "credentialEncryptionKey",
@@ -250,15 +281,23 @@ const keyMap: Record<string, keyof Settings> = {
     PROVIDER_HTTP_MAX_CONCURRENT: "providerHttpMaxConcurrent",
     PROVIDER_CACHE_LISTING_TTL_SECONDS: "providerCacheListingTtlSeconds",
     PROVIDER_CACHE_MENU_TTL_SECONDS: "providerCacheMenuTtlSeconds",
+    PROVIDER_REFRESH_VERSION: "providerRefreshVersion",
     INFERENCE_HIGH_CONFIDENCE_MIN_RATIO: "inferenceHighConfidenceMinRatio",
     INFERENCE_HIGH_CONFIDENCE_MIN_STRONG_SIGNALS: "inferenceHighConfidenceMinStrongSignals",
+    INFERENCE_HIGH_CONFIDENCE_MIN_UNIQUE_ITEMS: "inferenceHighConfidenceMinUniqueItems",
     INFERENCE_MEDIUM_CONFIDENCE_MIN_RATIO: "inferenceMediumConfidenceMinRatio",
+    INFERENCE_MEDIUM_CONFIDENCE_MIN_UNIQUE_ITEMS: "inferenceMediumConfidenceMinUniqueItems",
     INFERENCE_SMALL_MENU_THRESHOLD: "inferenceSmallMenuThreshold",
     INFERENCE_EVIDENCE_BOOST_CAP: "inferenceEvidenceBoostCap",
     INFERENCE_EVIDENCE_PENALTY_CAP: "inferenceEvidencePenaltyCap",
     INFERENCE_STRONG_SIGNAL_WEIGHT: "inferenceStrongSignalWeight",
     INFERENCE_MANUAL_OVERRIDE_WEIGHT: "inferenceManualOverrideWeight",
     INFERENCE_RATIO_WEIGHT: "inferenceRatioWeight",
+    INFERENCE_COVERAGE_WEIGHT: "inferenceCoverageWeight",
+    INFERENCE_VARIETY_WEIGHT: "inferenceVarietyWeight",
+    INFERENCE_CATEGORY_WEIGHT: "inferenceCategoryWeight",
+    INFERENCE_VARIETY_TARGET_ITEMS: "inferenceVarietyTargetItems",
+    INFERENCE_VARIETY_PENALTY_CAP: "inferenceVarietyPenaltyCap",
     INFERENCE_PENALTY_PER_EXCLUDED: "inferencePenaltyPerExcluded",
     INFERENCE_CONFIDENCE_MULTIPLIER_MEDIUM: "inferenceConfidenceMultiplierMedium",
     INFERENCE_CONFIDENCE_MULTIPLIER_LOW: "inferenceConfidenceMultiplierLow",
@@ -286,6 +325,10 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     minNormalizedTitleLength: (v) => Number(v),
     minSimilarityScore: (v) => Number(v),
     suggestionExcludeRecentCount: (v) => Number(v),
+    suggestionDefaultOpenOnly: (v) => /^(1|true|yes|on)$/i.test(v),
+    suggestionDefaultExcludeRecent: (v) => /^(1|true|yes|on)$/i.test(v),
+    suggestionDefaultRespectDoNotSuggest: (v) => /^(1|true|yes|on)$/i.test(v),
+    suggestionDefaultMinDietScore: (v) => Number(v),
     importMaxFileSizeBytes: (v) => Number(v),
     syncIntervalMs: (v) => Number(v),
     providerHttpTimeoutMs: (v) => Number(v),

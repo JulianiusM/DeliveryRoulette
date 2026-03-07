@@ -56,8 +56,10 @@ const mockRemoveProviderRef = providerRefService.removeProviderRef as jest.Mock;
 const mockComputeEffectiveSuitability = dietOverrideService.computeEffectiveSuitability as jest.Mock;
 const mockAddOverride = dietOverrideService.addOverride as jest.Mock;
 const mockRemoveOverride = dietOverrideService.removeOverride as jest.Mock;
-const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
+const mockGetAllByUserId = userRestaurantPrefService.getAllByUserId as jest.Mock;
 const mockGetByUserAndRestaurant = userRestaurantPrefService.getByUserAndRestaurant as jest.Mock;
+const mockToggleFavorite = userRestaurantPrefService.toggleFavorite as jest.Mock;
+const mockToggleDoNotSuggest = userRestaurantPrefService.toggleDoNotSuggest as jest.Mock;
 const mockListItemOverridesByItemIds = menuItemDietOverrideService.listByItemIds as jest.Mock;
 const mockQueueMenuSyncByProviderRef = providerSyncService.queueMenuSyncByProviderRef as jest.Mock;
 
@@ -80,8 +82,10 @@ const sampleRestaurant = {
 describe('RestaurantController', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockGetFavoriteRestaurantIds.mockResolvedValue([]);
+        mockGetAllByUserId.mockResolvedValue([]);
         mockGetByUserAndRestaurant.mockResolvedValue(null);
+        mockListCategoriesByRestaurant.mockResolvedValue([]);
+        mockComputeEffectiveSuitability.mockResolvedValue([]);
         mockListItemOverridesByItemIds.mockResolvedValue([]);
     });
 
@@ -92,10 +96,14 @@ describe('RestaurantController', () => {
             const result = await restaurantController.listRestaurants({search: 'Pizza', activeFilter: 'true'});
 
             expect(mockListRestaurants).toHaveBeenCalledWith({search: 'Pizza', isActive: true});
-            expect(result.restaurants).toEqual([sampleRestaurant]);
+            expect(result.restaurants).toHaveLength(1);
+            expect(result.restaurants[0].restaurant).toEqual(sampleRestaurant);
+            expect(result.restaurants[0].availabilityStatus.summaryLabel).toBe('Hours unknown');
             expect(result.search).toBe('Pizza');
             expect(result.active).toBe('true');
-            expect(result.favoriteIds).toEqual([]);
+            expect(result.favoriteFilter).toBe('all');
+            expect(result.suggestionFilter).toBe('all');
+            expect(result.openFilter).toBe('all');
         });
 
         test('passes undefined isActive for empty filter', async () => {
@@ -114,27 +122,49 @@ describe('RestaurantController', () => {
             expect(mockListRestaurants).toHaveBeenCalledWith({search: undefined, isActive: false});
         });
 
-        test('filters to favorites only when requested', async () => {
+        test('filters to favorites when requested', async () => {
             const favRestaurant = {...sampleRestaurant, id: 'fav-id', name: 'Fav Place'};
             const normalRestaurant = {...sampleRestaurant, id: 'normal-id', name: 'Normal Place'};
             setupMock(mockListRestaurants, [favRestaurant, normalRestaurant]);
-            mockGetFavoriteRestaurantIds.mockResolvedValue(['fav-id']);
+            mockGetAllByUserId.mockResolvedValue([
+                {restaurantId: 'fav-id', isFavorite: true, doNotSuggest: false},
+            ]);
 
-            const result = await restaurantController.listRestaurants({favoritesOnly: true, userId: 1});
+            const result = await restaurantController.listRestaurants({favoriteFilter: 'positive', userId: 1});
 
             expect(result.restaurants).toHaveLength(1);
-            expect(result.restaurants[0].name).toBe('Fav Place');
-            expect(result.favoriteIds).toEqual(['fav-id']);
+            expect(result.restaurants[0].restaurant.name).toBe('Fav Place');
+            expect(result.restaurants[0].isFavorite).toBe(true);
         });
 
-        test('returns all restaurants when favoritesOnly is false', async () => {
-            setupMock(mockListRestaurants, [sampleRestaurant]);
-            mockGetFavoriteRestaurantIds.mockResolvedValue(['test-uuid']);
+        test('filters to non-favorites when requested', async () => {
+            const favRestaurant = {...sampleRestaurant, id: 'fav-id', name: 'Fav Place'};
+            const normalRestaurant = {...sampleRestaurant, id: 'normal-id', name: 'Normal Place'};
+            setupMock(mockListRestaurants, [favRestaurant, normalRestaurant]);
+            mockGetAllByUserId.mockResolvedValue([
+                {restaurantId: 'fav-id', isFavorite: true, doNotSuggest: false},
+            ]);
 
-            const result = await restaurantController.listRestaurants({favoritesOnly: false, userId: 1});
+            const result = await restaurantController.listRestaurants({favoriteFilter: 'negative', userId: 1});
 
             expect(result.restaurants).toHaveLength(1);
-            expect(result.favoriteIds).toEqual(['test-uuid']);
+            expect(result.restaurants[0].restaurant.name).toBe('Normal Place');
+            expect(result.restaurants[0].isFavorite).toBe(false);
+        });
+
+        test('filters to do-not-suggest restaurants when requested', async () => {
+            const blockedRestaurant = {...sampleRestaurant, id: 'blocked-id', name: 'Blocked Place'};
+            const normalRestaurant = {...sampleRestaurant, id: 'normal-id', name: 'Normal Place'};
+            setupMock(mockListRestaurants, [blockedRestaurant, normalRestaurant]);
+            mockGetAllByUserId.mockResolvedValue([
+                {restaurantId: 'blocked-id', isFavorite: false, doNotSuggest: true},
+            ]);
+
+            const result = await restaurantController.listRestaurants({suggestionFilter: 'positive', userId: 1});
+
+            expect(result.restaurants).toHaveLength(1);
+            expect(result.restaurants[0].restaurant.name).toBe('Blocked Place');
+            expect(result.restaurants[0].doNotSuggest).toBe(true);
         });
     });
 
@@ -151,7 +181,9 @@ describe('RestaurantController', () => {
             expect(result.categories).toEqual([]);
             expect(result.providerRefs).toEqual([]);
             expect(result.dietSuitability).toEqual([]);
+            expect(result.insightSummary.menu.totalUniqueItems).toBe(0);
             expect(result.isOpenNow).toBeNull();
+            expect(result.openingHoursPresentation.status.summaryLabel).toBe('Hours unknown');
         });
 
         test('throws ExpectedError when restaurant not found', async () => {
@@ -303,6 +335,38 @@ describe('RestaurantController', () => {
             await expect(
                 restaurantController.removeProviderRef('bad-id', 'ref-uuid')
             ).rejects.toThrow(ExpectedError);
+        });
+    });
+
+    describe('restaurant preferences', () => {
+        test('toggleFavorite returns the updated preference row', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockToggleFavorite, {
+                restaurantId: 'test-uuid',
+                userId: 7,
+                isFavorite: true,
+                doNotSuggest: false,
+            });
+
+            const result = await restaurantController.toggleFavorite('test-uuid', 7);
+
+            expect(mockToggleFavorite).toHaveBeenCalledWith(7, 'test-uuid');
+            expect(result.isFavorite).toBe(true);
+        });
+
+        test('toggleDoNotSuggest returns the updated preference row', async () => {
+            setupMock(mockGetRestaurantById, sampleRestaurant);
+            setupMock(mockToggleDoNotSuggest, {
+                restaurantId: 'test-uuid',
+                userId: 7,
+                isFavorite: false,
+                doNotSuggest: true,
+            });
+
+            const result = await restaurantController.toggleDoNotSuggest('test-uuid', 7);
+
+            expect(mockToggleDoNotSuggest).toHaveBeenCalledWith(7, 'test-uuid');
+            expect(result.doNotSuggest).toBe(true);
         });
     });
 

@@ -9,6 +9,8 @@ import {
 import {normalizeText, getActiveMenuItems} from './DietInferenceService';
 import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
 
+export type SuggestionFavoriteMode = 'prefer' | 'only' | 'ignore';
+
 // ── Types ───────────────────────────────────────────────────
 
 export interface SuggestionFilters {
@@ -26,8 +28,12 @@ export interface SuggestionFilters {
     doNotSuggestIds?: string[];
     /** Restaurant IDs marked as favorites (boosted in random selection) */
     favoriteIds?: string[];
+    /** How favorites should influence the candidate pool */
+    favoriteMode?: SuggestionFavoriteMode;
     /** When true, only suggest restaurants that are currently open */
     openOnly?: boolean;
+    /** Minimum heuristic score required for inferred diet matches */
+    minDietScore?: number;
 }
 
 export interface DietMatchDetail {
@@ -36,6 +42,9 @@ export interface DietMatchDetail {
     dietTagLabel: string;
     supported: boolean | null;
     source: 'override' | 'inference' | 'none';
+    score?: number | null;
+    confidence?: 'LOW' | 'MEDIUM' | 'HIGH' | null;
+    meetsScoreThreshold?: boolean;
 }
 
 export interface SuggestionReason {
@@ -128,6 +137,7 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
 export async function checkDietCompatibility(
     restaurantId: string,
     requiredDietTagIds: string[],
+    minDietScore: number = 0,
 ): Promise<{compatible: boolean; matchedDiets: DietMatchDetail[]}> {
     if (requiredDietTagIds.length === 0) {
         return {compatible: true, matchedDiets: []};
@@ -135,12 +145,24 @@ export async function checkDietCompatibility(
 
     const suitability = await dietOverrideService.computeEffectiveSuitability(restaurantId);
     const requiredSet = new Set(requiredDietTagIds);
+    const suitabilityById = new Map(suitability.map((entry) => [entry.dietTagId, entry]));
+    const threshold = Math.max(0, Math.min(100, minDietScore));
 
     const matchedDiets: DietMatchDetail[] = [];
     let allSupported = true;
 
-    for (const s of suitability) {
-        if (!requiredSet.has(s.dietTagId)) continue;
+    for (const dietTagId of requiredDietTagIds) {
+        const s = suitabilityById.get(dietTagId);
+        if (!s || !requiredSet.has(dietTagId)) {
+            allSupported = false;
+            continue;
+        }
+
+        const inferredScore = s.inference?.score ?? null;
+        const inferredConfidence = (s.inference?.confidence as 'LOW' | 'MEDIUM' | 'HIGH' | undefined) ?? null;
+        const meetsScoreThreshold = s.source === 'override'
+            ? s.supported === true
+            : s.supported === true && (inferredScore ?? 0) >= threshold;
 
         matchedDiets.push({
             dietTagId: s.dietTagId,
@@ -148,14 +170,16 @@ export async function checkDietCompatibility(
             dietTagLabel: s.dietTagLabel,
             supported: s.supported,
             source: s.source,
+            score: inferredScore,
+            confidence: inferredConfidence,
+            meetsScoreThreshold,
         });
 
-        if (!s.supported) {
+        if (!s.supported || !meetsScoreThreshold) {
             allSupported = false;
         }
     }
 
-    // If a required tag was not found in suitability results at all, it's unsupported
     if (matchedDiets.length < requiredDietTagIds.length) {
         allSupported = false;
     }
@@ -198,7 +222,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
 
     // Hard-exclude do-not-suggest restaurants (no fallback)
     const doNotSuggestIds = new Set(filters.doNotSuggestIds ?? []);
-    const candidates = doNotSuggestIds.size > 0
+    let candidates = doNotSuggestIds.size > 0
         ? activeRestaurants.filter(r => !doNotSuggestIds.has(r.id))
         : activeRestaurants;
 
@@ -207,6 +231,15 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     const dietTagIds = filters.dietTagIds ?? [];
     const excludeIds = new Set(filters.excludeRestaurantIds ?? []);
     const favoriteIds = new Set(filters.favoriteIds ?? []);
+    const favoriteMode = filters.favoriteMode ?? 'prefer';
+    const minDietScore = Math.max(0, Math.min(100, filters.minDietScore ?? 0));
+
+    if (favoriteMode === 'only') {
+        candidates = candidates.filter((restaurant) => favoriteIds.has(restaurant.id));
+        if (candidates.length === 0) {
+            return null;
+        }
+    }
 
     // If no diet filters, pick randomly from active+cuisine-filtered restaurants
     if (dietTagIds.length === 0) {
@@ -215,7 +248,11 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
             : candidates;
         // Fallback: if everything excluded, use full list
         const pool = filtered.length > 0 ? filtered : candidates;
-        const picked = pickRandom(pool, favoriteIds, r => r.id);
+        const picked = pickRandom(
+            pool,
+            favoriteMode === 'prefer' ? favoriteIds : undefined,
+            r => r.id,
+        );
         if (!picked) return null;
         return {
             restaurant: picked,
@@ -230,7 +267,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     // Filter by diet compatibility
     const compatible: Array<{restaurant: Restaurant; matchedDiets: DietMatchDetail[]}> = [];
     for (const restaurant of candidates) {
-        const check = await checkDietCompatibility(restaurant.id, dietTagIds);
+        const check = await checkDietCompatibility(restaurant.id, dietTagIds, minDietScore);
         if (check.compatible) {
             compatible.push({restaurant, matchedDiets: check.matchedDiets});
         }
@@ -243,7 +280,11 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
         : compatible;
     // Fallback: if everything excluded, use full compatible list
     const pool = filtered.length > 0 ? filtered : compatible;
-    const picked = pickRandom(pool, favoriteIds, c => c.restaurant.id);
+    const picked = pickRandom(
+        pool,
+        favoriteMode === 'prefer' ? favoriteIds : undefined,
+        c => c.restaurant.id,
+    );
     if (!picked) return null;
 
     return {

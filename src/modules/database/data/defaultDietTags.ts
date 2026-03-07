@@ -69,13 +69,17 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
             'calamari', 'squid', 'doner', 'doener', 'shawarma', 'schawarma',
             'egg', 'eggs', 'cheese', 'milk', 'dairy', 'butter', 'cream',
-            'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey',
+            'halloumi', 'haloumi', 'camembert', 'brie', 'feta', 'mozzarella',
+            'paneer', 'ricotta', 'parmesan',
+            'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey', 'gyros',
             // DE
             'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
             'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn',
             'ei', 'eier', 'käse', 'milch', 'sahne', 'butter', 'joghurt',
-            'honig', 'quark',
+            'halloumi', 'haloumi', 'camembert', 'brie', 'feta', 'mozzarella',
+            'paneer', 'ricotta', 'parmesan',
+            'honig', 'quark', 'tzatziki'
         ],
         strongSignals: [
             'vegan', 'plant-based', 'plant based',
@@ -128,7 +132,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             // DE
             'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
-            'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn',
+            'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn', 'gyros',
         ],
         strongSignals: [
             'vegetarian', 'veggie', 'meat-free', 'meat free',

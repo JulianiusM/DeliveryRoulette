@@ -306,3 +306,806 @@
   a
     &:hover
       text-decoration: underline !important
+
+/* Unified app surface */
+:root
+  --app-accent: #f4b942
+  --app-accent-soft: rgba(244, 185, 66, 0.18)
+  --app-accent-cool-soft: rgba(97, 197, 255, 0.18)
+  --app-accent-success-soft: rgba(25, 135, 84, 0.22)
+  --app-accent-danger-soft: rgba(220, 53, 69, 0.2)
+  --app-surface: rgba(255, 255, 255, 0.04)
+  --app-surface-strong: rgba(255, 255, 255, 0.08)
+  --app-outline: rgba(255, 255, 255, 0.12)
+  --app-outline-strong: rgba(255, 255, 255, 0.2)
+  --app-text-soft: rgba(255, 255, 255, 0.84)
+  --app-text-muted: rgba(255, 255, 255, 0.62)
+  --app-shadow-lg: 0 1.5rem 3rem rgba(0, 0, 0, 0.22)
+  --restaurant-accent: var(--app-accent)
+  --restaurant-accent-soft: var(--app-accent-soft)
+  --restaurant-surface: var(--app-surface)
+  --restaurant-surface-strong: var(--app-surface-strong)
+  --restaurant-outline: var(--app-outline)
+
+body.app-root
+  background: radial-gradient(circle at top left, rgba(244, 185, 66, 0.1), transparent 28%), radial-gradient(circle at top right, rgba(97, 197, 255, 0.08), transparent 30%), linear-gradient(180deg, #0d1218 0%, #111821 100%)
+  color: #f8f9fa
+
+.app-header
+  position: sticky
+  top: 0
+  z-index: 1080
+
+.app-main
+  width: min(1600px, 100%)
+  position: relative
+  z-index: 1
+
+.app-navbar
+  background: rgba(10, 14, 19, 0.92) !important
+  backdrop-filter: blur(14px)
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08)
+  overflow: visible
+  z-index: 1081
+
+  .navbar-brand
+    letter-spacing: 0.02em
+    position: relative
+    z-index: 2
+
+    &.active
+      color: #fff
+
+  .navbar-collapse
+    overflow: visible
+
+  .nav-link,
+  .dropdown-item
+    transition: color 0.18s ease, background-color 0.18s ease
+
+  .nav-link:hover,
+  .nav-link:focus,
+  .dropdown-item:hover,
+  .dropdown-item:focus
+    color: #fff
+
+  .dropdown-menu
+    z-index: 1090
+    margin-top: 0.75rem
+    border: 1px solid rgba(255, 255, 255, 0.12)
+    background: rgba(15, 19, 25, 0.96)
+    backdrop-filter: blur(18px)
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.28)
+
+  .dropdown-item
+    display: flex
+    align-items: center
+    gap: 0.45rem
+    padding-top: 0.6rem
+    padding-bottom: 0.6rem
+
+  .dropdown-header
+    color: rgba(255, 255, 255, 0.52)
+    text-transform: uppercase
+    letter-spacing: 0.08em
+    font-size: 0.72rem
+
+.app-primary-nav
+  gap: 0.35rem
+
+.app-nav-pill
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  gap: 0.35rem
+  padding: 0.55rem 0.85rem !important
+  border-radius: 999px
+  color: rgba(255, 255, 255, 0.78)
+
+  &:hover,
+  &:focus,
+  &.active,
+  &.show
+    color: #fff
+    background: rgba(255, 255, 255, 0.08)
+
+  &.active
+    box-shadow: inset 0 0 0 1px rgba(244, 185, 66, 0.24)
+
+  &.dropdown-toggle::after
+    margin-left: 0.25rem
+
+.app-footer
+  background: rgba(10, 14, 19, 0.94) !important
+  border-top: 1px solid rgba(255, 255, 255, 0.08)
+
+.app-alert-stack
+  .alert
+    border: 1px solid rgba(255, 255, 255, 0.1)
+    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.14)
+
+.app-shell,
+.restaurant-shell,
+.restaurants-overview,
+.suggestion-page
+  display: flex
+  flex-direction: column
+  gap: 1.5rem
+
+.app-shell,
+.restaurant-shell,
+.restaurants-overview
+  .card
+    backdrop-filter: blur(10px)
+
+.app-hero-card,
+.restaurant-hero,
+.restaurant-list-hero
+  background: radial-gradient(circle at top left, var(--app-hero-accent, rgba(244, 185, 66, 0.22)), transparent 40%), linear-gradient(135deg, #11161c 0%, #202936 48%, #11161c 100%)
+  border: 1px solid var(--app-outline)
+  color: #fff
+  box-shadow: var(--app-shadow-lg)
+
+  &.is-success
+    --app-hero-accent: rgba(25, 135, 84, 0.24)
+
+  &.is-info
+    --app-hero-accent: rgba(97, 197, 255, 0.22)
+
+  &.is-danger
+    --app-hero-accent: rgba(220, 53, 69, 0.2)
+
+  &.is-neutral
+    --app-hero-accent: rgba(160, 171, 186, 0.16)
+
+.app-eyebrow
+  text-transform: uppercase
+  letter-spacing: 0.12em
+  font-size: 0.74rem
+  color: rgba(255, 255, 255, 0.58)
+
+.app-section-card
+  border: 1px solid var(--app-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03))
+  color: #fff
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.12)
+
+  > .card-header
+    padding: 1rem 1.25rem
+    border-bottom-color: rgba(255, 255, 255, 0.08)
+    background: rgba(255, 255, 255, 0.02)
+
+  > .card-body
+    padding: 1.25rem
+
+.app-panel,
+.restaurant-panel
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: var(--app-surface)
+
+.app-stat-card,
+.restaurant-stat-card,
+.restaurant-metric-tile
+  display: flex
+  flex-direction: column
+  gap: 0.35rem
+  height: 100%
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.14)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04))
+
+.app-stat-label,
+.restaurant-stat-label,
+.restaurant-metric-label
+  text-transform: uppercase
+  letter-spacing: 0.08em
+  font-size: 0.72rem
+  color: rgba(255, 255, 255, 0.6)
+
+.app-stat-value,
+.restaurant-stat-value,
+.restaurant-metric-value
+  font-size: clamp(1.45rem, 1.1rem + 1vw, 2rem)
+  line-height: 1
+  font-weight: 700
+
+.app-action-card
+  display: flex
+  flex-direction: column
+  gap: 1rem
+  height: 100%
+  padding: 1.25rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03))
+  color: #fff
+  text-decoration: none
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease
+
+  &:hover
+    transform: translateY(-4px)
+    color: #fff
+    border-color: rgba(244, 185, 66, 0.36)
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.16)
+
+.app-icon-badge
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  width: 3rem
+  height: 3rem
+  border-radius: 1rem
+  background: rgba(255, 255, 255, 0.08)
+  border: 1px solid rgba(255, 255, 255, 0.12)
+  font-size: 1.25rem
+
+  &.is-primary
+    color: #90c2ff
+
+  &.is-success
+    color: #8ee0ab
+
+  &.is-info
+    color: #8fd5ff
+
+  &.is-warning
+    color: #ffd36a
+
+  &.is-danger
+    color: #ff9ea9
+
+.app-chip-row
+  display: flex
+  flex-wrap: wrap
+  gap: 0.5rem
+
+  .btn
+    display: inline-flex
+    align-items: center
+    justify-content: center
+    gap: 0.35rem
+
+.app-chip
+  display: inline-flex
+  align-items: center
+  gap: 0.35rem
+  padding: 0.45rem 0.75rem
+  border-radius: 999px
+  border: 1px solid rgba(255, 255, 255, 0.1)
+  background: rgba(255, 255, 255, 0.04)
+  color: rgba(255, 255, 255, 0.86)
+  font-size: 0.92rem
+
+  &.is-strong
+    background: rgba(255, 255, 255, 0.9)
+    color: #10161c
+
+.app-empty-state,
+.restaurant-empty-state
+  display: flex
+  flex-direction: column
+  align-items: center
+  justify-content: center
+  gap: 0.75rem
+  padding: 2rem 1.5rem
+  border-radius: 1rem
+  border: 1px dashed rgba(255, 255, 255, 0.16)
+  background: rgba(255, 255, 255, 0.03)
+  color: rgba(255, 255, 255, 0.72)
+
+  i
+    font-size: 2rem
+
+.app-table-shell
+  border: 1px solid var(--app-outline)
+  border-radius: 1rem
+  overflow: hidden
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))
+
+  .table
+    margin-bottom: 0
+    --bs-table-bg: transparent
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02)
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.04)
+    --bs-table-border-color: rgba(255, 255, 255, 0.08)
+
+  thead th
+    padding-top: 0.9rem
+    padding-bottom: 0.9rem
+    text-transform: uppercase
+    letter-spacing: 0.08em
+    font-size: 0.72rem
+    color: rgba(255, 255, 255, 0.58)
+    border-bottom-width: 1px
+
+.app-list-card
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02))
+
+.app-kv-list
+  margin: 0
+
+  dt
+    color: rgba(255, 255, 255, 0.56)
+    font-weight: 600
+
+  dd
+    color: rgba(255, 255, 255, 0.88)
+
+.app-form-grid
+  display: grid
+  grid-template-columns: repeat(12, minmax(0, 1fr))
+  gap: 1rem
+
+.app-form-span-12
+  grid-column: span 12
+
+.app-form-span-6
+  grid-column: span 6
+
+.app-form-span-4
+  grid-column: span 4
+
+.app-form-span-3
+  grid-column: span 3
+
+.app-form-panel
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: rgba(255, 255, 255, 0.03)
+
+.app-sidebar-list
+  .list-group-item
+    border-color: rgba(255, 255, 255, 0.08)
+    background: transparent
+    color: rgba(255, 255, 255, 0.84)
+
+    &:hover
+      background: rgba(255, 255, 255, 0.05) !important
+      color: #fff
+
+    &.active
+      background: rgba(244, 185, 66, 0.16) !important
+      border-color: rgba(244, 185, 66, 0.28)
+      color: #fff
+
+.app-rich-content
+  padding: 1.5rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: rgba(255, 255, 255, 0.03)
+
+.app-status-card
+  padding: 1.5rem
+  border-radius: 1rem
+  border: 1px solid var(--app-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03))
+
+  &.is-danger
+    border-color: rgba(220, 53, 69, 0.36)
+    background: linear-gradient(180deg, rgba(220, 53, 69, 0.16), rgba(255, 255, 255, 0.03))
+
+  &.is-success
+    border-color: rgba(25, 135, 84, 0.36)
+    background: linear-gradient(180deg, rgba(25, 135, 84, 0.16), rgba(255, 255, 255, 0.03))
+
+  &.is-warning
+    border-color: rgba(255, 193, 7, 0.34)
+    background: linear-gradient(180deg, rgba(255, 193, 7, 0.14), rgba(255, 255, 255, 0.03))
+
+  &.is-info
+    border-color: rgba(13, 202, 240, 0.34)
+    background: linear-gradient(180deg, rgba(13, 202, 240, 0.14), rgba(255, 255, 255, 0.03))
+
+.app-provider-maintenance-card
+  display: flex
+  flex-direction: column
+  gap: 1rem
+
+.app-provider-search-meta
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  justify-content: space-between
+  gap: 0.75rem
+
+  .form-control
+    min-width: min(100%, 20rem)
+
+@media (max-width: 991.98px)
+  .app-form-span-6,
+  .app-form-span-4,
+  .app-form-span-3
+    grid-column: span 12
+
+  .app-primary-nav
+    margin-top: 0.75rem
+    margin-bottom: 0.75rem
+
+@media (max-width: 767.98px)
+  .app-section-card
+    > .card-header,
+    > .card-body
+      padding-left: 1rem
+      padding-right: 1rem
+
+  .app-nav-pill
+    justify-content: flex-start
+    width: 100%
+
+.restaurant-shell,
+.restaurants-overview
+  .card
+    backdrop-filter: blur(10px)
+
+.restaurant-hero,
+.restaurant-list-hero
+  background: radial-gradient(circle at top left, rgba(244, 185, 66, 0.22), transparent 40%), linear-gradient(135deg, #11161c 0%, #202936 48%, #11161c 100%)
+  border: 1px solid var(--restaurant-outline)
+  color: #fff
+
+.restaurant-divider
+  width: 0.35rem
+  height: 0.35rem
+  border-radius: 999px
+  background: rgba(255, 255, 255, 0.35)
+
+.restaurant-stat-card
+  display: flex
+  flex-direction: column
+  gap: 0.35rem
+  height: 100%
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.14)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04))
+
+.restaurant-stat-label,
+.restaurant-metric-label
+  text-transform: uppercase
+  letter-spacing: 0.08em
+  font-size: 0.72rem
+  color: rgba(255, 255, 255, 0.6)
+
+.restaurant-stat-value,
+.restaurant-metric-value
+  font-size: clamp(1.45rem, 1.1rem + 1vw, 2rem)
+  line-height: 1
+  font-weight: 700
+
+.restaurant-section
+  scroll-margin-top: 6rem
+
+.restaurant-panel
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid var(--restaurant-outline)
+  background: var(--restaurant-surface)
+
+.restaurant-live-status,
+.restaurant-inline-status,
+.opening-hours-service
+  padding: 1rem
+  border-radius: 1rem
+  border: 1px solid var(--restaurant-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02))
+
+.restaurant-live-status
+  margin-bottom: 1.5rem
+
+.restaurant-inline-status
+  margin-top: 1rem
+
+.restaurant-hours-schedule
+  padding-top: 1rem
+
+.restaurant-shell
+  [id^="diet-"],
+  [id^="explanation-"],
+  [id^="menu-item-"]
+    scroll-margin-top: 6.5rem
+
+.diet-suitability-expanded
+  margin-top: 0.25rem
+  padding-top: 1.25rem
+  border-top: 1px solid rgba(255, 255, 255, 0.12)
+
+.diet-suitability-content
+  display: flex
+  flex-direction: column
+
+.restaurant-list-availability
+  display: flex
+  flex-wrap: wrap
+  align-items: center
+  gap: 0.55rem
+  min-height: 2.5rem
+
+  &.is-open
+    color: rgba(167, 236, 191, 0.95)
+
+    .restaurant-list-availability-state
+      background: rgba(25, 135, 84, 0.2)
+      border-color: rgba(25, 135, 84, 0.45)
+      color: #b9f6cb
+
+  &.is-closed
+    color: rgba(255, 199, 206, 0.95)
+
+    .restaurant-list-availability-state
+      background: rgba(220, 53, 69, 0.18)
+      border-color: rgba(220, 53, 69, 0.42)
+      color: #ffccd2
+
+  &.is-unknown
+    color: rgba(222, 226, 230, 0.78)
+
+    .restaurant-list-availability-state
+      background: rgba(108, 117, 125, 0.18)
+      border-color: rgba(108, 117, 125, 0.32)
+      color: #e9ecef
+
+.restaurant-list-availability-state
+  display: inline-flex
+  align-items: center
+  gap: 0.35rem
+  padding: 0.3rem 0.65rem
+  border-radius: 999px
+  border: 1px solid rgba(255, 255, 255, 0.14)
+  font-weight: 600
+
+.restaurant-list-availability-detail
+  color: rgba(255, 255, 255, 0.78)
+
+.restaurant-status-card,
+.restaurant-live-status,
+.restaurant-inline-status
+  &.is-open
+    border-color: rgba(25, 135, 84, 0.45)
+    background: linear-gradient(180deg, rgba(25, 135, 84, 0.18), rgba(255, 255, 255, 0.04))
+
+  &.is-closed
+    border-color: rgba(220, 53, 69, 0.4)
+    background: linear-gradient(180deg, rgba(220, 53, 69, 0.16), rgba(255, 255, 255, 0.03))
+
+  &.is-unknown
+    border-color: rgba(108, 117, 125, 0.36)
+
+.restaurant-shell
+  .card-header,
+  .card-header h2,
+  .card-header h3,
+  h2.h5,
+  h3.h6,
+  .provider-ref-card h3,
+  .menu-item-card h3
+    color: #f8f9fa
+
+.opening-hours-service
+  display: flex
+  flex-direction: column
+  gap: 0.25rem
+
+.opening-hours-row
+  display: grid
+  grid-template-columns: minmax(110px, 140px) 1fr
+  gap: 0.85rem
+  align-items: center
+  padding: 0.75rem 0.85rem
+  border-radius: 0.85rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(255, 255, 255, 0.03)
+
+  &.is-today
+    border-color: rgba(244, 185, 66, 0.4)
+    background: rgba(244, 185, 66, 0.08)
+
+.opening-hours-day
+  font-weight: 600
+  color: #f8f9fa
+
+.restaurant-diet-hero-card,
+.restaurant-diet-strip
+  padding: 0.9rem 1rem
+  border-radius: 1rem
+  border: 1px solid var(--restaurant-outline)
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03))
+
+.restaurant-metric-tile
+  display: flex
+  flex-direction: column
+  gap: 0.3rem
+  height: 100%
+  padding: 0.95rem
+  border-radius: 0.95rem
+  border: 1px solid var(--restaurant-outline)
+  background: var(--restaurant-surface)
+
+.restaurant-empty-state
+  display: flex
+  flex-direction: column
+  align-items: center
+  justify-content: center
+  gap: 0.75rem
+  padding: 2rem 1.5rem
+  border-radius: 1rem
+  border: 1px dashed rgba(255, 255, 255, 0.16)
+  background: rgba(255, 255, 255, 0.03)
+  color: rgba(255, 255, 255, 0.72)
+
+  i
+    font-size: 2rem
+
+.provider-ref-card,
+.menu-item-card,
+.restaurant-list-card
+  border: 1px solid var(--restaurant-outline)
+  border-radius: 1rem
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02))
+
+.provider-ref-card,
+.menu-item-card
+  padding: 1rem
+  height: 100%
+
+.menu-item-card-top
+  min-height: 0
+
+.menu-item-meta-pill
+  display: inline-flex
+  align-items: center
+  gap: 0.25rem
+  padding: 0.45rem 0.7rem
+  border-radius: 999px
+  border: 1px solid rgba(255, 255, 255, 0.1)
+  background: rgba(255, 255, 255, 0.04)
+
+.menu-item-context
+  white-space: pre-wrap
+  padding: 0.85rem
+  border-radius: 0.85rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(0, 0, 0, 0.22)
+
+.restaurant-anchor-nav
+  .btn
+    border-radius: 999px
+
+.restaurants-overview
+  .progress,
+  .restaurant-shell .progress
+    height: 0.55rem
+    background: rgba(255, 255, 255, 0.08)
+
+.restaurant-list-card
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease
+
+  &:hover
+    transform: translateY(-4px)
+    border-color: rgba(244, 185, 66, 0.38)
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.18)
+
+.suggestion-page
+  display: flex
+  flex-direction: column
+  gap: 1.5rem
+
+.suggestion-hero-card
+  background: radial-gradient(circle at top left, rgba(25, 135, 84, 0.24), transparent 38%), linear-gradient(135deg, #11161c 0%, #1d2732 52%, #10161c 100%)
+
+.suggestion-launch-panel
+  padding: 1.5rem
+  border-radius: 1.25rem
+  border: 1px solid rgba(255, 255, 255, 0.1)
+  background: rgba(255, 255, 255, 0.04)
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04)
+
+.suggestion-checkbox-grid
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr))
+  gap: 0.85rem
+
+.suggestion-check-tile
+  display: flex
+  gap: 0.8rem
+  align-items: flex-start
+  padding: 0.95rem 1rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(255, 255, 255, 0.04)
+  cursor: pointer
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease
+
+  &:hover
+    transform: translateY(-1px)
+    border-color: rgba(255, 255, 255, 0.18)
+    background: rgba(255, 255, 255, 0.06)
+
+  input
+    margin-top: 0.3rem
+
+.suggestion-toggle-stack
+  display: flex
+  flex-direction: column
+  gap: 0.75rem
+
+.suggestion-switch
+  display: flex
+  gap: 0.8rem
+  align-items: flex-start
+  padding: 0.85rem 0.95rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(255, 255, 255, 0.04)
+  cursor: pointer
+
+  input
+    margin-top: 0.2rem
+
+.suggestion-result-card
+  background: linear-gradient(155deg, rgba(15, 17, 22, 0.98), rgba(20, 24, 32, 0.98))
+  transition: opacity 0.18s ease, transform 0.18s ease
+
+  &.is-loading
+    opacity: 0.7
+
+.suggestion-result-panel
+  height: 100%
+  padding: 1.1rem 1.15rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(255, 255, 255, 0.03)
+
+.suggestion-address
+  white-space: pre-line
+  font-family: inherit
+  color: rgba(255, 255, 255, 0.9)
+
+.suggestion-match-card
+  padding: 0.9rem 1rem
+  border-radius: 1rem
+  border: 1px solid rgba(255, 255, 255, 0.08)
+  background: rgba(255, 255, 255, 0.04)
+
+  & + &
+    margin-top: 0.8rem
+
+.suggestion-availability
+  min-height: 2.5rem
+
+  &.is-open
+    color: rgba(178, 245, 198, 0.96)
+
+  &.is-closed
+    color: rgba(255, 205, 210, 0.96)
+
+  &.is-unknown
+    color: rgba(233, 236, 239, 0.78)
+
+@media (max-width: 991.98px)
+  .restaurant-anchor-nav
+    .btn
+      flex: 1 1 calc(50% - 0.5rem)
+
+@media (max-width: 767.98px)
+  .restaurant-stat-card,
+  .restaurant-metric-tile
+    padding: 0.85rem
+
+  .suggestion-launch-panel
+    padding: 1.1rem
+
+  .opening-hours-row
+    grid-template-columns: 1fr
+    align-items: flex-start
+
+  .restaurant-hero,
+  .restaurant-list-hero
+    .card-body
+      padding: 1.5rem !important

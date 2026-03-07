@@ -8,10 +8,12 @@
 import * as ConnectorRegistry from '../providers/ConnectorRegistry';
 import {ProviderKey} from '../providers/ProviderKey';
 import {ConnectorCapabilities} from '../providers/DeliveryProviderConnector';
-import {queueSync, queueImportFromUrl, QueuedSyncJob} from '../modules/sync/ProviderSyncService';
+import {queueSync, queueImportFromUrl, queueProviderRefresh, QueuedSyncJob} from '../modules/sync/ProviderSyncService';
+import {isHeuristicRefreshRunning, startHeuristicRefresh} from '../modules/sync/HeuristicRefreshService';
 import {AppDataSource} from '../modules/database/dataSource';
 import {ProviderSourceConfig} from '../modules/database/entities/provider/ProviderSourceConfig';
 import {ExpectedError} from '../modules/lib/errors';
+import settings from '../modules/settings';
 
 export interface ProviderInfo {
     providerKey: string;
@@ -20,11 +22,19 @@ export interface ProviderInfo {
     listingUrl?: string;
 }
 
+export interface ProviderMaintenanceInfo {
+    heuristicRefreshRunning: boolean;
+    providerRefreshVersion: string;
+}
+
 /**
  * Get data for the generic providers settings page.
  * Lists all registered connectors with their capabilities and saved configs.
  */
-export async function getProvidersPageData(userId: string): Promise<{providers: ProviderInfo[]}> {
+export async function getProvidersPageData(userId: string): Promise<{
+    providers: ProviderInfo[];
+    maintenance: ProviderMaintenanceInfo;
+}> {
     const keys = ConnectorRegistry.registeredKeys();
     const providers: ProviderInfo[] = [];
 
@@ -45,7 +55,13 @@ export async function getProvidersPageData(userId: string): Promise<{providers: 
         });
     }
 
-    return {providers};
+    return {
+        providers,
+        maintenance: {
+            heuristicRefreshRunning: isHeuristicRefreshRunning(),
+            providerRefreshVersion: settings.value.providerRefreshVersion,
+        },
+    };
 }
 
 /**
@@ -111,6 +127,17 @@ export async function importFromUrl(userId: string, providerKey: string, menuUrl
         connector.providerKey as ProviderKey,
         menuUrl.trim(),
     );
+}
+
+export function triggerHeuristicRefresh(): {started: boolean; mode: 'stale' | 'all'} {
+    return startHeuristicRefresh({
+        forceAll: true,
+        source: 'manual',
+    });
+}
+
+export async function triggerProviderRefresh(): Promise<QueuedSyncJob> {
+    return await queueProviderRefresh(true);
 }
 
 // ── Internal helpers ──────────────────────────────────────────

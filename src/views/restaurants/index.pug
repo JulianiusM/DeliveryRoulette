@@ -1,83 +1,193 @@
-//- views/restaurants/index.pug – Restaurant List
 extends ../layout
 
 block meta
     title Restaurants | DeliveryRoulette
 
-block title
-    h1.card-header.text-center
-        i.bi.bi-shop.me-2
-        | Restaurants
-
-block content
-    - const restaurants = (data && data.restaurants) || []
+block body
+    - const cards = (data && data.restaurants) || []
     - const search = (data && data.search) || ''
     - const active = (data && data.active) || ''
-    - const favoritesOnly = (data && data.favoritesOnly) || false
-    - const favoriteIds = (data && data.favoriteIds) || []
+    - const favoriteFilter = (data && data.favoriteFilter) || 'all'
+    - const suggestionFilter = (data && data.suggestionFilter) || 'all'
+    - const openFilter = (data && data.openFilter) || 'all'
+    - const activeCount = cards.filter((card) => card.restaurant.isActive).length
+    - const favoriteCount = cards.filter((card) => card.isFavorite).length
+    - const openCount = cards.filter((card) => card.isOpenNow === true).length
 
-    //── Search & Filter ──────────────────────────────────
-    form.row.g-2.mb-4(method="GET" action="/restaurants")
-        .col-md-5
-            .input-group
-                span.input-group-text.text-bg-dark
-                    i.bi.bi-search
-                input.form-control.text-bg-dark(
-                    type="text"
-                    name="search"
-                    placeholder="Search by name or city..."
-                    value=search)
-        .col-md-3
-            select.form-select.text-bg-dark(name="active")
-                option(value="" selected=(active === '')) All
-                option(value="true" selected=(active === 'true')) Active only
-                option(value="false" selected=(active === 'false')) Inactive only
-        .col-md-2
-            .form-check.mt-2
-                input.form-check-input(type="checkbox" name="favorites" value="true" id="favoritesFilter" checked=favoritesOnly)
-                label.form-check-label(for="favoritesFilter")
-                    i.bi.bi-star-fill.text-warning.me-1
-                    | Favorites
-        .col-md-2.d-grid
-            button.btn.btn-primary(type="submit")
-                i.bi.bi-funnel.me-1
-                | Filter
+    .restaurants-overview.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.restaurant-list-hero
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.text-uppercase.small.text-white-50.mb-2 Restaurant intelligence
+                        h1.display-5.fw-semibold.mb-2 Restaurants
+                        p.lead.text-white-50.mb-0
+                            | Scan real menu coverage, diet variety, cuisine inference, and your personal flags in one place.
+                    .col-lg-4
+                        .row.g-3
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Total
+                                    strong.restaurant-stat-value #{cards.length}
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Shown in app
+                                    strong.restaurant-stat-value #{activeCount}
+                            .col-4
+                                .restaurant-stat-card
+                                    span.restaurant-stat-label Open now
+                                    strong.restaurant-stat-value #{openCount}
+                .d-flex.flex-wrap.justify-content-between.align-items-center.gap-2.mt-4
+                    p.text-white-50.small.mb-0 #{favoriteCount} favorites in current view
+                    a.btn.btn-success(href="/restaurants/new")
+                        i.bi.bi-plus-lg.me-1
+                        | Add Restaurant
 
-    //── Add button ──────────────────────────────────
-    .d-flex.justify-content-end.mb-3
-        a.btn.btn-success(href="/restaurants/new")
-            i.bi.bi-plus-lg.me-1
-            | Add Restaurant
+        section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
+            .card-header
+                i.bi.bi-funnel.me-2
+                | Filters
+            .card-body
+                form.row.g-3(method="GET" action="/restaurants")
+                    .col-lg-4
+                        label.form-label(for="restaurantSearch") Search
+                        .input-group
+                            span.input-group-text.text-bg-dark
+                                i.bi.bi-search
+                            input#restaurantSearch.form-control.text-bg-dark(type="text" name="search" placeholder="Search names, cities, or addresses" value=search)
+                    .col-sm-6.col-lg-2
+                        label.form-label(for="activeFilter") Shown in app
+                        select#activeFilter.form-select.text-bg-dark(name="active")
+                            option(value="" selected=(active === '')) All
+                            option(value="true" selected=(active === 'true')) Shown
+                            option(value="false" selected=(active === 'false')) Hidden
+                    .col-sm-6.col-lg-2
+                        label.form-label(for="favoriteFilter") Favorite
+                        select#favoriteFilter.form-select.text-bg-dark(name="favorite")
+                            option(value="all" selected=(favoriteFilter === 'all')) Any
+                            option(value="positive" selected=(favoriteFilter === 'positive')) Favorites
+                            option(value="negative" selected=(favoriteFilter === 'negative')) Non-favorites
+                    .col-sm-6.col-lg-2
+                        label.form-label(for="suggestionFilter") Suggestion
+                        select#suggestionFilter.form-select.text-bg-dark(name="suggestion")
+                            option(value="all" selected=(suggestionFilter === 'all')) Any
+                            option(value="negative" selected=(suggestionFilter === 'negative')) Allowed
+                            option(value="positive" selected=(suggestionFilter === 'positive')) Blocked
+                    .col-sm-6.col-lg-2
+                        label.form-label(for="openFilter") Open now
+                        select#openFilter.form-select.text-bg-dark(name="open")
+                            option(value="all" selected=(openFilter === 'all')) Any
+                            option(value="open" selected=(openFilter === 'open')) Open
+                            option(value="closed" selected=(openFilter === 'closed')) Closed
+                            option(value="unknown" selected=(openFilter === 'unknown')) Unknown
+                    .col-12.d-flex.flex-wrap.gap-2.justify-content-between.align-items-center
+                        if !user
+                            p.text-white-50.small.mb-0 Preference filters use your personal flags once you are logged in. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
+                        else
+                            p.text-white-50.small.mb-0 Preference filters are based on your saved restaurant flags. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
+                        .d-flex.gap-2
+                            a.btn.btn-outline-light(href="/restaurants") Reset
+                            button.btn.btn-primary(type="submit")
+                                i.bi.bi-funnel.me-1
+                                | Apply Filters
 
-    //── Restaurant table ────────────────────────────
-    if restaurants.length === 0
-        .text-center.text-white-50.py-4
-            i.bi.bi-shop.d-block.display-4.mb-2
-            p No restaurants found.
-    else
-        .table-responsive
-            table.table.table-dark.table-hover
-                thead
-                    tr
-                        th Name
-                        th City
-                        th Status
-                        th Actions
-                tbody
-                    each r in restaurants
-                        tr
-                            td
-                                if favoriteIds.includes(r.id)
-                                    i.bi.bi-star-fill.text-warning.me-1
-                                a.text-white(href=`/restaurants/${r.id}`) #{r.name}
-                            td #{r.city}
-                            td
-                                if r.isActive
-                                    span.badge.text-bg-success Active
+        if cards.length === 0
+            .restaurant-empty-state.mt-4
+                i.bi.bi-shop
+                p.mb-0 No restaurants match the current filters.
+        else
+            .row.g-4.mt-1
+                each card in cards
+                    - const r = card.restaurant
+                    - const insights = card.insightSummary || {menu: {}, topSupportedDiets: [], supportedDietCount: 0}
+                    - const menu = insights.menu || {}
+                    - const topSupported = insights.topSupportedDiets || []
+                    - const heuristicCuisines = ((card.cuisineProfile && card.cuisineProfile.cuisines) || []).slice(0, 3)
+                    - const availabilityStatus = card.availabilityStatus || {state: 'unknown', summaryLabel: 'Hours unknown', detailLabel: 'No opening hours stored for this restaurant.'}
+                    - const availabilityDetails = availabilityStatus.state === 'unknown' ? [] : [availabilityStatus.detailLabel, availabilityStatus.relativeLabel].filter(Boolean)
+                    .col-12.col-xxl-6
+                        article.card.text-bg-dark.border-secondary.shadow-sm.restaurant-list-card.h-100
+                            .card-body.p-4
+                                .d-flex.justify-content-between.align-items-start.gap-3.mb-3
+                                    div
+                                        .d-flex.flex-wrap.align-items-center.gap-2.mb-2
+                                            if card.isFavorite
+                                                span.badge.rounded-pill.text-bg-warning.text-dark
+                                                    i.bi.bi-star-fill.me-1
+                                                    | Favorite
+                                            if card.doNotSuggest
+                                                span.badge.rounded-pill.text-bg-danger
+                                                    i.bi.bi-x-circle.me-1
+                                                    | Blocked
+                                            if r.isActive
+                                                span.badge.rounded-pill.text-bg-success Shown in app
+                                            else
+                                                span.badge.rounded-pill.text-bg-secondary Hidden in app
+                                        h2.h4.mb-1
+                                            a.link-light.text-decoration-none(href=`/restaurants/${r.id}`) #{r.name}
+                                        p.text-white-50.mb-0
+                                            i.bi.bi-geo-alt.me-1
+                                            | #{r.city}
+                                            if r.country
+                                                | , #{r.country}
+                                        p.restaurant-list-availability.small.mb-0.mt-2(class=`is-${availabilityStatus.state}`)
+                                            span.restaurant-list-availability-state
+                                                i.bi.bi-clock-history.me-1
+                                                | #{availabilityStatus.summaryLabel}
+                                            if availabilityDetails.length > 0
+                                                span.restaurant-list-availability-detail #{availabilityDetails.join(' / ')}
+                                    .text-end
+                                        a.btn.btn-outline-light.btn-sm(href=`/restaurants/${r.id}`)
+                                            i.bi.bi-eye.me-1
+                                            | View
+
+                                .row.g-3.mb-3
+                                    .col-4
+                                        .restaurant-metric-tile
+                                            span.restaurant-metric-label Unique items
+                                            strong.restaurant-metric-value #{menu.totalUniqueItems || 0}
+                                            small.text-white-50 #{menu.totalCategories || 0} categories
+                                    .col-4
+                                        .restaurant-metric-tile
+                                            span.restaurant-metric-label Diets
+                                            strong.restaurant-metric-value #{insights.supportedDietCount || 0}
+                                            small.text-white-50 #{insights.blockedDietCount || 0} blocked
+                                    .col-4
+                                        .restaurant-metric-tile
+                                            span.restaurant-metric-label Duplicates
+                                            strong.restaurant-metric-value #{menu.duplicatesFiltered || 0}
+                                            small.text-white-50 deduped rows
+
+                                if topSupported.length > 0
+                                    .d-flex.flex-column.gap-3.mb-3
+                                        each diet in topSupported
+                                            .restaurant-diet-strip
+                                                .d-flex.justify-content-between.align-items-center.gap-3
+                                                    a.link-light.text-decoration-none.fw-semibold(href=`/restaurants/${r.id}#diet-${diet.dietTagId}`) #{diet.dietTagLabel}
+                                                    span.badge.rounded-pill.text-bg-success #{diet.score}%
+                                                .progress.mt-2(role="progressbar" aria-label=`${diet.dietTagLabel} share` aria-valuenow=diet.sharePercent aria-valuemin="0" aria-valuemax="100")
+                                                    .progress-bar.bg-success(style=`width:${diet.sharePercent}%`)
+                                                .d-flex.justify-content-between.text-white-50.small.mt-2
+                                                    span #{diet.matchedUniqueItems}/#{diet.totalUniqueItems} scored items
+                                                    span Variety #{diet.varietyPercent}%
                                 else
-                                    span.badge.text-bg-secondary Inactive
-                            td
-                                a.btn.btn-sm.btn-outline-light.me-1(href=`/restaurants/${r.id}`)
-                                    i.bi.bi-eye
-                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/edit`)
-                                    i.bi.bi-pencil
+                                    .restaurant-panel.mb-3
+                                        p.text-white-50.small.mb-0 No supported diet profile inferred yet.
+
+                                .d-flex.flex-wrap.gap-2.mb-3
+                                    each cuisine in card.providerCuisines
+                                        span.badge.rounded-pill.text-bg-info.text-dark #{cuisine}
+                                    each cuisine in heuristicCuisines
+                                        span.badge.rounded-pill.text-bg-dark.border.border-secondary #{cuisine.label} #{cuisine.score}%
+
+                                .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2.pt-2.border-top.border-secondary-subtle
+                                    a.link-light.text-decoration-none.small(href=`/restaurants/${r.id}#menu`)
+                                        i.bi.bi-menu-button-wide.me-1
+                                        | #{menu.itemCountLabel || 'Open menu'}
+                                    .d-flex.gap-2
+                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}#providers`)
+                                            i.bi.bi-link-45deg.me-1
+                                            | Providers
+                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/edit`)
+                                            i.bi.bi-pencil.me-1
+                                            | Edit

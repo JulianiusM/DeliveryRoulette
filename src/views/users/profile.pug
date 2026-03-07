@@ -1,19 +1,57 @@
 extends ../layout
 
-block content
-  .d-flex.justify-content-between.align-items-center.mb-3
-    h1.mb-0.text-white Profile
-    a.btn.btn-outline-light(href="/users/dashboard") Dashboard
+block meta
+    title Profile | DeliveryRoulette
 
-  if !user
-    .alert.alert-warning Not logged in.
-  else
-    .card.text-bg-dark.border-secondary
-      .card-body
-        dl.row.mb-0
-          dt.col-sm-3 ID
-          dd.col-sm-9.text-white-50 #{user.id}
-          dt.col-sm-3 Email
-          dd.col-sm-9.text-white-50 #{user.email}
-          dt.col-sm-3 Name
-          dd.col-sm-9.text-white-50 #{user.displayName}
+block body
+    .app-shell.py-3
+        if !user
+            section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-warning
+                .card-body.p-4.p-lg-5
+                    p.app-eyebrow.mb-2 Account access
+                    h1.display-5.fw-semibold.mb-2 Profile
+                    p.lead.text-white-50.mb-4 You need to be logged in to view profile information.
+                    a.btn.btn-outline-light(href="/users/login")
+                        i.bi.bi-box-arrow-in-right.me-1
+                        | Log In
+        else
+            section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-neutral
+                .card-body.p-4.p-lg-5
+                    .row.g-4.align-items-end
+                        .col-lg-8
+                            p.app-eyebrow.mb-2 Account details
+                            h1.display-5.fw-semibold.mb-2 #{user.displayName || user.name || user.username}
+                            p.lead.text-white-50.mb-0 Review the core identity data currently attached to your session.
+                        .col-lg-4
+                            .d-flex.flex-wrap.gap-2.justify-content-lg-end
+                                a.btn.btn-outline-light(href="/users/dashboard")
+                                    i.bi.bi-speedometer2.me-1
+                                    | Dashboard
+                                a.btn.btn-outline-light(href="/users/settings")
+                                    i.bi.bi-gear-fill.me-1
+                                    | Settings
+
+            section.card.app-section-card
+                .card-header
+                    i.bi.bi-person-badge.me-2
+                    | Account Summary
+                .card-body
+                    .row.g-4
+                        .col-lg-6
+                            .app-panel.h-100
+                                dl.row.app-kv-list.mb-0
+                                    dt.col-sm-4 ID
+                                    dd.col-sm-8 #{user.id}
+                                    dt.col-sm-4 Username
+                                    dd.col-sm-8 #{user.username}
+                                    dt.col-sm-4 Email
+                                    dd.col-sm-8 #{user.email || '-'}
+                                    dt.col-sm-4 Display name
+                                    dd.col-sm-8 #{user.displayName || user.name || '-'}
+                        .col-lg-6
+                            .app-panel.h-100
+                                h2.h6.text-uppercase.text-white-50.mb-3 What to do here
+                                ul.text-white-50.small.mb-0
+                                    li Use Settings to define suggestion defaults.
+                                    li Use the dashboard as your shortcut hub for restaurants, imports, and provider sync.
+                                    li Favorite and block restaurant choices from the restaurant pages themselves.

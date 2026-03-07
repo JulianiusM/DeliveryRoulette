@@ -1,11 +1,6 @@
-//- views/restaurants/_diet_suitability.pug - Diet Suitability Partial
-//- Expects: r (restaurant), dietSuitability (EffectiveSuitability[])
-
-.card.text-bg-dark.border-secondary.mt-4
-    .card-header.d-flex.justify-content-between.align-items-center
-        span
-            i.bi.bi-heart-pulse.me-2
-            | Diet Suitability
+.diet-suitability-content
+    .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+        p.text-white-50.small.mb-0 Manual overrides sit on top of heuristics. Re-run heuristics after menu imports, then open the relevant diet below if you need the evidence.
         .d-flex.gap-2
             form(method="POST" action=`/restaurants/${r.id}/diet/recompute`)
                 +csrf
@@ -15,61 +10,89 @@
             button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
                 i.bi.bi-plus-lg.me-1
                 | Add Override
-    .card-body
-        #addOverrideForm.collapse.mb-3
-            form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
-                +csrf
-                .row.g-2
-                    .col-md-4
-                        select.form-select.form-select-sm(name="dietTagId" required)
-                            option(value="" disabled selected) Select diet tag...
-                            each dt in dietSuitability
-                                option(value=dt.dietTagId) #{dt.dietTagLabel}
-                    .col-md-3
-                        select.form-select.form-select-sm(name="supported" required)
-                            option(value="" disabled selected) Supports?
-                            option(value="true") Yes - Supports
-                            option(value="false") No - Does not support
-                    .col-md-3
-                        input.form-control.form-control-sm(type="text" name="notes" placeholder="Notes (optional)")
-                    .col-md-2
-                        button.btn.btn-sm.btn-success.w-100(type="submit")
-                            i.bi.bi-plus-lg.me-1
-                            | Add
 
-        if dietSuitability.length === 0
-            .text-center.text-white-50.py-3
-                i.bi.bi-heart-pulse.d-block.display-6.mb-2
-                p No diet tags configured yet.
-        else
+    #addOverrideForm.collapse.mt-4
+        form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
+            +csrf
+            .row.g-2
+                .col-md-4
+                    select.form-select.form-select-sm(name="dietTagId" required)
+                        option(value="" disabled selected) Select diet tag...
+                        each dt in dietSuitability
+                            option(value=dt.dietTagId) #{dt.dietTagLabel}
+                .col-md-3
+                    select.form-select.form-select-sm(name="supported" required)
+                        option(value="" disabled selected) Supports?
+                        option(value="true") Yes - Supports
+                        option(value="false") No - Does not support
+                .col-md-3
+                    input.form-control.form-control-sm(type="text" name="notes" placeholder="Notes (optional)")
+                .col-md-2
+                    button.btn.btn-sm.btn-success.w-100(type="submit")
+                        i.bi.bi-plus-lg.me-1
+                        | Add
+
+    if dietSuitability.length === 0
+        .restaurant-empty-state.mt-4
+            i.bi.bi-heart-pulse
+            p.mb-0 No diet tags configured yet.
+    else
+        .d-flex.flex-column.gap-3.mt-4
             each ds in dietSuitability
-                .card.text-bg-dark.border-secondary.mb-2
-                    .card-body.py-2.px-3
-                        .d-flex.justify-content-between.align-items-center
+                - const dietInsight = (insightSummary.diets || []).find((entry) => entry.dietTagId === ds.dietTagId) || null
+                - const reasons = ds.inference && ds.inference.reasons ? ds.inference.reasons : null
+                article.card.border-secondary.bg-black.bg-opacity-25(id=`diet-${ds.dietTagId}`)
+                    .card-body
+                        .d-flex.justify-content-between.align-items-start.flex-wrap.gap-3
+                            .flex-grow-1
+                                .d-flex.flex-wrap.align-items-center.gap-2.mb-2
+                                    h2.h5.mb-0 #{ds.dietTagLabel}
+                                    if ds.supported === true
+                                        span.badge.rounded-pill.text-bg-success Supported
+                                    else if ds.supported === false
+                                        span.badge.rounded-pill.text-bg-danger Not Supported
+                                    else
+                                        span.badge.rounded-pill.text-bg-secondary No Data
+
+                                    if ds.source === 'override'
+                                        span.badge.rounded-pill.text-bg-warning.text-dark Manual Override
+                                    else if ds.source === 'inference'
+                                        span.badge.rounded-pill.text-bg-info.text-dark Heuristic
+
+                                    if ds.inference
+                                        span.badge.rounded-pill.text-bg-dark.border.border-secondary Score #{ds.inference.score}%
+                                        span.badge.rounded-pill.text-bg-dark.border.border-secondary #{ds.inference.confidence}
+
+                                if dietInsight
+                                    .row.g-3.mt-1
+                                        .col-md-4
+                                            .restaurant-metric-tile
+                                                span.restaurant-metric-label Scored share
+                                                strong.restaurant-metric-value #{dietInsight.sharePercent}%
+                                                small.text-white-50 #{dietInsight.matchedUniqueItems} / #{dietInsight.totalUniqueItems} scored items
+                                        .col-md-4
+                                            .restaurant-metric-tile
+                                                span.restaurant-metric-label Variety
+                                                strong.restaurant-metric-value #{dietInsight.varietyPercent}%
+                                                small.text-white-50 #{dietInsight.matchedCategories} / #{dietInsight.totalCategories} categories
+                                        .col-md-4
+                                            .restaurant-metric-tile
+                                                span.restaurant-metric-label Deduped rows
+                                                strong.restaurant-metric-value #{dietInsight.duplicateMatchesFiltered}
+                                                small.text-white-50 #{dietInsight.matchedRows} raw matches, #{dietInsight.excludedUniqueItems} excluded
+
+                                    .progress.mt-3(role="progressbar" aria-label=`${ds.dietTagLabel} share` aria-valuenow=dietInsight.sharePercent aria-valuemin="0" aria-valuemax="100")
+                                        .progress-bar(class=ds.supported === true ? 'bg-success' : ds.supported === false ? 'bg-danger' : 'bg-secondary' style=`width:${dietInsight.sharePercent}%`)
+
+                                    if dietInsight.previewItems.length > 0
+                                        .d-flex.flex-wrap.gap-2.mt-3
+                                            each item in dietInsight.previewItems
+                                                a.badge.rounded-pill.text-bg-dark.border.border-secondary.text-decoration-none(href=`#menu-item-${item.itemId}`) #{item.itemName}
+
                             .d-flex.align-items-center.gap-2
-                                strong #{ds.dietTagLabel}
-                                if ds.supported === true
-                                    span.badge.text-bg-success Supported
-                                else if ds.supported === false
-                                    span.badge.text-bg-danger Not Supported
-                                else
-                                    span.badge.text-bg-secondary No Data
-
-                                if ds.source === 'override'
-                                    span.badge.text-bg-warning.text-dark Manual Override
-                                else if ds.source === 'inference'
-                                    span.badge.text-bg-info.text-dark Heuristic
-
-                                if ds.inference
-                                    span.badge.text-bg-dark.border.border-secondary Score: #{ds.inference.score}%
-                                    span.badge.text-bg-dark.border.border-secondary #{ds.inference.confidence}
-                                    if ds.inference.reasons && ds.inference.reasons.scoreBreakdown
-                                        span.badge.text-bg-dark.border.border-secondary Ratio: #{ds.inference.reasons.scoreBreakdown.ratioScore}%
-
-                            .d-flex.align-items-center.gap-1
                                 if ds.source === 'override' || ds.source === 'inference'
                                     button.btn.btn-sm.btn-outline-light(type="button" data-bs-toggle="collapse" data-bs-target=`#explanation-${ds.dietTagId}` title="Show explanation")
-                                        i.bi.bi-info-circle
+                                        i.bi.bi-chevron-down
                                 if ds.source === 'override' && ds.override
                                     form.d-inline(method="POST" action=`/restaurants/${r.id}/diet-overrides/${ds.override.id}/delete`)
                                         +csrf
@@ -77,68 +100,58 @@
                                             i.bi.bi-trash
 
                         if ds.source === 'override'
-                            .collapse.mt-2(id=`explanation-${ds.dietTagId}`)
-                                .card.text-bg-dark.border-secondary
-                                    .card-body.py-2.px-3
-                                        h6.mb-1
-                                            i.bi.bi-person-check.me-1
-                                            | Manual Override
-                                        if ds.override && ds.override.notes
-                                            p.mb-1
-                                                strong Reason:&nbsp;
-                                                | #{ds.override.notes}
-                                        else
-                                            p.text-white-50.mb-1 No reason provided.
-                                        if ds.override
-                                            p.text-white-50.mb-0
-                                                small Updated: #{new Date(ds.override.updatedAt).toLocaleDateString()}
-                                        if ds.inference
-                                            hr.my-2.border-secondary
-                                            p.text-white-50.mb-1
-                                                small
-                                                    i.bi.bi-robot.me-1
-                                                    | Heuristic also available - Score: #{ds.inference.score}% (#{ds.inference.confidence})
+                            .collapse.mt-3(id=`explanation-${ds.dietTagId}`)
+                                .restaurant-panel
+                                    h3.h6.mb-2
+                                        i.bi.bi-person-check.me-1
+                                        | Manual Override
+                                    if ds.override && ds.override.notes
+                                        p.mb-2 #{ds.override.notes}
+                                    else
+                                        p.text-white-50.mb-2 No override note provided.
+                                    if ds.override
+                                        p.text-white-50.small.mb-0 Updated #{new Date(ds.override.updatedAt).toLocaleDateString()}
+                                    if ds.inference
+                                        hr.border-secondary
+                                        p.text-white-50.small.mb-0
+                                            | Heuristic score still available: #{ds.inference.score}% (#{ds.inference.confidence})
 
                         else if ds.source === 'inference' && ds.inference
-                            .collapse.mt-2(id=`explanation-${ds.dietTagId}`)
-                                .card.text-bg-dark.border-secondary
-                                    .card-body.py-2.px-3
-                                        h6.mb-1
-                                            i.bi.bi-robot.me-1
-                                            | Heuristic Analysis
-                                        if ds.inference.reasons && ds.inference.reasons.matchedItems && ds.inference.reasons.matchedItems.length > 0
-                                            p.mb-1
-                                                | Matched&nbsp;
-                                                strong #{ds.inference.reasons.matchedItems.length}
-                                                |  of #{ds.inference.reasons.totalMenuItems} menu items (#{Math.round(ds.inference.reasons.matchRatio * 100)}%)
-                                            if ds.inference.reasons.scoreBreakdown
-                                                p.text-white-50.small.mb-2
-                                                    | Weighted score #{ds.inference.reasons.scoreBreakdown.finalScore}% = ratio #{ds.inference.reasons.scoreBreakdown.ratioScore}% + evidence #{ds.inference.reasons.scoreBreakdown.evidenceBoost} - penalties #{ds.inference.reasons.scoreBreakdown.evidencePenalty}, confidence multiplier #{ds.inference.reasons.scoreBreakdown.confidenceMultiplier}.
-                                            ul.list-unstyled.mb-2.ms-2
-                                                each mi in ds.inference.reasons.matchedItems
-                                                    li.mb-1
-                                                        i.bi.bi-check2.text-success.me-1
-                                                        a.link-light.text-decoration-none(href=`#menu-item-${mi.itemId}`) #{mi.itemName}
-                                                        if mi.source === 'manual_override'
-                                                            span.badge.text-bg-warning.text-dark.ms-1 Manual
-                                                        if mi.keywords && mi.keywords.length > 0
-                                                            span.text-white-50.ms-1
-                                                                | - keywords:&nbsp;
-                                                                each kw, idx in mi.keywords
-                                                                    if idx > 0
-                                                                        | ,&nbsp;
-                                                                    span.badge.text-bg-secondary.me-1 #{kw}
-                                        else
-                                            p.text-white-50.mb-2 No matching menu items found.
+                            .collapse.mt-3(id=`explanation-${ds.dietTagId}`)
+                                .restaurant-panel
+                                    h3.h6.mb-3
+                                        i.bi.bi-robot.me-1
+                                        | Heuristic Analysis
+                                    if reasons && reasons.scoreBreakdown
+                                        p.text-white-50.small.mb-3
+                                            | Coverage #{reasons.scoreBreakdown.coverageScore || reasons.scoreBreakdown.ratioScore}%,
+                                            |  variety #{reasons.scoreBreakdown.varietyScore || 0}%,
+                                            |  category reach #{reasons.scoreBreakdown.categoryScore || 0}%,
+                                            |  evidence +#{reasons.scoreBreakdown.evidenceBoost},
+                                            |  safeguards -#{reasons.scoreBreakdown.evidencePenalty},
+                                            |  low-variety penalty -#{reasons.scoreBreakdown.varietyPenalty || 0},
+                                            |  multiplier #{reasons.scoreBreakdown.confidenceMultiplier}.
 
-                                        if ds.inference.reasons && ds.inference.reasons.excludedItems && ds.inference.reasons.excludedItems.length > 0
-                                            p.mb-1.mt-2.text-warning
-                                                strong Excluded by safeguards:
-                                            ul.list-unstyled.mb-0.ms-2
-                                                each ex in ds.inference.reasons.excludedItems
-                                                    li.mb-1
-                                                        i.bi.bi-shield-exclamation.text-warning.me-1
-                                                        a.link-light.text-decoration-none(href=`#menu-item-${ex.itemId}`) #{ex.itemName}
-                                                        if ex.excludedBy && ex.excludedBy.length > 0
-                                                            span.text-white-50.ms-1
-                                                                | - #{ex.excludedBy.join(', ')}
+                                    if reasons && reasons.matchedItems && reasons.matchedItems.length > 0
+                                        ul.list-unstyled.mb-0
+                                            each mi in reasons.matchedItems
+                                                li.mb-2
+                                                    i.bi.bi-check2.text-success.me-1
+                                                    a.link-light.text-decoration-none(href=`#menu-item-${mi.itemId}`) #{mi.itemName}
+                                                    if mi.source === 'manual_override'
+                                                        span.badge.rounded-pill.text-bg-warning.text-dark.ms-1 Manual
+                                                    if mi.keywords && mi.keywords.length > 0
+                                                        span.text-white-50.small.ms-2 #{mi.keywords.join(', ')}
+                                    else
+                                        p.text-white-50.mb-0 No matching menu items found.
+
+                                    if reasons && reasons.excludedItems && reasons.excludedItems.length > 0
+                                        hr.border-secondary
+                                        p.text-warning.small.mb-2 Safeguards excluded these candidates:
+                                        ul.list-unstyled.mb-0
+                                            each ex in reasons.excludedItems
+                                                li.mb-2
+                                                    i.bi.bi-shield-exclamation.text-warning.me-1
+                                                    a.link-light.text-decoration-none(href=`#menu-item-${ex.itemId}`) #{ex.itemName}
+                                                    if ex.excludedBy && ex.excludedBy.length > 0
+                                                        span.text-white-50.small.ms-2 #{ex.excludedBy.join(', ')}
