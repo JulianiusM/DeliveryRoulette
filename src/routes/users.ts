@@ -10,7 +10,7 @@ import {ExpectedError} from "../modules/lib/errors";
 import {handleValidationError} from '../middleware/validationErrorHandler';
 import {
     validateRegister, validateLogin, validateForgotPassword,
-    validateResetPassword, validateSettings,
+    validateResetPassword,
 } from '../middleware/validationChains';
 
 const app = express.Router();
@@ -131,7 +131,7 @@ app.get('/settings', asyncHandler(async (req: Request, res: Response) => {
     renderer.renderWithData(res, 'users/settings', data);
 }));
 
-app.post('/settings', validateSettings, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/settings', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
     }

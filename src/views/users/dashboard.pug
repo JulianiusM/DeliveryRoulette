@@ -9,6 +9,8 @@ block body
     - const syncAlertCount = (data && data.syncAlertCount) || 0
     - const dietTagCount = (data && data.dietTagCount) || 0
     - const preferences = (data && data.preferences) || {}
+    - const defaultLocation = preferences.defaultLocation || null
+    - const hasStructuredLocation = !!(defaultLocation && (defaultLocation.label || defaultLocation.addressLine1 || defaultLocation.city || defaultLocation.postalCode || defaultLocation.country))
     - const displayName = user ? (user.displayName || user.name || user.username) : 'User'
 
     .app-shell.py-3
@@ -87,9 +89,21 @@ block body
                     i.bi.bi-pencil.me-1
                     | Edit Settings
             .card-body
-                if preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
+                if hasStructuredLocation || preferences.deliveryArea || preferences.cuisineIncludes || preferences.cuisineExcludes
                     .row.g-4
-                        if preferences.deliveryArea
+                        if hasStructuredLocation
+                            .col-md-4
+                                .app-panel.h-100
+                                    h2.h6.text-uppercase.text-white-50.mb-2 Saved location
+                                    p.mb-1 #{defaultLocation.label}
+                                    - const locationSummaryParts = [defaultLocation.addressLine1, [defaultLocation.postalCode, defaultLocation.city].filter(Boolean).join(' '), defaultLocation.country].filter(Boolean)
+                                    if locationSummaryParts.length
+                                        p.text-white-50.small.mb-1 #{locationSummaryParts.join(' / ')}
+                                    if defaultLocation.latitude !== '' && defaultLocation.longitude !== ''
+                                        span.badge.rounded-pill.text-bg-success Coordinates set
+                                    else
+                                        span.badge.rounded-pill.text-bg-secondary Coordinates missing
+                        else if preferences.deliveryArea
                             .col-md-4
                                 .app-panel.h-100
                                     h2.h6.text-uppercase.text-white-50.mb-2 Delivery area

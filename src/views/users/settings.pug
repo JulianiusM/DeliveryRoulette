@@ -6,6 +6,10 @@ block meta
 block body
     - const d = data || {}
     - const selectedDietCount = (d.dietTags || []).filter((tag) => tag.selected).length
+    - const defaultLocation = d.defaultLocation || {}
+    - const savedLocations = d.savedLocations || []
+    - const hasSavedLocation = !!(defaultLocation.label || defaultLocation.addressLine1 || defaultLocation.city || defaultLocation.postalCode || defaultLocation.country || defaultLocation.latitude || defaultLocation.longitude)
+    - const hasCoordinates = defaultLocation.latitude !== '' && defaultLocation.longitude !== ''
 
     .app-shell.py-3
         section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-info
@@ -14,18 +18,22 @@ block body
                     .col-lg-8
                         p.app-eyebrow.mb-2 Personal defaults
                         h1.display-5.fw-semibold.mb-2 Settings
-                        p.lead.text-white-50.mb-0 Set the defaults that should prefill the suggestion flow. These values are personal and only shape your own filters.
+                        p.lead.text-white-50.mb-0 Configure the saved location and filters that drive location-aware suggestions and provider syncs. The old delivery-area string is still stored only as a compatibility fallback.
                     .col-lg-4
                         .row.g-3
-                            .col-4
+                            .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
-                                    span.app-stat-label Delivery area
-                                    strong.app-stat-value #{d.deliveryArea ? 'Set' : '-'}
-                            .col-4
+                                    span.app-stat-label Location
+                                    strong.app-stat-value #{hasSavedLocation ? 'Set' : '-'}
+                            .col-6.col-xl-3.col-lg-6
+                                .app-stat-card
+                                    span.app-stat-label Geo coords
+                                    strong.app-stat-value #{hasCoordinates ? 'Set' : '-'}
+                            .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
                                     span.app-stat-label Diets
                                     strong.app-stat-value #{selectedDietCount}
-                            .col-4
+                            .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
                                     span.app-stat-label Cuisines
                                     strong.app-stat-value #{[d.cuisineIncludes, d.cuisineExcludes].filter(Boolean).length}
@@ -41,46 +49,131 @@ block body
             .card-body
                 form(action="/users/settings" method="post")
                     +csrf
+                    input(type="hidden" name="defaultLocationId" value=(defaultLocation.id || ''))
                     .row.g-4
-                        .col-lg-6
+                        .col-xl-6
                             .app-panel.h-100
-                                h2.h5.mb-3
-                                    i.bi.bi-compass.me-2
-                                    | Location And Cuisine Defaults
-                                .mb-3
-                                    label.form-label(for="deliveryArea")
-                                        i.bi.bi-geo-alt.me-1
-                                        | Default Delivery Area
-                                    input#deliveryArea.form-control.text-bg-dark(
-                                        type="text"
-                                        name="deliveryArea"
-                                        maxlength="150"
-                                        value=(d.deliveryArea || '')
-                                        placeholder="e.g. Downtown, Midtown, 10km radius"
-                                    )
-                                .mb-3
-                                    label.form-label(for="cuisineIncludes")
-                                        i.bi.bi-hand-thumbs-up.me-1
-                                        | Preferred Cuisines
-                                    input#cuisineIncludes.form-control.text-bg-dark(
-                                        type="text"
-                                        name="cuisineIncludes"
-                                        value=(d.cuisineIncludes || '')
-                                        placeholder="e.g. Italian, Japanese, Mexican"
-                                    )
-                                    .form-text.text-white-50 Comma-separated list of cuisines to prefer.
-                                .mb-0
-                                    label.form-label(for="cuisineExcludes")
-                                        i.bi.bi-hand-thumbs-down.me-1
-                                        | Excluded Cuisines
-                                    input#cuisineExcludes.form-control.text-bg-dark(
-                                        type="text"
-                                        name="cuisineExcludes"
-                                        value=(d.cuisineExcludes || '')
-                                        placeholder="e.g. Fast Food, Sushi"
-                                    )
-                                    .form-text.text-white-50 Comma-separated list of cuisines to exclude.
-                        .col-lg-6
+                                .d-flex.justify-content-between.align-items-start.flex-wrap.gap-2.mb-3
+                                    h2.h5.mb-0
+                                        i.bi.bi-geo-alt-fill.me-2
+                                        | Saved Default Location
+                                    if hasCoordinates
+                                        span.badge.rounded-pill.text-bg-success Coordinates set
+                                    else
+                                        span.badge.rounded-pill.text-bg-secondary Coordinates optional
+                                p.text-white-50.small.mb-3 This location is the primary context for provider resolution, sync, and suggestion filtering. Add latitude and longitude for the most reliable Lieferando-style availability.
+                                .row.g-3
+                                    .col-12
+                                        label.form-label(for="defaultLocationLabel")
+                                            i.bi.bi-bookmark-star.me-1
+                                            | Location Label
+                                        input#defaultLocationLabel.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationLabel"
+                                            maxlength="150"
+                                            value=(defaultLocation.label || '')
+                                            placeholder="e.g. Home, Office, Weekend Flat"
+                                        )
+                                    .col-12
+                                        label.form-label(for="defaultLocationAddressLine1")
+                                            i.bi.bi-signpost-2.me-1
+                                            | Address Line 1
+                                        input#defaultLocationAddressLine1.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationAddressLine1"
+                                            maxlength="255"
+                                            value=(defaultLocation.addressLine1 || '')
+                                            placeholder="Street and house number"
+                                        )
+                                    .col-12
+                                        label.form-label(for="defaultLocationAddressLine2")
+                                            i.bi.bi-signpost-split.me-1
+                                            | Address Line 2
+                                        input#defaultLocationAddressLine2.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationAddressLine2"
+                                            maxlength="255"
+                                            value=(defaultLocation.addressLine2 || '')
+                                            placeholder="Apartment, building, floor"
+                                        )
+                                    .col-md-5
+                                        label.form-label(for="defaultLocationCity")
+                                            i.bi.bi-buildings.me-1
+                                            | City
+                                        input#defaultLocationCity.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationCity"
+                                            maxlength="100"
+                                            value=(defaultLocation.city || '')
+                                            placeholder="City"
+                                        )
+                                    .col-md-3
+                                        label.form-label(for="defaultLocationPostalCode")
+                                            i.bi.bi-mailbox.me-1
+                                            | Postal Code
+                                        input#defaultLocationPostalCode.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationPostalCode"
+                                            maxlength="20"
+                                            value=(defaultLocation.postalCode || '')
+                                            placeholder="93073"
+                                        )
+                                    .col-md-4
+                                        label.form-label(for="defaultLocationCountry")
+                                            i.bi.bi-globe-europe-africa.me-1
+                                            | Country
+                                        input#defaultLocationCountry.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationCountry"
+                                            maxlength="100"
+                                            value=(defaultLocation.country || '')
+                                            placeholder="Germany"
+                                        )
+                                    .col-md-6
+                                        label.form-label(for="defaultLocationLatitude")
+                                            i.bi.bi-crosshair.me-1
+                                            | Latitude
+                                        input#defaultLocationLatitude.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationLatitude"
+                                            value=(defaultLocation.latitude || '')
+                                            placeholder="48.9889211"
+                                            inputmode="decimal"
+                                        )
+                                    .col-md-6
+                                        label.form-label(for="defaultLocationLongitude")
+                                            i.bi.bi-crosshair2.me-1
+                                            | Longitude
+                                        input#defaultLocationLongitude.form-control.text-bg-dark(
+                                            type="text"
+                                            name="defaultLocationLongitude"
+                                            value=(defaultLocation.longitude || '')
+                                            placeholder="12.1984299"
+                                            inputmode="decimal"
+                                        )
+                                if savedLocations.length
+                                    .mt-4
+                                        h3.h6.text-uppercase.text-white-50.mb-3 Saved Locations
+                                        .d-flex.flex-column.gap-2
+                                            each location in savedLocations
+                                                - const summaryParts = [location.addressLine1, [location.postalCode, location.city].filter(Boolean).join(' '), location.country].filter(Boolean)
+                                                .rounded-3.border.border-secondary-subtle.p-3
+                                                    .d-flex.justify-content-between.align-items-start.flex-wrap.gap-2
+                                                        div
+                                                            strong.d-block #{location.label}
+                                                            if summaryParts.length
+                                                                small.text-white-50 #{summaryParts.join(' / ')}
+                                                        .d-flex.flex-wrap.gap-2
+                                                            if location.isDefault
+                                                                span.badge.rounded-pill.text-bg-info Default
+                                                            if location.latitude !== null && location.longitude !== null
+                                                                span.badge.rounded-pill.text-bg-success Geo-tagged
+                                                            else
+                                                                span.badge.rounded-pill.text-bg-secondary No coords
+                                else
+                                    .rounded-3.border.border-secondary-subtle.p-3.mt-4
+                                        p.text-white-50.small.mb-0 No saved locations yet. Saving the form above will create your first default location.
+                        .col-xl-6
                             .app-panel.h-100
                                 h2.h5.mb-3
                                     i.bi.bi-heart-pulse.me-2
@@ -103,6 +196,46 @@ block body
                                                         small.text-white-50 #{tag.key}
                                 else
                                     p.text-white-50.mb-0 No diet tags are available right now.
+                    .row.g-4.mt-1
+                        .col-12
+                            .app-panel
+                                h2.h5.mb-3
+                                    i.bi.bi-emoji-smile.me-2
+                                    | Cuisine Defaults
+                                .row.g-3
+                                    .col-lg-6
+                                        label.form-label(for="cuisineIncludes")
+                                            i.bi.bi-hand-thumbs-up.me-1
+                                            | Preferred Cuisines
+                                        input#cuisineIncludes.form-control.text-bg-dark(
+                                            type="text"
+                                            name="cuisineIncludes"
+                                            value=(d.cuisineIncludes || '')
+                                            placeholder="e.g. Italian, Japanese, Mexican"
+                                        )
+                                        .form-text.text-white-50 Comma-separated list of cuisines to prefer.
+                                    .col-lg-6
+                                        label.form-label(for="cuisineExcludes")
+                                            i.bi.bi-hand-thumbs-down.me-1
+                                            | Excluded Cuisines
+                                        input#cuisineExcludes.form-control.text-bg-dark(
+                                            type="text"
+                                            name="cuisineExcludes"
+                                            value=(d.cuisineExcludes || '')
+                                            placeholder="e.g. Fast Food, Sushi"
+                                        )
+                                        .form-text.text-white-50 Comma-separated list of cuisines to exclude.
+                                .mt-3
+                                    label.form-label(for="deliveryAreaDerived")
+                                        i.bi.bi-arrow-repeat.me-1
+                                        | Legacy Delivery Area
+                                    input#deliveryAreaDerived.form-control.text-bg-dark(
+                                        type="text"
+                                        value=(d.deliveryArea || '')
+                                        readonly
+                                        placeholder="Derived from the saved default location"
+                                    )
+                                    .form-text.text-white-50 This value is kept only for transition and backfill. The saved location above is the real availability key.
                     .d-flex.flex-wrap.gap-2.mt-4
                         button.btn.btn-success(type="submit")
                             i.bi.bi-check-lg.me-1

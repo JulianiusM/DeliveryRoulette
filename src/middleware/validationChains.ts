@@ -43,6 +43,42 @@ export const validateSettings = [
     body('deliveryArea').optional().trim().isLength({max: 150}).withMessage('Delivery area must be at most 150 characters'),
     body('cuisineIncludes').optional().trim(),
     body('cuisineExcludes').optional().trim(),
+    body('defaultLocationId').optional({checkFalsy: true}).trim().isUUID().withMessage('Default location ID must be a valid UUID'),
+    body('defaultLocationLabel').optional().trim().isLength({max: 150}).withMessage('Default location label must be at most 150 characters'),
+    body('defaultLocationAddressLine1').optional().trim().isLength({max: 255}).withMessage('Address line 1 must be at most 255 characters'),
+    body('defaultLocationAddressLine2').optional().trim().isLength({max: 255}).withMessage('Address line 2 must be at most 255 characters'),
+    body('defaultLocationCity').optional().trim().isLength({max: 100}).withMessage('City must be at most 100 characters'),
+    body('defaultLocationPostalCode').optional().trim().isLength({max: 20}).withMessage('Postal code must be at most 20 characters'),
+    body('defaultLocationCountry').optional().trim().isLength({max: 100}).withMessage('Country must be at most 100 characters'),
+    body('defaultLocationLatitude').optional({checkFalsy: true}).trim().isFloat({min: -90, max: 90}).withMessage('Latitude must be between -90 and 90'),
+    body('defaultLocationLongitude').optional({checkFalsy: true}).trim().isFloat({min: -180, max: 180}).withMessage('Longitude must be between -180 and 180'),
+    body('defaultLocationLabel').custom((value, {req}) => {
+        const label = typeof value === 'string' ? value.trim() : '';
+        const relatedFields = [
+            req.body.defaultLocationAddressLine1,
+            req.body.defaultLocationAddressLine2,
+            req.body.defaultLocationCity,
+            req.body.defaultLocationPostalCode,
+            req.body.defaultLocationCountry,
+            req.body.defaultLocationLatitude,
+            req.body.defaultLocationLongitude,
+        ];
+        const hasRelatedValue = relatedFields.some((field) => typeof field === 'string' && field.trim().length > 0);
+        if (hasRelatedValue && !label) {
+            throw new Error('Default location label is required when saving a location');
+        }
+        return true;
+    }),
+    body('defaultLocationLongitude').custom((value, {req}) => {
+        const latitude = typeof req.body.defaultLocationLatitude === 'string'
+            ? req.body.defaultLocationLatitude.trim()
+            : '';
+        const longitude = typeof value === 'string' ? value.trim() : '';
+        if (Boolean(latitude) !== Boolean(longitude)) {
+            throw new Error('Latitude and longitude must both be provided together');
+        }
+        return true;
+    }),
 ];
 
 // ── Restaurant routes ───────────────────────────────────────
