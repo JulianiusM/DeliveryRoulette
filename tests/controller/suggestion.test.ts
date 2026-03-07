@@ -28,6 +28,10 @@ import * as userDietPrefService from '../../src/modules/database/services/UserDi
 jest.mock('../../src/modules/database/services/UserPreferenceService');
 import * as userPrefService from '../../src/modules/database/services/UserPreferenceService';
 
+// Mock the UserLocationService
+jest.mock('../../src/modules/database/services/UserLocationService');
+import * as userLocationService from '../../src/modules/database/services/UserLocationService';
+
 // Mock the UserRestaurantPreferenceService
 jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
 import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
@@ -38,6 +42,9 @@ const mockRecordSuggestion = suggestionHistoryService.recordSuggestion as jest.M
 const mockGetAllDietTags = userDietPrefService.getAllDietTags as jest.Mock;
 const mockGetEffectiveDietFilterIds = userDietPrefService.getEffectiveDietFilterIds as jest.Mock;
 const mockGetByUserId = userPrefService.getByUserId as jest.Mock;
+const mockGetOrBackfillDefaultFromDeliveryArea = userLocationService.getOrBackfillDefaultFromDeliveryArea as jest.Mock;
+const mockGetByIdForUser = userLocationService.getByIdForUser as jest.Mock;
+const mockTouchLocation = userLocationService.touchLocation as jest.Mock;
 const mockGetDoNotSuggestRestaurantIds = userRestaurantPrefService.getDoNotSuggestRestaurantIds as jest.Mock;
 const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
 
@@ -50,6 +57,24 @@ describe('SuggestionController', () => {
         // Default: no recent history
         mockGetRecentRestaurantIds.mockResolvedValue([]);
         mockRecordSuggestion.mockResolvedValue({});
+        mockGetByUserId.mockResolvedValue(null);
+        mockGetOrBackfillDefaultFromDeliveryArea.mockResolvedValue({
+            id: 'loc-1',
+            label: 'Downtown',
+            addressLine1: null,
+            city: 'Springfield',
+            postalCode: '12345',
+            country: 'USA',
+        });
+        mockGetByIdForUser.mockResolvedValue({
+            id: 'loc-1',
+            label: 'Downtown',
+            addressLine1: null,
+            city: 'Springfield',
+            postalCode: '12345',
+            country: 'USA',
+        });
+        mockTouchLocation.mockResolvedValue(undefined);
         // Default: no do-not-suggest restaurants
         mockGetDoNotSuggestRestaurantIds.mockResolvedValue([]);
         // Default: no favorites
@@ -78,6 +103,12 @@ describe('SuggestionController', () => {
             expect(result.respectDoNotSuggest).toBe(true);
             expect(result.minDietScore).toBe(formDataDefaults.expectedMinDietScore);
             expect(result.favoriteMode).toBe('prefer');
+            expect(result.activeLocation).toMatchObject({
+                id: 'loc-1',
+                label: 'Downtown',
+            });
+            expect(result.locationRequired).toBe(true);
+            expect(result.serviceType).toBe('delivery');
         });
 
         test('returns empty defaults for anonymous user', async () => {
@@ -92,6 +123,7 @@ describe('SuggestionController', () => {
             expect(result.excludeAllergens).toBe('');
             expect(mockGetEffectiveDietFilterIds).not.toHaveBeenCalled();
             expect(mockGetByUserId).not.toHaveBeenCalled();
+            expect(result.activeLocation).toBeNull();
         });
     });
 
@@ -99,7 +131,7 @@ describe('SuggestionController', () => {
         test.each(processSuggestionValidData)('$description', async (testCase) => {
             setupMock(mockSuggest, testCase.suggestResult);
 
-            const result = await suggestionController.processSuggestion(testCase.input);
+            const result = await suggestionController.processSuggestion(testCase.input, 1);
 
             expect(result.restaurant.name).toBe(testCase.expectedRestaurantName);
             expect(result.restaurant.id).toBeDefined();
@@ -111,11 +143,11 @@ describe('SuggestionController', () => {
             setupMock(mockSuggest, null);
 
             await expect(
-                suggestionController.processSuggestion(testCase.input)
+                suggestionController.processSuggestion(testCase.input, 1)
             ).rejects.toThrow(APIError);
 
             await expect(
-                suggestionController.processSuggestion(testCase.input)
+                suggestionController.processSuggestion(testCase.input, 1)
             ).rejects.toMatchObject({
                 message: expect.stringContaining('No restaurants match'),
             });
@@ -127,10 +159,12 @@ describe('SuggestionController', () => {
                 reason: {matchedDiets: [], totalCandidates: 1},
             });
 
-            await suggestionController.processSuggestion({dietTagIds: ['', 'tag-vegan', '']});
+            await suggestionController.processSuggestion({dietTagIds: ['', 'tag-vegan', '']}, 1);
 
             expect(mockSuggest).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    locationId: 'loc-1',
+                    serviceType: 'delivery',
                     dietTagIds: ['tag-vegan'],
                 })
             );
@@ -162,6 +196,7 @@ describe('SuggestionController', () => {
             await suggestionController.processSuggestion({}, 7);
 
             expect(mockRecordSuggestion).toHaveBeenCalledWith('r1', 7);
+            expect(mockTouchLocation).toHaveBeenCalledWith('loc-1');
         });
 
         test('does not record history when no match found', async () => {
@@ -191,20 +226,10 @@ describe('SuggestionController', () => {
             );
         });
 
-        test('passes empty do-not-suggest list for anonymous user', async () => {
-            setupMock(mockSuggest, {
-                restaurant: {id: 'r1', name: 'Test'},
-                reason: {matchedDiets: [], totalCandidates: 1},
+        test('rejects anonymous suggestion requests because location is required', async () => {
+            await expect(suggestionController.processSuggestion({})).rejects.toMatchObject({
+                message: expect.stringContaining('saved user location'),
             });
-
-            await suggestionController.processSuggestion({});
-
-            expect(mockGetDoNotSuggestRestaurantIds).not.toHaveBeenCalled();
-            expect(mockSuggest).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    doNotSuggestIds: [],
-                })
-            );
         });
 
         test('passes favorite restaurant IDs for logged-in user', async () => {
@@ -219,24 +244,31 @@ describe('SuggestionController', () => {
             expect(mockGetFavoriteRestaurantIds).toHaveBeenCalledWith(5);
             expect(mockSuggest).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    locationId: 'loc-1',
                     favoriteIds: ['r-fav-1', 'r-fav-2'],
                     favoriteMode: 'prefer',
                 })
             );
         });
 
-        test('passes empty favorites list for anonymous user', async () => {
+        test('uses an explicitly requested saved location when provided', async () => {
             setupMock(mockSuggest, {
                 restaurant: {id: 'r1', name: 'Test'},
                 reason: {matchedDiets: [], totalCandidates: 1},
             });
+            mockGetFavoriteRestaurantIds.mockResolvedValueOnce(['r-fav-1', 'r-fav-2']);
+            mockGetByIdForUser.mockResolvedValueOnce({
+                id: 'loc-2',
+                label: 'Office',
+            });
 
-            await suggestionController.processSuggestion({});
+            await suggestionController.processSuggestion({locationId: 'loc-2'}, 5);
 
-            expect(mockGetFavoriteRestaurantIds).not.toHaveBeenCalled();
+            expect(mockGetByIdForUser).toHaveBeenCalledWith(5, 'loc-2');
             expect(mockSuggest).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    favoriteIds: [],
+                    locationId: 'loc-2',
+                    favoriteIds: ['r-fav-1', 'r-fav-2'],
                     openOnly: true,
                     minDietScore: 10,
                 })

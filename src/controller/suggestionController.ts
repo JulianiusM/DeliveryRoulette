@@ -2,6 +2,7 @@ import * as suggestionService from "../modules/database/services/SuggestionServi
 import * as suggestionHistoryService from "../modules/database/services/SuggestionHistoryService";
 import * as userDietPrefService from "../modules/database/services/UserDietPreferenceService";
 import * as userPrefService from "../modules/database/services/UserPreferenceService";
+import * as userLocationService from "../modules/database/services/UserLocationService";
 import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {APIError} from "../modules/lib/errors";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../modules/database/services/SuggestionService";
 import settings from "../modules/settings";
 import {getOpeningHoursPresentation} from "../modules/lib/openingHours";
+import {ProviderServiceType} from "../providers/ProviderTypes";
 
 export interface SuggestionFormData {
     dietTags: Array<{id: string; key: string; label: string}>;
@@ -25,6 +27,16 @@ export interface SuggestionFormData {
     favoriteMode: SuggestionFavoriteMode;
     recentSuggestionCount: number;
     deliveryArea: string;
+    serviceType: ProviderServiceType;
+    locationRequired: boolean;
+    activeLocation?: {
+        id: string;
+        label: string;
+        addressLine1?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        country?: string | null;
+    } | null;
 }
 
 export interface SuggestionResultData {
@@ -115,6 +127,7 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
     let cuisineIncludes = '';
     let cuisineExcludes = '';
     let deliveryArea = '';
+    let activeLocation: SuggestionFormData['activeLocation'] = null;
 
     if (userId) {
         selectedDietTagIds = await userDietPrefService.getEffectiveDietFilterIds(userId);
@@ -123,6 +136,20 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
             cuisineIncludes = pref.cuisineIncludes || '';
             cuisineExcludes = pref.cuisineExcludes || '';
             deliveryArea = pref.deliveryArea || '';
+        }
+        const location = await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+            userId,
+            pref?.deliveryArea ?? null,
+        );
+        if (location) {
+            activeLocation = {
+                id: location.id,
+                label: location.label,
+                addressLine1: location.addressLine1 ?? null,
+                city: location.city ?? null,
+                postalCode: location.postalCode ?? null,
+                country: location.country ?? null,
+            };
         }
     }
 
@@ -139,6 +166,9 @@ export async function getSuggestionFormData(userId?: number): Promise<Suggestion
         favoriteMode: normalizeFavoriteMode(undefined),
         recentSuggestionCount: settings.value.suggestionExcludeRecentCount,
         deliveryArea,
+        serviceType: 'delivery',
+        locationRequired: true,
+        activeLocation,
     };
 }
 
@@ -147,17 +177,47 @@ export async function processSuggestion(body: {
     excludeAllergens?: string;
     cuisineIncludes?: string;
     cuisineExcludes?: string;
+    locationId?: string;
+    serviceType?: string;
     openOnly?: boolean | string;
     excludeRecentlySuggested?: boolean | string;
     respectDoNotSuggest?: boolean | string;
     favoriteMode?: string;
     minDietScore?: number | string;
 }, userId?: number | null): Promise<SuggestionResultData> {
+    if (!userId) {
+        throw new APIError(
+            'Location-aware suggestions require a saved user location. Sign in and configure a default location first.',
+            {},
+            400,
+        );
+    }
+
     let dietTagIds: string[] = [];
     if (body.dietTagIds) {
         dietTagIds = Array.isArray(body.dietTagIds) ? body.dietTagIds : [body.dietTagIds];
     }
     dietTagIds = dietTagIds.filter(Boolean);
+
+    const preference = await userPrefService.getByUserId(userId);
+    const requestedLocationId = typeof body.locationId === 'string' ? body.locationId.trim() : '';
+    const activeLocation = requestedLocationId
+        ? await userLocationService.getByIdForUser(userId, requestedLocationId)
+        : await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+            userId,
+            preference?.deliveryArea ?? null,
+        );
+    if (!activeLocation) {
+        throw new APIError(
+            'No saved delivery location is configured. Save a default location before requesting suggestions.',
+            {},
+            400,
+        );
+    }
+
+    const serviceType: ProviderServiceType = body.serviceType === 'collection'
+        ? 'collection'
+        : 'delivery';
 
     const openOnly = parseBooleanLike(body.openOnly, settings.value.suggestionDefaultOpenOnly);
     const excludeRecentlySuggested = parseBooleanLike(
@@ -184,6 +244,8 @@ export async function processSuggestion(body: {
         : [];
 
     const filters: SuggestionFilters = {
+        locationId: activeLocation.id,
+        serviceType,
         dietTagIds,
         excludeAllergens: parseCsvList(body.excludeAllergens),
         cuisineIncludes: parseCsvList(body.cuisineIncludes),
@@ -207,6 +269,7 @@ export async function processSuggestion(body: {
     }
 
     await suggestionHistoryService.recordSuggestion(result.restaurant.id, userId);
+    await userLocationService.touchLocation(activeLocation.id);
 
     return formatResult(result, {
         minDietScore,

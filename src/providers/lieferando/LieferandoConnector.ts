@@ -10,7 +10,16 @@
  */
 import {ConnectorCapabilities, DeliveryProviderConnector} from '../DeliveryProviderConnector';
 import {ProviderKey} from '../ProviderKey';
-import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from '../ProviderTypes';
+import {
+    ProviderLocationContext,
+    ProviderLocationInput,
+    ProviderLocationResolution,
+    ProviderMenu,
+    ProviderRestaurant,
+    ProviderRestaurantAvailability,
+    ProviderRestaurantListRequest,
+    RateLimitPolicy,
+} from '../ProviderTypes';
 import {parseListingHtml, parseMenuHtml} from './lieferandoParsing';
 import type {ParsedMenu, ParsedMenuCategory} from './lieferandoTypes';
 import {execFile} from 'node:child_process';
@@ -59,9 +68,10 @@ export class LieferandoConnector implements DeliveryProviderConnector {
 
     /**
      * List restaurants from a listing URL.
-     * @param query  The listing URL to discover restaurants from
+     * @param request  The listing request to discover restaurants from
      */
-    async listRestaurants(query: string): Promise<ProviderRestaurant[]> {
+    async listRestaurants(request: ProviderRestaurantListRequest): Promise<ProviderRestaurant[]> {
+        const query = request.query?.trim() || '';
         if (!query) return [];
 
         const html = await this.fetchHtml(query, {
@@ -83,6 +93,10 @@ export class LieferandoConnector implements DeliveryProviderConnector {
             const externalId = slugFromUrl(r.menuUrl);
             const normalized: ProviderRestaurant = {
                 externalId,
+                providerNativeId: r.providerNativeId ?? null,
+                providerIdentityJson: r.providerNativeId
+                    ? JSON.stringify({restaurantNumericId: r.providerNativeId})
+                    : null,
                 name: r.name,
                 url: r.menuUrl,
                 cuisines: parseCuisineList(r.cuisines),
@@ -92,6 +106,7 @@ export class LieferandoConnector implements DeliveryProviderConnector {
                 country: r.country ?? null,
                 openingHours: r.openingHours ?? null,
                 openingDays: r.openingDays ?? null,
+                rawListingJson: r.rawListingJson ?? null,
             };
 
             const existing = deduped.get(externalId);
@@ -106,6 +121,8 @@ export class LieferandoConnector implements DeliveryProviderConnector {
                 ...normalized,
                 name: existing.name || normalized.name,
                 url: preferNewUrl ? normalized.url : existing.url,
+                providerNativeId: existing.providerNativeId ?? normalized.providerNativeId ?? null,
+                providerIdentityJson: existing.providerIdentityJson ?? normalized.providerIdentityJson ?? null,
                 cuisines: existing.cuisines && existing.cuisines.length > 0
                     ? existing.cuisines
                     : (normalized.cuisines ?? null),
@@ -115,10 +132,53 @@ export class LieferandoConnector implements DeliveryProviderConnector {
                 country: existing.country ?? normalized.country ?? null,
                 openingHours: existing.openingHours ?? normalized.openingHours ?? null,
                 openingDays: existing.openingDays ?? normalized.openingDays ?? null,
+                rawListingJson: existing.rawListingJson ?? normalized.rawListingJson ?? null,
             });
         }
 
         return [...deduped.values()];
+    }
+
+    async resolveLocation(location: ProviderLocationInput): Promise<ProviderLocationResolution | null> {
+        const providerLocationSlug = normalizeLocationValue(location.providerLocationSlug)
+            ?? extractLocationSlugFromListingUrl(location.listingUrl ?? null);
+        const providerAreaId = normalizeLocationValue(location.providerAreaId);
+        const latitude = Number.isFinite(location.latitude) ? Number(location.latitude) : null;
+        const longitude = Number.isFinite(location.longitude) ? Number(location.longitude) : null;
+
+        if (!providerLocationSlug && !providerAreaId && latitude === null && longitude === null) {
+            return null;
+        }
+
+        return {
+            providerKey: this.providerKey,
+            providerAreaId,
+            providerLocationSlug,
+            latitude,
+            longitude,
+            status: providerAreaId && latitude !== null && longitude !== null ? 'resolved' : 'partial',
+            rawResolutionJson: JSON.stringify({
+                listingUrl: location.listingUrl ?? null,
+                providerAreaId,
+                providerLocationSlug,
+                latitude,
+                longitude,
+            }),
+        };
+    }
+
+    async fetchAvailability(
+        providerRestaurantId: string,
+        locationContext: ProviderLocationContext,
+        orderTime: Date,
+    ): Promise<ProviderRestaurantAvailability[]> {
+        void providerRestaurantId;
+        void locationContext;
+        void orderTime;
+
+        throw new Error(
+            'Lieferando availability fetch is not implemented yet; TODO: wire the captured dynamic availability endpoint into this connector.',
+        );
     }
 
     /**
@@ -523,6 +583,10 @@ export class LieferandoConnector implements DeliveryProviderConnector {
 function toProviderMenu(parsed: ParsedMenu, externalId: string): ProviderMenu {
     return {
         restaurantName: parsed.restaurantName ?? null,
+        providerNativeId: parsed.restaurantNumericId ?? null,
+        providerIdentityJson: parsed.restaurantNumericId
+            ? JSON.stringify({restaurantNumericId: parsed.restaurantNumericId})
+            : null,
         categories: parsed.categories.map((cat, idx) => ({
             name: cat.name,
             items: cat.items.map((item, itemIdx) => ({
@@ -1663,6 +1727,20 @@ function parseCuisineList(value: string | null | undefined): string[] | null {
         .filter((entry) => entry.length > 0);
     if (normalized.length === 0) return null;
     return [...new Set(normalized)];
+}
+
+function extractLocationSlugFromListingUrl(url: string | null): string | null {
+    if (!url) return null;
+    const match = url.match(/\/delivery\/food\/([^/?#]+)/i);
+    if (match?.[1]) {
+        return decodeURIComponent(match[1].trim());
+    }
+    return null;
+}
+
+function normalizeLocationValue(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
 }
 
 // ── Allergen type mapping ────────────────────────────────────────

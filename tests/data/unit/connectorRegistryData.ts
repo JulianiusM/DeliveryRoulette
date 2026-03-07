@@ -3,14 +3,19 @@
  */
 import {ProviderKey} from '../../../src/providers/ProviderKey';
 import {ConnectorCapabilities, DeliveryProviderConnector} from '../../../src/providers/DeliveryProviderConnector';
-import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from '../../../src/providers/ProviderTypes';
+import {
+    ProviderMenu,
+    ProviderRestaurant,
+    ProviderRestaurantListRequest,
+    RateLimitPolicy,
+} from '../../../src/providers/ProviderTypes';
 
 /** Helper: build a minimal stub connector for a given key. */
 export function stubConnector(key: ProviderKey, displayName: string): DeliveryProviderConnector {
     return {
         providerKey: key,
         displayName,
-        listRestaurants: jest.fn<Promise<ProviderRestaurant[]>, [string]>()
+        listRestaurants: jest.fn<Promise<ProviderRestaurant[]>, [ProviderRestaurantListRequest]>()
             .mockResolvedValue([]),
         fetchMenu: jest.fn<Promise<ProviderMenu>, [string]>()
             .mockResolvedValue({categories: []}),

@@ -1,6 +1,6 @@
 import {ConnectorCapabilities, DeliveryProviderConnector} from "./DeliveryProviderConnector";
 import {ProviderKey} from "./ProviderKey";
-import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes";
+import {ProviderMenu, ProviderRestaurant, ProviderRestaurantListRequest, RateLimitPolicy} from "./ProviderTypes";
 import {ImportPayload, ImportRestaurant} from "../modules/import/importSchema";
 
 /**
@@ -30,7 +30,7 @@ export class ImportConnector implements DeliveryProviderConnector {
 
     // ── DeliveryProviderConnector interface ──────────────────
 
-    async listRestaurants(_query: string): Promise<ProviderRestaurant[]> {
+    async listRestaurants(_request: ProviderRestaurantListRequest): Promise<ProviderRestaurant[]> {
         return [...this.restaurants.values()].map((r) => ({
             externalId: r.name,
             name: r.name,

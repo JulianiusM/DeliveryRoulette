@@ -5,6 +5,8 @@ import {DietManualOverride} from '../database/entities/diet/DietManualOverride';
 import * as restaurantService from '../database/services/RestaurantService';
 import * as menuService from '../database/services/MenuService';
 import * as providerRefService from '../database/services/RestaurantProviderRefService';
+import * as providerLocationRefService from '../database/services/ProviderLocationRefService';
+import * as restaurantAvailabilityService from '../database/services/RestaurantAvailabilityService';
 import * as dietInferenceService from '../database/services/DietInferenceService';
 import * as cuisineInferenceService from '../database/services/CuisineInferenceService';
 import * as syncAlertService from '../database/services/SyncAlertService';
@@ -12,6 +14,7 @@ import * as providerFetchCache from '../providers/ProviderFetchCacheService';
 import * as ConnectorRegistry from '../../providers/ConnectorRegistry';
 import {ProviderKey} from '../../providers/ProviderKey';
 import type {DeliveryProviderConnector} from '../../providers/DeliveryProviderConnector';
+import {ProviderLocationContext, ProviderMenu, ProviderRestaurant} from '../../providers/ProviderTypes';
 import settings from '../settings';
 import logger from '../logger';
 
@@ -154,6 +157,13 @@ interface MenuRefSyncQuery {
 
 const MENU_REF_QUERY_PREFIX = 'menu-ref:';
 
+interface ListingSyncQuery {
+    listingUrl: string;
+    providerLocationRefId?: string | null;
+}
+
+const LISTING_QUERY_PREFIX = 'listing-url:';
+
 interface ImportUrlSyncQuery {
     menuUrl: string;
 }
@@ -233,6 +243,26 @@ export async function queueImportFromUrl(
         providerKey,
         syncQuery: encodeImportUrlSyncQuery({
             menuUrl: menuUrl.trim(),
+        }),
+        status: 'pending',
+    });
+    const saved = await repo.save(job);
+
+    startSyncQueueWorker();
+    return toQueuedJob(saved);
+}
+
+export async function queueListingSync(
+    providerKey: ProviderKey,
+    listingUrl: string,
+    providerLocationRefId?: string | null,
+): Promise<QueuedSyncJob> {
+    const repo = AppDataSource.getRepository(SyncJob);
+    const job = repo.create({
+        providerKey,
+        syncQuery: encodeListingSyncQuery({
+            listingUrl: listingUrl.trim(),
+            providerLocationRefId: providerLocationRefId ?? null,
         }),
         status: 'pending',
     });
@@ -521,6 +551,16 @@ function encodeMenuRefSyncQuery(query: MenuRefSyncQuery): string {
     return `${MENU_REF_QUERY_PREFIX}${query.restaurantId}:${query.providerRefId}`;
 }
 
+function encodeListingSyncQuery(query: ListingSyncQuery): string {
+    const encodedListingUrl = encodeURIComponent(query.listingUrl.trim());
+    const encodedLocationRefId = query.providerLocationRefId?.trim();
+    if (!encodedLocationRefId) {
+        return `${LISTING_QUERY_PREFIX}${encodedListingUrl}`;
+    }
+
+    return `${LISTING_QUERY_PREFIX}${encodedListingUrl}|${encodedLocationRefId}`;
+}
+
 function decodeMenuRefSyncQuery(query: string | null): MenuRefSyncQuery | null {
     if (!query || !query.startsWith(MENU_REF_QUERY_PREFIX)) {
         return null;
@@ -533,6 +573,31 @@ function decodeMenuRefSyncQuery(query: string | null): MenuRefSyncQuery | null {
     }
 
     return {restaurantId, providerRefId};
+}
+
+function decodeListingSyncQuery(query: string | null): ListingSyncQuery | null {
+    if (!query || !query.startsWith(LISTING_QUERY_PREFIX)) {
+        return null;
+    }
+
+    const raw = query.slice(LISTING_QUERY_PREFIX.length);
+    if (!raw) {
+        return null;
+    }
+
+    const [encodedListingUrl, providerLocationRefId] = raw.split('|');
+    if (!encodedListingUrl) {
+        return null;
+    }
+
+    try {
+        return {
+            listingUrl: decodeURIComponent(encodedListingUrl),
+            providerLocationRefId: providerLocationRefId?.trim() || null,
+        };
+    } catch {
+        return null;
+    }
 }
 
 function encodeImportUrlSyncQuery(query: ImportUrlSyncQuery): string {
@@ -591,6 +656,8 @@ async function executeSyncJob(
             return await executeImportUrlSyncJob(job, options, importUrlQuery);
         }
 
+        const listingQuery = decodeListingSyncQuery(syncQuery ?? null);
+
         const connectors = resolveConnectors(directConnector, providerKey);
         if (providerKey && connectors.length === 0) {
             throw new Error(`No connector registered for provider: ${providerKey}`);
@@ -600,29 +667,39 @@ async function executeSyncJob(
         let synced = 0;
 
         for (const conn of connectors) {
-            const providerRestaurants = await conn.listRestaurants(syncQuery ?? '');
+            const locationContext = listingQuery?.providerLocationRefId
+                ? await buildListingLocationContext(conn.providerKey, listingQuery.providerLocationRefId)
+                : null;
+            const providerRestaurants = await conn.listRestaurants({
+                query: listingQuery?.listingUrl ?? syncQuery ?? '',
+                locationContext,
+            });
             const seenRestaurantIds = new Set<string>();
 
             for (const incoming of providerRestaurants) {
                 try {
-                    const restaurantId = await restaurantService.upsertFromProvider(incoming);
+                    const restaurantId = await restaurantService.upsertFromProvider(conn.providerKey, incoming);
                     seenRestaurantIds.add(restaurantId);
 
-                    await providerRefService.ensureProviderRef(
+                    let primaryProviderRef = await providerRefService.ensureProviderRef({
                         restaurantId,
-                        conn.providerKey,
-                        incoming.externalId,
-                        incoming.url,
-                    );
+                        providerKey: conn.providerKey,
+                        externalId: incoming.externalId,
+                        providerNativeId: incoming.providerNativeId ?? null,
+                        providerIdentityJson: incoming.providerIdentityJson ?? null,
+                        url: incoming.url,
+                    });
 
                     if (incoming.providerRefs) {
                         for (const ref of incoming.providerRefs) {
-                            await providerRefService.ensureProviderRef(
+                            await providerRefService.ensureProviderRef({
                                 restaurantId,
-                                ref.providerKey,
-                                ref.externalId ?? null,
-                                ref.url,
-                            );
+                                providerKey: ref.providerKey,
+                                externalId: ref.externalId ?? null,
+                                providerNativeId: ref.providerNativeId ?? null,
+                                providerIdentityJson: ref.providerIdentityJson ?? null,
+                                url: ref.url,
+                            });
                         }
                     }
 
@@ -632,11 +709,30 @@ async function executeSyncJob(
                     );
                     const preScores = new Map(preSyncInference.map((r) => [r.dietTagId, r.score]));
 
-                    await syncMenuForRestaurant(conn, incoming.externalId, restaurantId, {
+                    const syncedMenu = await syncMenuForRestaurant(conn, incoming.externalId, restaurantId, {
                         requireMenuItems: conn.providerKey !== ProviderKey.IMPORT,
                     });
+                    if (syncedMenu.providerNativeId || syncedMenu.providerIdentityJson) {
+                        primaryProviderRef = await providerRefService.ensureProviderRef({
+                            restaurantId,
+                            providerKey: conn.providerKey,
+                            externalId: incoming.externalId,
+                            providerNativeId: syncedMenu.providerNativeId ?? incoming.providerNativeId ?? null,
+                            providerIdentityJson: syncedMenu.providerIdentityJson ?? incoming.providerIdentityJson ?? null,
+                            url: incoming.url,
+                        });
+                    }
+
+                    if (listingQuery?.providerLocationRefId) {
+                        await persistListingAvailabilitySnapshot(
+                            incoming,
+                            restaurantId,
+                            primaryProviderRef.id,
+                            listingQuery.providerLocationRefId,
+                        );
+                    }
                     await checkDietOverrideAlerts(restaurantId, conn.providerKey, preScores);
-                    await updateLastSyncAt(restaurantId, conn.providerKey);
+                    await updateLastSyncAt(primaryProviderRef.id);
 
                     allResults.push({name: incoming.name, success: true});
                     synced++;
@@ -646,7 +742,11 @@ async function executeSyncJob(
                 }
             }
 
-            await detectStaleRestaurants(conn.providerKey, seenRestaurantIds);
+            if (!listingQuery) {
+                // Listing-based syncs are location-scoped snapshots, not an authoritative
+                // provider-wide catalog. Do not globally stale provider refs from them.
+                await detectStaleRestaurants(conn.providerKey, seenRestaurantIds);
+            }
         }
 
         job.status = 'completed';
@@ -720,6 +820,25 @@ async function executeProviderRefreshMaintenanceJob(job: SyncJob): Promise<SyncR
     };
 }
 
+async function buildListingLocationContext(
+    providerKey: string,
+    providerLocationRefId: string,
+): Promise<ProviderLocationContext | null> {
+    const locationRef = await providerLocationRefService.getById(providerLocationRefId);
+    if (!locationRef || locationRef.providerKey !== providerKey) {
+        return null;
+    }
+
+    return {
+        sourceLocationId: locationRef.sourceLocationId,
+        providerKey,
+        providerAreaId: locationRef.providerAreaId ?? null,
+        providerLocationSlug: locationRef.providerLocationSlug ?? null,
+        latitude: locationRef.latitude ?? null,
+        longitude: locationRef.longitude ?? null,
+    };
+}
+
 async function executeMenuRefSyncJob(
     job: SyncJob,
     query: MenuRefSyncQuery,
@@ -752,9 +871,17 @@ async function executeMenuRefSyncJob(
     );
     const preScores = new Map(preSyncInference.map((result) => [result.dietTagId, result.score]));
 
-    await syncMenuForRestaurant(connector, externalId, query.restaurantId);
+    const syncedMenu = await syncMenuForRestaurant(connector, externalId, query.restaurantId);
+    await providerRefService.ensureProviderRef({
+        restaurantId: query.restaurantId,
+        providerKey: ref.providerKey,
+        externalId: ref.externalId ?? null,
+        providerNativeId: syncedMenu.providerNativeId ?? ref.providerNativeId ?? null,
+        providerIdentityJson: syncedMenu.providerIdentityJson ?? ref.providerIdentityJson ?? null,
+        url: ref.url,
+    });
     await checkDietOverrideAlerts(query.restaurantId, parsedProviderKey, preScores);
-    await updateLastSyncAt(query.restaurantId, parsedProviderKey);
+    await updateLastSyncAt(ref.id);
 
     const restaurant = await restaurantService.getRestaurantById(query.restaurantId);
 
@@ -811,8 +938,10 @@ async function executeImportUrlSyncJob(
     const inferredName = normalizeRestaurantName(menu.restaurantName, menuUrl);
     const externalId = deriveExternalId(menuUrl);
 
-    const restaurantId = await restaurantService.upsertFromProvider({
+    const restaurantId = await restaurantService.upsertFromProvider(connector.providerKey, {
         externalId,
+        providerNativeId: menu.providerNativeId ?? null,
+        providerIdentityJson: menu.providerIdentityJson ?? null,
         name: inferredName,
         url: menuUrl,
         address: menu.restaurantDetails?.address ?? null,
@@ -820,16 +949,20 @@ async function executeImportUrlSyncJob(
         city: menu.restaurantDetails?.city ?? null,
         postalCode: menu.restaurantDetails?.postalCode ?? null,
         country: menu.restaurantDetails?.country ?? null,
+        latitude: menu.restaurantDetails?.latitude ?? null,
+        longitude: menu.restaurantDetails?.longitude ?? null,
         openingHours: menu.restaurantDetails?.openingHours ?? null,
         openingDays: menu.restaurantDetails?.openingDays ?? null,
     });
 
-    await providerRefService.ensureProviderRef(
+    let providerRef = await providerRefService.ensureProviderRef({
         restaurantId,
-        connector.providerKey,
+        providerKey: connector.providerKey,
         externalId,
-        menuUrl,
-    );
+        providerNativeId: menu.providerNativeId ?? null,
+        providerIdentityJson: menu.providerIdentityJson ?? null,
+        url: menuUrl,
+    });
 
     const preSyncInference = await dietInferenceService.getResultsByRestaurant(
         restaurantId,
@@ -837,9 +970,19 @@ async function executeImportUrlSyncJob(
     );
     const preScores = new Map(preSyncInference.map((result) => [result.dietTagId, result.score]));
 
-    await syncMenuForRestaurant(connector, menuUrl, restaurantId, {menu});
+    const syncedMenu = await syncMenuForRestaurant(connector, menuUrl, restaurantId, {menu});
+    if (syncedMenu.providerNativeId || syncedMenu.providerIdentityJson) {
+        providerRef = await providerRefService.ensureProviderRef({
+            restaurantId,
+            providerKey: connector.providerKey,
+            externalId,
+            providerNativeId: syncedMenu.providerNativeId ?? menu.providerNativeId ?? null,
+            providerIdentityJson: syncedMenu.providerIdentityJson ?? menu.providerIdentityJson ?? null,
+            url: menuUrl,
+        });
+    }
     await checkDietOverrideAlerts(restaurantId, connector.providerKey, preScores);
-    await updateLastSyncAt(restaurantId, connector.providerKey);
+    await updateLastSyncAt(providerRef.id);
 
     job.status = 'completed';
     job.restaurantsSynced = 1;
@@ -910,31 +1053,14 @@ async function syncMenuForRestaurant(
     restaurantId: string,
     options: {
         requireMenuItems?: boolean;
-        menu?: {
-            categories: Array<{
-                name: string;
-                items: Array<{
-                    externalId: string;
-                    name: string;
-                    description?: string | null;
-                    dietContext?: string | null;
-                    allergens?: string[] | null;
-                    price?: number | null;
-                    currency?: string | null;
-                }>;
-            }>;
-            restaurantDetails?: {
-                address?: string | null;
-                addressLine2?: string | null;
-                city?: string | null;
-                postalCode?: string | null;
-                country?: string | null;
-                openingHours?: string | null;
-                openingDays?: string | null;
-            };
-        };
+        menu?: ProviderMenu;
     } = {},
-): Promise<{categoryCount: number; itemCount: number}> {
+): Promise<{
+    categoryCount: number;
+    itemCount: number;
+    providerNativeId?: string | null;
+    providerIdentityJson?: string | null;
+}> {
     const requireMenuItems = options.requireMenuItems !== false;
     const menu = options.menu ?? await connector.fetchMenu(externalId);
     const normalizedCategories = normalizeProviderMenuCategories(menu.categories);
@@ -975,6 +1101,8 @@ async function syncMenuForRestaurant(
     return {
         categoryCount: normalizedCategories.length,
         itemCount,
+        providerNativeId: menu.providerNativeId ?? null,
+        providerIdentityJson: menu.providerIdentityJson ?? null,
     };
 }
 
@@ -1084,15 +1212,7 @@ function normalizeProviderMenuCategories(
 
 async function applyRestaurantDetailsFromMenu(
     restaurantId: string,
-    menu: { restaurantDetails?: {
-        address?: string | null;
-        addressLine2?: string | null;
-        city?: string | null;
-        postalCode?: string | null;
-        country?: string | null;
-        openingHours?: string | null;
-        openingDays?: string | null;
-    } },
+    menu: ProviderMenu,
 ): Promise<void> {
     const details = menu.restaurantDetails;
     if (!details) return;
@@ -1103,6 +1223,8 @@ async function applyRestaurantDetailsFromMenu(
         city?: string;
         postalCode?: string;
         country?: string;
+        latitude?: number | null;
+        longitude?: number | null;
         openingHours?: string | null;
         openingDays?: string | null;
     } = {};
@@ -1112,6 +1234,8 @@ async function applyRestaurantDetailsFromMenu(
     if (details.city?.trim()) patch.city = details.city.trim();
     if (details.postalCode?.trim()) patch.postalCode = details.postalCode.trim();
     if (details.country?.trim()) patch.country = details.country.trim();
+    if (details.latitude !== undefined) patch.latitude = details.latitude ?? null;
+    if (details.longitude !== undefined) patch.longitude = details.longitude ?? null;
     if (details.openingHours !== undefined) patch.openingHours = details.openingHours?.trim() || null;
     if (details.openingDays !== undefined) patch.openingDays = details.openingDays?.trim() || null;
 
@@ -1128,15 +1252,48 @@ function stringifyAllergens(allergens?: string[] | null): string | null {
     return [...new Set(normalized)].join(', ');
 }
 
-async function updateLastSyncAt(restaurantId: string, providerKey: string): Promise<void> {
+async function updateLastSyncAt(providerRefId: string): Promise<void> {
     const refRepo = AppDataSource.getRepository(RestaurantProviderRef);
     const ref = await refRepo.findOne({
-        where: {restaurantId, providerKey, status: 'active'},
+        where: {id: providerRefId},
     });
     if (ref) {
         ref.lastSyncAt = new Date();
         await refRepo.save(ref);
     }
+}
+
+async function persistListingAvailabilitySnapshot(
+    incoming: ProviderRestaurant,
+    restaurantId: string,
+    providerRefId: string,
+    providerLocationRefId: string,
+): Promise<void> {
+    const observedAt = new Date();
+    const expiresAt = new Date(
+        observedAt.getTime() + (settings.value.providerAvailabilityListingSnapshotTtlSeconds * 1000),
+    );
+    const coverage = await restaurantAvailabilityService.upsertCoverageFromListing({
+        restaurantId,
+        restaurantProviderRefId: providerRefId,
+        providerLocationRefId,
+        observedAt,
+        sourceUrl: incoming.url,
+        rawListingJson: incoming.rawListingJson ?? null,
+    });
+
+    await restaurantAvailabilityService.recordServiceSnapshot({
+        coverageId: coverage.id,
+        serviceType: 'delivery',
+        isAvailable: true,
+        observedAt,
+        expiresAt,
+        rawPayloadJson: incoming.rawListingJson ?? JSON.stringify({
+            source: 'listing',
+            url: incoming.url,
+            providerNativeId: incoming.providerNativeId ?? null,
+        }),
+    });
 }
 
 function toResult(job: SyncJob): Omit<SyncResult, 'restaurants'> {

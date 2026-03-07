@@ -24,6 +24,12 @@ export class Restaurant {
     @Column("varchar", {name: "country", length: 100, default: ""})
     country!: string;
 
+    @Column("double", {name: "latitude", nullable: true})
+    latitude?: number | null;
+
+    @Column("double", {name: "longitude", nullable: true})
+    longitude?: number | null;
+
     @Column("text", {name: "opening_hours", nullable: true})
     openingHours?: string | null;
 

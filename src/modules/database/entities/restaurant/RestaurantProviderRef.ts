@@ -19,6 +19,12 @@ export class RestaurantProviderRef {
     @Column("varchar", {name: "external_id", length: 255, nullable: true})
     externalId?: string | null;
 
+    @Column("varchar", {name: "provider_native_id", length: 255, nullable: true})
+    providerNativeId?: string | null;
+
+    @Column("longtext", {name: "provider_identity_json", nullable: true})
+    providerIdentityJson?: string | null;
+
     @Column("varchar", {name: "url", length: 500})
     url!: string;
 

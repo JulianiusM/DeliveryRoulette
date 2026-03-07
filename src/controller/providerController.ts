@@ -8,10 +8,13 @@
 import * as ConnectorRegistry from '../providers/ConnectorRegistry';
 import {ProviderKey} from '../providers/ProviderKey';
 import {ConnectorCapabilities} from '../providers/DeliveryProviderConnector';
-import {queueSync, queueImportFromUrl, queueProviderRefresh, QueuedSyncJob} from '../modules/sync/ProviderSyncService';
+import {queueListingSync, queueImportFromUrl, queueProviderRefresh, QueuedSyncJob} from '../modules/sync/ProviderSyncService';
 import {isHeuristicRefreshRunning, startHeuristicRefresh} from '../modules/sync/HeuristicRefreshService';
 import {AppDataSource} from '../modules/database/dataSource';
 import {ProviderSourceConfig} from '../modules/database/entities/provider/ProviderSourceConfig';
+import * as providerLocationRefService from '../modules/database/services/ProviderLocationRefService';
+import * as userLocationService from '../modules/database/services/UserLocationService';
+import * as userPreferenceService from '../modules/database/services/UserPreferenceService';
 import {ExpectedError} from '../modules/lib/errors';
 import settings from '../modules/settings';
 
@@ -89,13 +92,48 @@ export async function syncProvider(userId: string, providerKey: string, listingU
         }
     }
 
-    // Save config
-    await saveSourceConfig(userId, providerKey, listingUrl.trim());
+    const normalizedListingUrl = listingUrl.trim();
 
-    return await queueSync({
-        providerKey: connector.providerKey as ProviderKey,
-        query: listingUrl.trim(),
-    });
+    // Save config
+    await saveSourceConfig(userId, providerKey, normalizedListingUrl);
+
+    let providerLocationRefId: string | null = null;
+    const numericUserId = Number(userId);
+    if (Number.isInteger(numericUserId) && numericUserId > 0 && connector.resolveLocation) {
+        const preference = await userPreferenceService.getByUserId(numericUserId);
+        const activeLocation = await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+            numericUserId,
+            preference?.deliveryArea ?? null,
+        );
+
+        if (activeLocation) {
+            const resolution = await connector.resolveLocation({
+                label: activeLocation.label,
+                addressLine1: activeLocation.addressLine1 ?? null,
+                addressLine2: activeLocation.addressLine2 ?? null,
+                city: activeLocation.city ?? null,
+                postalCode: activeLocation.postalCode ?? null,
+                country: activeLocation.country ?? null,
+                latitude: activeLocation.latitude ?? null,
+                longitude: activeLocation.longitude ?? null,
+                listingUrl: normalizedListingUrl,
+            });
+
+            if (resolution) {
+                const providerLocationRef = await providerLocationRefService.upsertResolvedLocation(
+                    activeLocation.id,
+                    resolution,
+                );
+                providerLocationRefId = providerLocationRef.id;
+            }
+        }
+    }
+
+    return await queueListingSync(
+        connector.providerKey as ProviderKey,
+        normalizedListingUrl,
+        providerLocationRefId,
+    );
 }
 
 /**

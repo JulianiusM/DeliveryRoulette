@@ -1,5 +1,14 @@
 import {ProviderKey} from "./ProviderKey";
-import {ProviderMenu, ProviderRestaurant, RateLimitPolicy} from "./ProviderTypes";
+import {
+    ProviderLocationContext,
+    ProviderLocationInput,
+    ProviderLocationResolution,
+    ProviderMenu,
+    ProviderRestaurant,
+    ProviderRestaurantAvailability,
+    ProviderRestaurantListRequest,
+    RateLimitPolicy,
+} from "./ProviderTypes";
 
 /**
  * Capabilities advertised by a connector.
@@ -44,8 +53,22 @@ export interface DeliveryProviderConnector {
     /** Human-readable display name (e.g. "Uber Eats"). */
     readonly displayName: string;
 
-    /** List restaurants available from this provider for the given query. */
-    listRestaurants(query: string): Promise<ProviderRestaurant[]>;
+    /** Resolve provider-specific location metadata for a saved user location. */
+    resolveLocation?(location: ProviderLocationInput): Promise<ProviderLocationResolution | null>;
+
+    /** List restaurants available from this provider for the given request. */
+    listRestaurants(request: ProviderRestaurantListRequest): Promise<ProviderRestaurant[]>;
+
+    /**
+     * Fetch availability for one provider-native restaurant identity at a specific
+     * user location and time. Phase 1 callers may persist coarse snapshots from the
+     * listing page instead when a connector does not implement this yet.
+     */
+    fetchAvailability?(
+        providerRestaurantId: string,
+        locationContext: ProviderLocationContext,
+        orderTime: Date,
+    ): Promise<ProviderRestaurantAvailability[]>;
 
     /** Fetch the full menu for a restaurant identified by its external ID. */
     fetchMenu(externalId: string): Promise<ProviderMenu>;

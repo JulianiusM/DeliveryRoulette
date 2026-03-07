@@ -1,6 +1,7 @@
 import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
 import * as dietOverrideService from './DietOverrideService';
+import * as restaurantAvailabilityService from './RestaurantAvailabilityService';
 import {
     getRestaurantCuisineTokens,
     matchesCuisineFilter,
@@ -8,12 +9,17 @@ import {
 } from './CuisineInferenceService';
 import {normalizeText, getActiveMenuItems} from './DietInferenceService';
 import {computeIsOpenNowFromOpeningHours} from '../../lib/openingHours';
+import {ProviderServiceType} from '../../../providers/ProviderTypes';
 
 export type SuggestionFavoriteMode = 'prefer' | 'only' | 'ignore';
 
 // ── Types ───────────────────────────────────────────────────
 
 export interface SuggestionFilters {
+    /** Saved user location ID used to scope provider availability snapshots */
+    locationId?: string;
+    /** Delivery vs pickup availability filter. Defaults to delivery. */
+    serviceType?: ProviderServiceType;
     /** Diet tag IDs the restaurant must support */
     dietTagIds?: string[];
     /** Allergen tokens to exclude — restaurants with items containing these allergens are deprioritized */
@@ -74,6 +80,17 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
     const qb = repo.createQueryBuilder('r')
         .leftJoinAndSelect('r.providerCuisines', 'rc')
         .where('r.is_active = :active', {active: 1});
+
+    if (filters.locationId) {
+        const availableRestaurantIds = await restaurantAvailabilityService.listAvailableRestaurantIdsForLocation(
+            filters.locationId,
+            filters.serviceType ?? 'delivery',
+        );
+        if (availableRestaurantIds.length === 0) {
+            return [];
+        }
+        qb.andWhere('r.id IN (:...availableRestaurantIds)', {availableRestaurantIds});
+    }
 
     qb.orderBy('r.name', 'ASC');
     const active = await qb.getMany();

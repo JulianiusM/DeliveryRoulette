@@ -1,6 +1,7 @@
 import {AppDataSource} from '../dataSource';
 import {Restaurant} from '../entities/restaurant/Restaurant';
 import {RestaurantCuisine} from '../entities/restaurant/RestaurantCuisine';
+import {RestaurantProviderRef} from '../entities/restaurant/RestaurantProviderRef';
 import {ProviderRestaurant} from '../../../providers/ProviderTypes';
 import {filterRestaurantsBySearch} from '../../lib/restaurantSearch';
 
@@ -16,6 +17,8 @@ export async function createRestaurant(data: {
     city: string;
     postalCode: string;
     country?: string;
+    latitude?: number | null;
+    longitude?: number | null;
     openingHours?: string | null;
     openingDays?: string | null;
     cuisineInferenceJson?: string | null;
@@ -35,6 +38,8 @@ export async function updateRestaurant(id: string, data: {
     city?: string;
     postalCode?: string;
     country?: string;
+    latitude?: number | null;
+    longitude?: number | null;
     openingHours?: string | null;
     openingDays?: string | null;
     cuisineInferenceJson?: string | null;
@@ -74,14 +79,15 @@ export async function listRestaurants(options: ListRestaurantsOptions = {}): Pro
  * Returns the restaurant ID.
  * Wrapped in a transaction to prevent partial writes.
  */
-export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<string> {
+export async function upsertFromProvider(
+    providerKey: string,
+    incoming: ProviderRestaurant,
+): Promise<string> {
     return AppDataSource.transaction(async (manager) => {
         const repo = manager.getRepository(Restaurant);
         const cuisineRepo = manager.getRepository(RestaurantCuisine);
-        const all = await repo.find();
-        const existing = all.find(
-            (r) => r.name.toLowerCase() === incoming.name.toLowerCase(),
-        );
+        const providerRefRepo = manager.getRepository(RestaurantProviderRef);
+        const existing = await findExistingRestaurant(repo, providerRefRepo, providerKey, incoming);
         const providerCuisines = normalizeCuisineList(incoming.cuisines);
 
         if (existing) {
@@ -91,6 +97,8 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
                 city: incoming.city ?? '',
                 postalCode: incoming.postalCode ?? '',
                 country: incoming.country ?? '',
+                latitude: incoming.latitude ?? existing.latitude ?? null,
+                longitude: incoming.longitude ?? existing.longitude ?? null,
                 openingHours: incoming.openingHours ?? existing.openingHours ?? null,
                 openingDays: incoming.openingDays ?? existing.openingDays ?? null,
                 isActive: true,
@@ -112,6 +120,8 @@ export async function upsertFromProvider(incoming: ProviderRestaurant): Promise<
             city: incoming.city ?? '',
             postalCode: incoming.postalCode ?? '',
             country: incoming.country ?? '',
+            latitude: incoming.latitude ?? null,
+            longitude: incoming.longitude ?? null,
             openingHours: incoming.openingHours ?? null,
             openingDays: incoming.openingDays ?? null,
             isActive: true,
@@ -164,4 +174,103 @@ function normalizeCuisineList(cuisines?: string[] | null): string[] {
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0);
     return [...new Set(normalized)];
+}
+
+async function findExistingRestaurant(
+    restaurantRepo: import('typeorm').Repository<Restaurant>,
+    providerRefRepo: import('typeorm').Repository<RestaurantProviderRef>,
+    providerKey: string,
+    incoming: ProviderRestaurant,
+): Promise<Restaurant | null> {
+    const normalizedExternalId = normalizeIdentityValue(incoming.externalId);
+    const normalizedProviderNativeId = normalizeIdentityValue(incoming.providerNativeId);
+
+    if (normalizedExternalId || normalizedProviderNativeId) {
+        const providerRefQb = providerRefRepo.createQueryBuilder('provider_ref')
+            .where('LOWER(provider_ref.providerKey) = LOWER(:providerKey)', {providerKey});
+
+        if (normalizedExternalId && normalizedProviderNativeId) {
+            providerRefQb.andWhere(
+                '(provider_ref.externalId = :externalId OR provider_ref.providerNativeId = :providerNativeId)',
+                {
+                    externalId: normalizedExternalId,
+                    providerNativeId: normalizedProviderNativeId,
+                },
+            );
+        } else if (normalizedExternalId) {
+            providerRefQb.andWhere('provider_ref.externalId = :externalId', {externalId: normalizedExternalId});
+        } else if (normalizedProviderNativeId) {
+            providerRefQb.andWhere('provider_ref.providerNativeId = :providerNativeId', {
+                providerNativeId: normalizedProviderNativeId,
+            });
+        }
+
+        const providerRef = await providerRefQb.getOne();
+        if (providerRef) {
+            return await restaurantRepo.findOne({where: {id: providerRef.restaurantId}});
+        }
+    }
+
+    const restaurants = await restaurantRepo.find();
+    const incomingName = normalizeTextKey(incoming.name);
+    const incomingExactAddress = buildExactAddressKey({
+        addressLine1: incoming.address ?? null,
+        addressLine2: incoming.addressLine2 ?? null,
+        city: incoming.city ?? null,
+        postalCode: incoming.postalCode ?? null,
+        country: incoming.country ?? null,
+    });
+    const incomingPostalCity = buildPostalCityKey(incoming.city ?? null, incoming.postalCode ?? null);
+
+    return restaurants.find((restaurant) => {
+        if (normalizeTextKey(restaurant.name) !== incomingName) {
+            return false;
+        }
+
+        const restaurantExactAddress = buildExactAddressKey(restaurant);
+        if (incomingExactAddress && restaurantExactAddress && incomingExactAddress === restaurantExactAddress) {
+            return true;
+        }
+
+        const restaurantPostalCity = buildPostalCityKey(restaurant.city, restaurant.postalCode);
+        return Boolean(incomingPostalCity && restaurantPostalCity && incomingPostalCity === restaurantPostalCity);
+    }) ?? null;
+}
+
+function normalizeIdentityValue(value?: string | null): string | null {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+}
+
+function normalizeTextKey(value?: string | null): string {
+    return (value ?? '').trim().toLowerCase();
+}
+
+function buildExactAddressKey(location: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+}): string | null {
+    const parts = [
+        location.addressLine1,
+        location.addressLine2,
+        location.city,
+        location.postalCode,
+        location.country,
+    ]
+        .map((value) => normalizeTextKey(value))
+        .filter((value) => value.length > 0);
+
+    return parts.length >= 3 ? parts.join('|') : null;
+}
+
+function buildPostalCityKey(city?: string | null, postalCode?: string | null): string | null {
+    const normalizedCity = normalizeTextKey(city);
+    const normalizedPostalCode = normalizeTextKey(postalCode);
+    if (!normalizedCity || !normalizedPostalCode) {
+        return null;
+    }
+    return `${normalizedPostalCode}|${normalizedCity}`;
 }

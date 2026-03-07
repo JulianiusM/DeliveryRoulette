@@ -517,7 +517,7 @@ describe('listRestaurants', () => {
             jest.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
         }
 
-        const result = await connector.listRestaurants(query);
+        const result = await connector.listRestaurants({query});
         expect(result).toHaveLength(expectCount);
     });
 });
@@ -535,7 +535,7 @@ describe('listRestaurants failures', () => {
             } as Response);
         }
 
-        await expect(connector.listRestaurants(query)).rejects.toThrow(expectedError);
+        await expect(connector.listRestaurants({query})).rejects.toThrow(expectedError);
     });
 });
 
@@ -547,7 +547,7 @@ describe('listRestaurants externalId mapping', () => {
             text: async () => '<html></html>',
         } as Response);
 
-        const result = await connector.listRestaurants(query);
+        const result = await connector.listRestaurants({query});
         expect(result).toHaveLength(expected.length);
         result.forEach((restaurant, idx) => {
             expect(restaurant).toMatchObject(expected[idx]);

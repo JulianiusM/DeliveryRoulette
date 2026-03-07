@@ -6,6 +6,7 @@
 export interface DiscoveredRestaurant {
     name: string;
     menuUrl: string;
+    providerNativeId?: string | null;
     cuisines?: string | null;
     address?: string | null;
     city?: string | null;
@@ -13,6 +14,7 @@ export interface DiscoveredRestaurant {
     country?: string | null;
     openingHours?: string | null;
     openingDays?: string | null;
+    rawListingJson?: string | null;
 }
 
 /** A menu item parsed from a Lieferando menu page. */

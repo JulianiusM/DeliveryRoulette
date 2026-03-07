@@ -916,6 +916,8 @@ function extractFromNextDataListing(
                 country: 'DE',
                 openingHours,
                 openingDays,
+                providerNativeId: /^\d+$/.test(id) ? id : null,
+                rawListingJson: JSON.stringify(entry),
             },
         );
     }
@@ -1018,6 +1020,8 @@ function addDiscoveredRestaurant(
         country?: string | null;
         openingHours?: string | null;
         openingDays?: string | null;
+        providerNativeId?: string | null;
+        rawListingJson?: string | null;
     },
 ): void {
     const absoluteUrl = resolveUrl(href, pageUrl);
@@ -1033,6 +1037,8 @@ function addDiscoveredRestaurant(
             country: existing.country ?? details?.country ?? null,
             openingHours: existing.openingHours ?? details?.openingHours ?? null,
             openingDays: existing.openingDays ?? details?.openingDays ?? null,
+            providerNativeId: existing.providerNativeId ?? details?.providerNativeId ?? null,
+            rawListingJson: existing.rawListingJson ?? details?.rawListingJson ?? null,
         });
         return;
     }
@@ -1047,6 +1053,8 @@ function addDiscoveredRestaurant(
         country: details?.country ?? null,
         openingHours: details?.openingHours ?? null,
         openingDays: details?.openingDays ?? null,
+        providerNativeId: details?.providerNativeId ?? null,
+        rawListingJson: details?.rawListingJson ?? null,
     });
 }
 
