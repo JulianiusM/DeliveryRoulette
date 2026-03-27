@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import {DataSource} from 'typeorm';
 import bcrypt from "bcryptjs";
 import {User} from "../src/modules/database/entities/user/User";
+import {UserLocation} from "../src/modules/database/entities/user/UserLocation";
 
 dotenv.config({path: process.env.E2E_DOTENV_FILE ?? '.env.e2e'});
 
@@ -60,15 +61,30 @@ async function main() {
     // ---- Seed minimal fixture data ----
     // Example: create a test admin user. Replace with your own seeder logic.
     const userRepo = E2EDataSource.getRepository(User);
+    const userLocationRepo = E2EDataSource.getRepository(UserLocation);
     const passwordHash = await bcrypt.hash(process.env.E2E_ADMIN_PASSWORD!, 10);
-    await userRepo.save(userRepo.create({
+    const adminUser = await userRepo.save(userRepo.create({
         username: process.env.E2E_ADMIN_USERNAME!,
         name: process.env.E2E_ADMIN_USERNAME!,
         email: process.env.E2E_ADMIN_EMAIL!,
+        role: 'admin',
         password: passwordHash,
         isActive: true,
     }));
     console.log("Users created...")
+
+    await userLocationRepo.save(userLocationRepo.create({
+        userId: adminUser.id,
+        label: 'E2E Default Location',
+        addressLine1: '123 Test Street',
+        city: 'Test City',
+        postalCode: '12345',
+        country: 'Germany',
+        latitude: 52.52,
+        longitude: 13.405,
+        isDefault: true,
+    }));
+    console.log("Default user location created...")
 
     // Seed diet tags (idempotent)
     const {seedDietTags} = await import('./seedDietTags');

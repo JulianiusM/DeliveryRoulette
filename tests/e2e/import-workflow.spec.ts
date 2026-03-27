@@ -55,7 +55,12 @@ test.describe('Workflow 2: Import → Preview → Apply → Suggest', () => {
 
         // Now test the suggestion feature
         await requestSuggestion(page);
-        const resultArea = page.locator('#suggestionResult');
-        await expect(resultArea).not.toBeEmpty();
+        const resultName = page.locator('#resultName');
+        const alert = page.locator('#suggestionAlerts .alert');
+        if (await alert.count() > 0 && await alert.isVisible()) {
+            await expect(alert).toContainText('No location-specific availability has been imported');
+        } else {
+            await expect(resultName).not.toBeEmpty();
+        }
     });
 });

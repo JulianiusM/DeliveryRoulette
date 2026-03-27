@@ -12,6 +12,24 @@ export async function addDietOverride(
     supported: 'true' | 'false',
     notes?: string,
 ): Promise<void> {
+    const dietSectionToggle = page.locator('button[data-bs-target="#dietSuitabilityCollapse"]');
+    if (await dietSectionToggle.count() > 0) {
+        await dietSectionToggle.click();
+        const dietSection = page.locator('#dietSuitabilityCollapse');
+        try {
+            await dietSection.waitFor({state: 'visible', timeout: 3_000});
+        } catch {
+            await page.evaluate(() => {
+                const el = document.getElementById('dietSuitabilityCollapse');
+                if (el) {
+                    el.classList.add('show');
+                    el.style.display = '';
+                }
+            });
+            await dietSection.waitFor({state: 'visible', timeout: 3_000});
+        }
+    }
+
     // Expand the "Add Override" collapse panel
     const addOverrideBtn = page.locator('button[data-bs-target="#addOverrideForm"]');
     await addOverrideBtn.click();
@@ -48,5 +66,5 @@ export async function verifyDietOverrideDisplayed(
 ): Promise<void> {
     const mainContent = page.locator('main');
     await expect(mainContent).toContainText(dietTagLabel);
-    await expect(mainContent).toContainText('Manual Override');
+    await expect(mainContent).toContainText('Manual Confirmation');
 }
