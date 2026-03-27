@@ -34,7 +34,6 @@ function createMockRepo(data: any[]) {
         create: jest.fn(),
         save: jest.fn(),
         remove: jest.fn(),
-        count: jest.fn().mockResolvedValue(sampleDietTags.length),
     };
 }
 
@@ -55,7 +54,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[0];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -80,7 +78,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[1];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -101,7 +98,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[2];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -119,7 +115,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[3];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -139,7 +134,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[4];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -160,7 +154,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[5];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -186,7 +179,6 @@ describe('DietOverrideService', () => {
             const testCase = effectiveSuitabilityTestData[6];
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo(testCase.overrides);
-            const inferenceRepo = createMockRepo(testCase.inferences);
 
             setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
@@ -204,7 +196,6 @@ describe('DietOverrideService', () => {
         test('returns results for all diet tags', async () => {
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo([]);
-            const inferenceRepo = createMockRepo([]);
 
             setupMockRepositories(tagRepo, overrideRepo, []);
 
@@ -217,18 +208,6 @@ describe('DietOverrideService', () => {
         test('handles malformed reasonsJson gracefully', async () => {
             const tagRepo = createMockRepo(sampleDietTags);
             const overrideRepo = createMockRepo([]);
-            const inferenceRepo = createMockRepo([
-                {
-                    id: 'inf-1',
-                    restaurantId: 'r-1',
-                    dietTagId: 'tag-vegan',
-                    score: 25,
-                    confidence: 'MEDIUM' as const,
-                    reasonsJson: 'invalid json{{{',
-                    engineVersion: '1.0.0',
-                    computedAt: new Date(),
-                },
-            ]);
 
             setupMockRepositories(tagRepo, overrideRepo, [
                 {
