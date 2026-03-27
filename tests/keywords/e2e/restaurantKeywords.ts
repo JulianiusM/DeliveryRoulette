@@ -58,10 +58,9 @@ export async function navigateToRestaurantDetail(
     await page.goto(urls.list);
     await page.waitForLoadState('networkidle');
     const tableRow = page.locator('tr', { hasText: restaurantName });
-    let viewLink = tableRow.locator('a[href*="/restaurants/"]').first();
-    if (await viewLink.count() === 0) {
-        viewLink = page.locator('a[href^="/restaurants/"]', {hasText: restaurantName}).first();
-    }
+    const tableViewLink = tableRow.locator('a[href*="/restaurants/"]').first();
+    const cardViewLink = page.locator('a[href^="/restaurants/"]', { hasText: restaurantName }).first();
+    const viewLink = (await tableViewLink.count()) > 0 ? tableViewLink : cardViewLink;
     await viewLink.click();
     await page.waitForLoadState('networkidle');
 }

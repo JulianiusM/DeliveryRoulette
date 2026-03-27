@@ -7,6 +7,9 @@ import {UserLocation} from "../src/modules/database/entities/user/UserLocation";
 
 dotenv.config({path: process.env.E2E_DOTENV_FILE ?? '.env.e2e'});
 
+const E2E_DEFAULT_LATITUDE = Number(process.env.E2E_DEFAULT_LATITUDE ?? '52.52');
+const E2E_DEFAULT_LONGITUDE = Number(process.env.E2E_DEFAULT_LONGITUDE ?? '13.405');
+
 // ---- Guardrails: refuse to run on non-E2E DBs ----
 const DB_NAME = process.env.E2E_DB_NAME ?? '';
 if (!/e2e/i.test(DB_NAME)) {
@@ -80,8 +83,8 @@ async function main() {
         city: 'Test City',
         postalCode: '12345',
         country: 'Germany',
-        latitude: 52.52,
-        longitude: 13.405,
+        latitude: E2E_DEFAULT_LATITUDE,
+        longitude: E2E_DEFAULT_LONGITUDE,
         isDefault: true,
     }));
     console.log("Default user location created...")
