@@ -12,10 +12,20 @@ jest.mock('../../src/modules/database/dataSource', () => ({
     },
 }));
 
+jest.mock('../../src/modules/database/services/DietInferenceService', () => {
+    const actual = jest.requireActual('../../src/modules/database/services/DietInferenceService');
+    return {
+        ...actual,
+        ensureCurrentResultsForRestaurant: jest.fn(),
+    };
+});
+
 import {AppDataSource} from '../../src/modules/database/dataSource';
 import * as dietOverrideService from '../../src/modules/database/services/DietOverrideService';
+import {ensureCurrentResultsForRestaurant} from '../../src/modules/database/services/DietInferenceService';
 
 const mockGetRepository = AppDataSource.getRepository as jest.Mock;
+const mockEnsureCurrentResultsForRestaurant = ensureCurrentResultsForRestaurant as jest.Mock;
 
 function createMockRepo(data: any[]) {
     return {
@@ -24,7 +34,15 @@ function createMockRepo(data: any[]) {
         create: jest.fn(),
         save: jest.fn(),
         remove: jest.fn(),
+        count: jest.fn().mockResolvedValue(sampleDietTags.length),
     };
+}
+
+function setupMockRepositories(tagRepo: ReturnType<typeof createMockRepo>, overrideRepo: ReturnType<typeof createMockRepo>, inferences: any[]): void {
+    mockGetRepository
+        .mockReturnValueOnce(tagRepo)
+        .mockReturnValueOnce(overrideRepo);
+    mockEnsureCurrentResultsForRestaurant.mockResolvedValue(inferences);
 }
 
 describe('DietOverrideService', () => {
@@ -39,10 +57,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -67,10 +82,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -91,10 +103,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -112,10 +121,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -135,10 +141,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -159,10 +162,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -188,10 +188,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo(testCase.overrides);
             const inferenceRepo = createMockRepo(testCase.inferences);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, testCase.inferences);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -209,10 +206,7 @@ describe('DietOverrideService', () => {
             const overrideRepo = createMockRepo([]);
             const inferenceRepo = createMockRepo([]);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, []);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
@@ -236,10 +230,18 @@ describe('DietOverrideService', () => {
                 },
             ]);
 
-            mockGetRepository
-                .mockReturnValueOnce(tagRepo)
-                .mockReturnValueOnce(overrideRepo)
-                .mockReturnValueOnce(inferenceRepo);
+            setupMockRepositories(tagRepo, overrideRepo, [
+                {
+                    id: 'inf-1',
+                    restaurantId: 'r-1',
+                    dietTagId: 'tag-vegan',
+                    score: 25,
+                    confidence: 'MEDIUM' as const,
+                    reasonsJson: 'invalid json{{{',
+                    engineVersion: '1.0.0',
+                    computedAt: new Date(),
+                },
+            ]);
 
             const results = await dietOverrideService.computeEffectiveSuitability('r-1');
 
