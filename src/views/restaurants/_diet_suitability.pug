@@ -1,16 +1,16 @@
 .diet-suitability-content
     .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
-        p.text-white-50.small.mb-0 Manual overrides sit on top of heuristics. Re-run heuristics after menu imports, then open the relevant diet below if you need the evidence.
+        p.text-white-50.small.mb-0 Use this section to review each diet match. Manually confirmed results take priority over calculated ones.
         if userIsAdmin
             .d-flex.gap-2
                 form(method="POST" action=`/restaurants/${r.id}/diet/recompute`)
                     +csrf
-                    button.btn.btn-sm.btn-outline-info(type="submit" title="Re-run heuristic analysis")
+                    button.btn.btn-sm.btn-outline-info(type="submit" title="Refresh diet analysis")
                         i.bi.bi-arrow-repeat.me-1
-                        | Re-run Heuristics
+                        | Refresh Diet Analysis
                 button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
                     i.bi.bi-plus-lg.me-1
-                    | Add Override
+                    | Add Manual Match
 
     if userIsAdmin
         #addOverrideForm.collapse.mt-4
@@ -34,7 +34,7 @@
                             i.bi.bi-plus-lg.me-1
                             | Add
     else if user
-        p.text-white-50.small.mt-3.mb-0 Manual diet overrides are restricted to administrators because they affect the shared catalog.
+        p.text-white-50.small.mt-3.mb-0 Manual diet confirmations are limited to administrators because they affect the shared catalog.
 
     if dietSuitability.length === 0
         .restaurant-empty-state.mt-4
@@ -59,9 +59,9 @@
                                         span.badge.rounded-pill.text-bg-secondary No Data
 
                                     if ds.source === 'override'
-                                        span.badge.rounded-pill.text-bg-warning.text-dark Manual Override
+                                        span.badge.rounded-pill.text-bg-warning.text-dark Manually Set
                                     else if ds.source === 'inference'
-                                        span.badge.rounded-pill.text-bg-info.text-dark Heuristic
+                                        span.badge.rounded-pill.text-bg-info.text-dark Calculated
 
                                     if ds.inference
                                         span.badge.rounded-pill.text-bg-dark.border.border-secondary Score #{ds.inference.score}%
@@ -81,9 +81,9 @@
                                                 small.text-white-50 #{dietInsight.matchedCategories} / #{dietInsight.totalCategories} categories
                                         .col-md-4
                                             .restaurant-metric-tile
-                                                span.restaurant-metric-label Deduped rows
+                                                span.restaurant-metric-label Extra rows merged
                                                 strong.restaurant-metric-value #{dietInsight.duplicateMatchesFiltered}
-                                                small.text-white-50 #{dietInsight.matchedRows} raw matches, #{dietInsight.excludedUniqueItems} excluded
+                                                small.text-white-50 #{dietInsight.matchedRows} item hits checked, #{dietInsight.excludedUniqueItems} skipped
 
                                     .progress.mt-3(role="progressbar" aria-label=`${ds.dietTagLabel} share` aria-valuenow=dietInsight.sharePercent aria-valuemin="0" aria-valuemax="100")
                                         .progress-bar(class=ds.supported === true ? 'bg-success' : ds.supported === false ? 'bg-danger' : 'bg-secondary' style=`width:${dietInsight.sharePercent}%`)
@@ -108,7 +108,7 @@
                                 .restaurant-panel
                                     h3.h6.mb-2
                                         i.bi.bi-person-check.me-1
-                                        | Manual Override
+                                        | Manual Confirmation
                                     if ds.override && ds.override.notes
                                         p.mb-2 #{ds.override.notes}
                                     else
@@ -118,14 +118,14 @@
                                     if ds.inference
                                         hr.border-secondary
                                         p.text-white-50.small.mb-0
-                                            | Heuristic score still available: #{ds.inference.score}% (#{ds.inference.confidence})
+                                            | Calculated score: #{ds.inference.score}% (#{ds.inference.confidence})
 
                         else if ds.source === 'inference' && ds.inference
                             .collapse.mt-3(id=`explanation-${ds.dietTagId}`)
                                 .restaurant-panel
                                     h3.h6.mb-3
                                         i.bi.bi-robot.me-1
-                                        | Heuristic Analysis
+                                        | How this was matched
                                     if reasons && reasons.scoreBreakdown
                                         p.text-white-50.small.mb-3
                                             | Coverage #{reasons.scoreBreakdown.coverageScore || reasons.scoreBreakdown.ratioScore}%,
@@ -151,7 +151,7 @@
 
                                     if reasons && reasons.excludedItems && reasons.excludedItems.length > 0
                                         hr.border-secondary
-                                        p.text-warning.small.mb-2 Safeguards excluded these candidates:
+                                        p.text-warning.small.mb-2 These items were ignored to keep the match accurate:
                                         ul.list-unstyled.mb-0
                                             each ex in reasons.excludedItems
                                                 li.mb-2

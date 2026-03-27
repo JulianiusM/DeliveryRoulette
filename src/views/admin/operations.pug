@@ -13,12 +13,12 @@ block body
                     .col-lg-8
                         p.app-eyebrow.mb-2 Administration
                         h1.display-5.fw-semibold.mb-2 Admin Operations
-                        p.lead.text-white-50.mb-0 Global maintenance, bulk imports, sync queue review, and heuristic controls live here. User-facing location imports stay on the Location Imports page.
+                        p.lead.text-white-50.mb-0 Use this page for system-wide refreshes, bulk imports, and background job review. Saved-location imports stay on the Location Imports page.
                     .col-lg-4
                         .row.g-3
                             .col-6
                                 .app-stat-card
-                                    span.app-stat-label Heuristics
+                                    span.app-stat-label Diet refresh
                                     strong.app-stat-value #{maintenance.heuristicRefreshRunning ? 'Running' : 'Idle'}
                             .col-6
                                 .app-stat-card
@@ -33,13 +33,13 @@ block body
                 .row.g-4
                     .col-lg-6
                         .app-panel.app-provider-maintenance-card.h-100
-                            h2.h5.mb-2 Re-run All Heuristics
-                            p.text-white-50.small.mb-3 Refresh stored inference results for all restaurants after scoring, keyword, or rule changes.
+                            h2.h5.mb-2 Refresh Diet Analysis
+                            p.text-white-50.small.mb-3 Recalculate diet matches for every restaurant after changing diet rules or menu data.
                             form(method="POST" action="/admin/maintenance/heuristics")
                                 +csrf
                                 button.btn.btn-outline-info(type="submit" disabled=maintenance.heuristicRefreshRunning)
                                     i.bi.bi-cpu.me-1
-                                    | #{maintenance.heuristicRefreshRunning ? 'Heuristic Refresh Running' : 'Re-run All Heuristics'}
+                                    | #{maintenance.heuristicRefreshRunning ? 'Diet Refresh Running' : 'Refresh Diet Analysis'}
                     .col-lg-6
                         .app-panel.app-provider-maintenance-card.h-100
                             h2.h5.mb-2 Reimport Provider Data
@@ -86,5 +86,5 @@ block body
                                 span.app-icon-badge.is-success
                                     i.bi.bi-sliders
                                 div
-                                    h2.h5.mb-1 Diet Heuristics
-                                    p.text-white-50.small.mb-0 Edit global diet keyword and dish rules.
+                                    h2.h5.mb-1 Diet Rules
+                                    p.text-white-50.small.mb-0 Edit the shared keywords and common dishes used for diet matching.

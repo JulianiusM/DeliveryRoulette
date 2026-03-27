@@ -10,6 +10,10 @@ block body
     - const favoriteFilter = (data && data.favoriteFilter) || 'all'
     - const suggestionFilter = (data && data.suggestionFilter) || 'all'
     - const openFilter = (data && data.openFilter) || 'all'
+    - const dietTags = (data && data.dietTags) || []
+    - const selectedDietTagIds = (data && data.selectedDietTagIds) || []
+    - const selectedDietLabels = dietTags.filter((tag) => selectedDietTagIds.includes(tag.id)).map((tag) => tag.label)
+    - const sort = (data && data.sort) || 'default'
     - const activeCount = cards.filter((card) => card.restaurant.isActive).length
     - const favoriteCount = cards.filter((card) => card.isFavorite).length
     - const openCount = cards.filter((card) => card.isOpenNow === true).length
@@ -22,7 +26,7 @@ block body
                         p.text-uppercase.small.text-white-50.mb-2 Restaurant intelligence
                         h1.display-5.fw-semibold.mb-2 Restaurants
                         p.lead.text-white-50.mb-0
-                            | Scan real menu coverage, diet variety, cuisine inference, and your personal flags in one place.
+                            | Compare menus, diet options, cuisine hints, and your personal flags in one place.
                     .col-lg-4
                         .row.g-3
                             .col-4
@@ -38,7 +42,15 @@ block body
                                     span.restaurant-stat-label Open now
                                     strong.restaurant-stat-value #{openCount}
                 .d-flex.flex-wrap.justify-content-between.align-items-center.gap-2.mt-4
-                    p.text-white-50.small.mb-0 #{favoriteCount} favorites in current view
+                    .d-flex.flex-wrap.align-items-center.gap-2
+                        if selectedDietLabels.length > 0
+                            p.text-white-50.small.mb-0 #{selectedDietLabels.length} diet filter#{selectedDietLabels.length === 1 ? '' : 's'} active
+                            each label in selectedDietLabels
+                                span.badge.rounded-pill.text-bg-light.text-dark #{label}
+                            if sort === 'selected_diet_score'
+                                span.badge.rounded-pill.text-bg-info.text-dark Sorted by diet match
+                        else
+                            p.text-white-50.small.mb-0 #{favoriteCount} favorites in current view
                     if userIsAdmin
                         a.btn.btn-success(href="/restaurants/new")
                             i.bi.bi-plus-lg.me-1
@@ -81,13 +93,39 @@ block body
                             option(value="open" selected=(openFilter === 'open')) Open
                             option(value="closed" selected=(openFilter === 'closed')) Closed
                             option(value="unknown" selected=(openFilter === 'unknown')) Unknown
+                    .col-12.col-xl-8
+                        label.form-label.d-block Diet match
+                        if dietTags.length
+                            .d-flex.flex-wrap.gap-3
+                                each tag in dietTags
+                                    .form-check
+                                        input.form-check-input(
+                                            type="checkbox"
+                                            name="dietTagIds"
+                                            value=tag.id
+                                            id=`dietFilter-${tag.key}`
+                                            checked=selectedDietTagIds.includes(tag.id)
+                                        )
+                                        label.form-check-label(for=`dietFilter-${tag.key}`) #{tag.label}
+                            .form-text.text-white-50 Show only restaurants that support every checked diet.
+                        else
+                            p.text-white-50.small.mb-0 No diet filters are available yet.
+                    .col-sm-6.col-xl-4
+                        label.form-label(for="sortFilter") Sort
+                        select#sortFilter.form-select.text-bg-dark(name="sort")
+                            option(value="default" selected=(sort === 'default')) Current order
+                            option(value="selected_diet_score" selected=(sort === 'selected_diet_score')) Selected diet match
+                        if selectedDietTagIds.length > 0
+                            .form-text.text-white-50 Sort by the weakest selected-diet score first. Manually confirmed diets count as verified.
+                        else
+                            .form-text.text-white-50 Select one or more diets to make diet-based ranking useful.
                     .col-12.d-flex.flex-wrap.gap-2.justify-content-between.align-items-center
                         if !user
                             p.text-white-50.small.mb-0 Preference filters use your personal flags once you are logged in. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
                         else if !userIsAdmin
-                            p.text-white-50.small.mb-0 Favorites and suggestion blocks are personal. Shared restaurant and menu edits are restricted to administrators.
+                            p.text-white-50.small.mb-0 Favorites and suggestion blocks are personal. Checked diets must all be supported. Shared restaurant and menu edits are restricted to administrators.
                         else
-                            p.text-white-50.small.mb-0 Preference filters are based on your saved restaurant flags. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
+                            p.text-white-50.small.mb-0 Preference filters are based on your saved restaurant flags. Checked diets must all be supported. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
                         .d-flex.gap-2
                             a.btn.btn-outline-light(href="/restaurants") Reset
                             button.btn.btn-primary(type="submit")
@@ -105,6 +143,7 @@ block body
                     - const insights = card.insightSummary || {menu: {}, topSupportedDiets: [], supportedDietCount: 0}
                     - const menu = insights.menu || {}
                     - const topSupported = insights.topSupportedDiets || []
+                    - const selectedDietMatches = card.selectedDietMatches || []
                     - const heuristicCuisines = ((card.cuisineProfile && card.cuisineProfile.cuisines) || []).slice(0, 3)
                     - const availabilityStatus = card.availabilityStatus || {state: 'unknown', summaryLabel: 'Hours unknown', detailLabel: 'No opening hours stored for this restaurant.'}
                     - const availabilityDetails = availabilityStatus.state === 'unknown' ? [] : [availabilityStatus.detailLabel, availabilityStatus.relativeLabel].filter(Boolean)
@@ -159,7 +198,19 @@ block body
                                         .restaurant-metric-tile
                                             span.restaurant-metric-label Duplicates
                                             strong.restaurant-metric-value #{menu.duplicatesFiltered || 0}
-                                            small.text-white-50 deduped rows
+                                            small.text-white-50 duplicate rows removed
+
+                                if selectedDietMatches.length > 0
+                                    .restaurant-panel.mb-3
+                                        .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2.mb-2
+                                            p.text-uppercase.small.text-white-50.mb-0 Selected diets
+                                            if sort === 'selected_diet_score' && card.selectedDietSortScore !== null
+                                                span.badge.rounded-pill.text-bg-light.text-dark Match score #{card.selectedDietSortScore}%
+                                        .d-flex.flex-wrap.gap-2
+                                            each match in selectedDietMatches
+                                                span.badge.rounded-pill(class=match.source === 'override' ? 'text-bg-warning text-dark' : 'text-bg-success')
+                                                    | #{match.dietTagLabel}
+                                                    span.ms-1 #{match.scoreLabel}
 
                                 if topSupported.length > 0
                                     .d-flex.flex-column.gap-3.mb-3
@@ -175,7 +226,7 @@ block body
                                                     span Variety #{diet.varietyPercent}%
                                 else
                                     .restaurant-panel.mb-3
-                                        p.text-white-50.small.mb-0 No supported diet profile inferred yet.
+                                        p.text-white-50.small.mb-0 No diet summary is available yet.
 
                                 .d-flex.flex-wrap.gap-2.mb-3
                                     each cuisine in card.providerCuisines

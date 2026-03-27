@@ -14,15 +14,30 @@ import {
 
 const app = express.Router();
 
-// GET /restaurants - List restaurants with search and active filter
+// GET /restaurants - List restaurants with overview filters
 app.get('/', asyncHandler(async (req: Request, res: Response) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const activeFilter = typeof req.query.active === 'string' ? req.query.active : undefined;
     const favoriteFilter = typeof req.query.favorite === 'string' ? req.query.favorite : undefined;
     const suggestionFilter = typeof req.query.suggestion === 'string' ? req.query.suggestion : undefined;
     const openFilter = typeof req.query.open === 'string' ? req.query.open : undefined;
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : undefined;
+    const selectedDietTagIds = Array.isArray(req.query.dietTagIds)
+        ? req.query.dietTagIds.filter((value): value is string => typeof value === 'string')
+        : typeof req.query.dietTagIds === 'string'
+            ? [req.query.dietTagIds]
+            : [];
     const userId = getSessionUserId(req.session);
-    const data = await restaurantController.listRestaurants({search, activeFilter, favoriteFilter, suggestionFilter, openFilter, userId});
+    const data = await restaurantController.listRestaurants({
+        search,
+        activeFilter,
+        favoriteFilter,
+        suggestionFilter,
+        openFilter,
+        selectedDietTagIds,
+        sort,
+        userId,
+    });
     renderer.renderWithData(res, 'restaurants/index', data);
 }));
 

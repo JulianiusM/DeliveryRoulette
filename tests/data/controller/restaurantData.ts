@@ -184,3 +184,57 @@ export const updateRestaurantInvalidData = [
         expectedError: 'City is required.',
     },
 ];
+
+export const restaurantListDietFilterData = [
+    {
+        description: 'filters restaurants to a single selected diet',
+        selectedDietTagIds: ['tag-vegan'],
+        suitabilityByRestaurant: {
+            'r-vegan': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference', inference: {score: 82, confidence: 'HIGH'}},
+            ],
+            'r-plain': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+            ],
+        },
+        expectedRestaurantIds: ['r-vegan'],
+    },
+    {
+        description: 'requires all selected diets to be supported',
+        selectedDietTagIds: ['tag-vegan', 'tag-gf'],
+        suitabilityByRestaurant: {
+            'r-both': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference', inference: {score: 90, confidence: 'HIGH'}},
+                {dietTagId: 'tag-gf', dietTagKey: 'GLUTEN_FREE', dietTagLabel: 'Gluten Free', supported: true, source: 'override'},
+            ],
+            'r-one': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference', inference: {score: 75, confidence: 'MEDIUM'}},
+                {dietTagId: 'tag-gf', dietTagKey: 'GLUTEN_FREE', dietTagLabel: 'Gluten Free', supported: false, source: 'none'},
+            ],
+        },
+        expectedRestaurantIds: ['r-both'],
+    },
+];
+
+export const restaurantListSortData = [
+    {
+        description: 'sorts selected diets by weakest score and keeps manual confirmations at the top',
+        selectedDietTagIds: ['tag-vegan', 'tag-gf'],
+        sort: 'selected_diet_score',
+        suitabilityByRestaurant: {
+            'r-balanced': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference', inference: {score: 74, confidence: 'MEDIUM'}},
+                {dietTagId: 'tag-gf', dietTagKey: 'GLUTEN_FREE', dietTagLabel: 'Gluten Free', supported: true, source: 'inference', inference: {score: 72, confidence: 'MEDIUM'}},
+            ],
+            'r-verified': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'override'},
+                {dietTagId: 'tag-gf', dietTagKey: 'GLUTEN_FREE', dietTagLabel: 'Gluten Free', supported: true, source: 'inference', inference: {score: 88, confidence: 'HIGH'}},
+            ],
+            'r-low': [
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: true, source: 'inference', inference: {score: 60, confidence: 'LOW'}},
+                {dietTagId: 'tag-gf', dietTagKey: 'GLUTEN_FREE', dietTagLabel: 'Gluten Free', supported: true, source: 'inference', inference: {score: 65, confidence: 'LOW'}},
+            ],
+        },
+        expectedRestaurantIds: ['r-verified', 'r-balanced', 'r-low'],
+    },
+];

@@ -2,6 +2,7 @@ import * as restaurantService from "../modules/database/services/RestaurantServi
 import * as menuService from "../modules/database/services/MenuService";
 import * as providerRefService from "../modules/database/services/RestaurantProviderRefService";
 import * as dietOverrideService from "../modules/database/services/DietOverrideService";
+import * as userDietPrefService from "../modules/database/services/UserDietPreferenceService";
 import * as userRestaurantPrefService from "../modules/database/services/UserRestaurantPreferenceService";
 import {ValidationError, ExpectedError} from "../modules/lib/errors";
 import {Restaurant} from "../modules/database/entities/restaurant/Restaurant";
@@ -28,6 +29,18 @@ const DETAIL_TEMPLATE = 'restaurants/detail';
 
 type TriStateFilter = 'all' | 'positive' | 'negative';
 type OpenStateFilter = 'all' | 'open' | 'closed' | 'unknown';
+type RestaurantListSort = 'default' | 'selected_diet_score';
+
+export interface RestaurantListSelectedDietMatch {
+    dietTagId: string;
+    dietTagKey: string;
+    dietTagLabel: string;
+    supported: boolean | null;
+    source: 'override' | 'inference' | 'none';
+    score: number | null;
+    scoreLabel: string;
+    sortScore: number | null;
+}
 
 export interface RestaurantListCard {
     restaurant: Restaurant;
@@ -38,6 +51,9 @@ export interface RestaurantListCard {
     doNotSuggest: boolean;
     isOpenNow: boolean | null;
     availabilityStatus: OpeningHoursStatus;
+    selectedDietMatches: RestaurantListSelectedDietMatch[];
+    selectedDietSortScore: number | null;
+    selectedDietAverageScore: number | null;
 }
 
 interface RestaurantPreferenceState {
@@ -67,6 +83,26 @@ function normalizeOpenFilter(value?: string): OpenStateFilter {
         return value;
     }
     return 'all';
+}
+
+function normalizeListSort(value?: string): RestaurantListSort {
+    if (value === 'selected_diet_score') {
+        return value;
+    }
+    return 'default';
+}
+
+function normalizeSelectedDietTagIds(values?: string[]): string[] {
+    const uniqueIds = new Set<string>();
+
+    for (const value of values ?? []) {
+        const normalized = value?.trim();
+        if (normalized) {
+            uniqueIds.add(normalized);
+        }
+    }
+
+    return [...uniqueIds];
 }
 
 function getRestaurantPreferenceState(
@@ -108,6 +144,89 @@ function buildUnknownOpeningStatus(): OpeningHoursStatus {
     };
 }
 
+function buildSelectedDietMatches(
+    dietSuitability: EffectiveSuitability[],
+    selectedDietTagIds: string[],
+): RestaurantListSelectedDietMatch[] {
+    if (selectedDietTagIds.length === 0) {
+        return [];
+    }
+
+    const suitabilityByTagId = new Map(dietSuitability.map((entry) => [entry.dietTagId, entry]));
+
+    return selectedDietTagIds
+        .map<RestaurantListSelectedDietMatch | null>((dietTagId) => {
+            const suitability = suitabilityByTagId.get(dietTagId);
+            if (!suitability) {
+                return null;
+            }
+
+            const score = typeof suitability.inference?.score === 'number'
+                ? suitability.inference.score
+                : null;
+            const sortScore = suitability.supported === true
+                ? suitability.source === 'override'
+                    ? 100
+                    : score ?? 0
+                : null;
+            const scoreLabel = suitability.source === 'override'
+                ? 'Verified'
+                : score !== null
+                    ? `${score}%`
+                    : suitability.supported === true
+                        ? 'Matched'
+                        : 'No data';
+
+            return {
+                dietTagId: suitability.dietTagId,
+                dietTagKey: suitability.dietTagKey,
+                dietTagLabel: suitability.dietTagLabel,
+                supported: suitability.supported,
+                source: suitability.source,
+                score,
+                scoreLabel,
+                sortScore,
+            };
+        })
+        .filter((entry): entry is RestaurantListSelectedDietMatch => entry !== null);
+}
+
+function hasAllSelectedDietMatches(
+    matches: RestaurantListSelectedDietMatch[],
+    selectedDietCount: number,
+): boolean {
+    if (selectedDietCount === 0) {
+        return true;
+    }
+
+    return matches.length === selectedDietCount
+        && matches.every((match) => match.supported === true);
+}
+
+function getSelectedDietSortScore(matches: RestaurantListSelectedDietMatch[]): number | null {
+    const scores = matches
+        .map((match) => match.sortScore)
+        .filter((score): score is number => score !== null);
+
+    if (scores.length === 0) {
+        return null;
+    }
+
+    return Math.min(...scores);
+}
+
+function getSelectedDietAverageScore(matches: RestaurantListSelectedDietMatch[]): number | null {
+    const scores = matches
+        .map((match) => match.sortScore)
+        .filter((score): score is number => score !== null);
+
+    if (scores.length === 0) {
+        return null;
+    }
+
+    return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+}
+
 // ── List / Detail / Edit data ───────────────────────────────
 
 export async function listRestaurants(options: {
@@ -116,24 +235,38 @@ export async function listRestaurants(options: {
     favoriteFilter?: string;
     suggestionFilter?: string;
     openFilter?: string;
+    selectedDietTagIds?: string[];
+    sort?: string;
     userId?: number;
 }): Promise<{
     restaurants: RestaurantListCard[];
+    dietTags: Array<{id: string; key: string; label: string}>;
     search?: string;
     active?: string;
     favoriteFilter: TriStateFilter;
     suggestionFilter: TriStateFilter;
     openFilter: OpenStateFilter;
+    selectedDietTagIds: string[];
+    sort: RestaurantListSort;
 }> {
     let isActive: boolean | undefined;
     if (options.activeFilter === 'true') isActive = true;
     else if (options.activeFilter === 'false') isActive = false;
 
-    const restaurants = await restaurantService.listRestaurants({search: options.search, isActive});
+    const [restaurants, allDietTags] = await Promise.all([
+        restaurantService.listRestaurants({search: options.search, isActive}),
+        userDietPrefService.getAllDietTags(),
+    ]);
 
     const favoriteFilter = normalizeTriStateFilter(options.favoriteFilter);
     const suggestionFilter = normalizeTriStateFilter(options.suggestionFilter);
     const openFilter = normalizeOpenFilter(options.openFilter);
+    const validDietTagIds = new Set(allDietTags.map((tag) => tag.id));
+    const selectedDietTagIds = normalizeSelectedDietTagIds(options.selectedDietTagIds)
+        .filter((dietTagId) => validDietTagIds.has(dietTagId));
+    const sort = selectedDietTagIds.length > 0
+        ? normalizeListSort(options.sort)
+        : 'default';
 
     const preferences = options.userId
         ? await userRestaurantPrefService.getAllByUserId(options.userId)
@@ -170,26 +303,54 @@ export async function listRestaurants(options: {
         ]);
         const preferenceState = getRestaurantPreferenceState(preferenceMap, restaurant.id);
         const availabilityStatus = openingStatusMap.get(restaurant.id) ?? buildUnknownOpeningStatus();
+        const insightSummary = buildRestaurantInsightSummary(categories, dietSuitability);
+        const selectedDietMatches = buildSelectedDietMatches(dietSuitability, selectedDietTagIds);
 
         return {
             restaurant,
             providerCuisines: (restaurant.providerCuisines ?? []).map((cuisine) => cuisine.value),
             cuisineProfile: cuisineInferenceService.parseCuisineInference(restaurant.cuisineInferenceJson),
-            insightSummary: buildRestaurantInsightSummary(categories, dietSuitability),
+            insightSummary,
             isFavorite: preferenceState.isFavorite,
             doNotSuggest: preferenceState.doNotSuggest,
             isOpenNow: availabilityStatus.isOpenNow,
             availabilityStatus,
+            selectedDietMatches,
+            selectedDietSortScore: getSelectedDietSortScore(selectedDietMatches),
+            selectedDietAverageScore: getSelectedDietAverageScore(selectedDietMatches),
         };
     }));
 
+    const dietFilteredCards = cards.filter((card) => hasAllSelectedDietMatches(
+        card.selectedDietMatches,
+        selectedDietTagIds.length,
+    ));
+    const sortedCards = sort === 'selected_diet_score'
+        ? [...dietFilteredCards].sort((left, right) => {
+            const primary = (right.selectedDietSortScore ?? -1) - (left.selectedDietSortScore ?? -1);
+            if (primary !== 0) {
+                return primary;
+            }
+
+            const secondary = (right.selectedDietAverageScore ?? -1) - (left.selectedDietAverageScore ?? -1);
+            if (secondary !== 0) {
+                return secondary;
+            }
+
+            return left.restaurant.name.localeCompare(right.restaurant.name);
+        })
+        : dietFilteredCards;
+
     return {
-        restaurants: cards,
+        restaurants: sortedCards,
+        dietTags: allDietTags.map((tag) => ({id: tag.id, key: tag.key, label: tag.label})),
         search: options.search,
         active: options.activeFilter,
         favoriteFilter,
         suggestionFilter,
         openFilter,
+        selectedDietTagIds,
+        sort,
     };
 }
 

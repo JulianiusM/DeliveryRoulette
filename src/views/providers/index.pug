@@ -114,7 +114,7 @@ block body
                                                                         value=location.id
                                                                         selected=!!(activeLocation && activeLocation.id === location.id)
                                                                     ) #{location.label}#{location.isDefault ? ' (Default)' : ''}#{location.hasCoordinates ? '' : ' - no coords'}
-                                                            .form-text.text-white-50 Choose the user location that should resolve provider area and availability. If no coordinates are stored, sync falls back to coarser listing behavior.
+                                                            .form-text.text-white-50 Choose the saved location that should be used for this import. If no coordinates are stored, DeliveryRoulette will use the address instead.
                                                     else
                                                         .alert.alert-warning.py-2.mb-3
                                                             i.bi.bi-exclamation-triangle.me-1

@@ -6,6 +6,8 @@
 import {
     createRestaurantValidData,
     createRestaurantInvalidData,
+    restaurantListDietFilterData,
+    restaurantListSortData,
     updateRestaurantValidData,
     updateRestaurantInvalidData,
 } from '../data/controller/restaurantData';
@@ -36,6 +38,10 @@ import * as dietOverrideService from '../../src/modules/database/services/DietOv
 jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
 import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
 
+// Mock the UserDietPreferenceService (used by listRestaurants for filter options)
+jest.mock('../../src/modules/database/services/UserDietPreferenceService');
+import * as userDietPrefService from '../../src/modules/database/services/UserDietPreferenceService';
+
 // Mock MenuItemDietOverrideService (used for item chips in detail page)
 jest.mock('../../src/modules/database/services/MenuItemDietOverrideService');
 import * as menuItemDietOverrideService from '../../src/modules/database/services/MenuItemDietOverrideService';
@@ -60,6 +66,7 @@ const mockGetAllByUserId = userRestaurantPrefService.getAllByUserId as jest.Mock
 const mockGetByUserAndRestaurant = userRestaurantPrefService.getByUserAndRestaurant as jest.Mock;
 const mockToggleFavorite = userRestaurantPrefService.toggleFavorite as jest.Mock;
 const mockToggleDoNotSuggest = userRestaurantPrefService.toggleDoNotSuggest as jest.Mock;
+const mockGetAllDietTags = userDietPrefService.getAllDietTags as jest.Mock;
 const mockListItemOverridesByItemIds = menuItemDietOverrideService.listByItemIds as jest.Mock;
 const mockQueueMenuSyncByProviderRef = providerSyncService.queueMenuSyncByProviderRef as jest.Mock;
 
@@ -79,9 +86,15 @@ const sampleRestaurant = {
     updatedAt: new Date(),
 };
 
+const sampleDietTags = [
+    {id: 'tag-gf', key: 'GLUTEN_FREE', label: 'Gluten Free'},
+    {id: 'tag-vegan', key: 'VEGAN', label: 'Vegan'},
+];
+
 describe('RestaurantController', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockGetAllDietTags.mockResolvedValue(sampleDietTags);
         mockGetAllByUserId.mockResolvedValue([]);
         mockGetByUserAndRestaurant.mockResolvedValue(null);
         mockListCategoriesByRestaurant.mockResolvedValue([]);
@@ -104,6 +117,9 @@ describe('RestaurantController', () => {
             expect(result.favoriteFilter).toBe('all');
             expect(result.suggestionFilter).toBe('all');
             expect(result.openFilter).toBe('all');
+            expect(result.selectedDietTagIds).toEqual([]);
+            expect(result.sort).toBe('default');
+            expect(result.dietTags).toEqual(sampleDietTags);
         });
 
         test('passes undefined isActive for empty filter', async () => {
@@ -165,6 +181,46 @@ describe('RestaurantController', () => {
             expect(result.restaurants).toHaveLength(1);
             expect(result.restaurants[0].restaurant.name).toBe('Blocked Place');
             expect(result.restaurants[0].doNotSuggest).toBe(true);
+        });
+
+        test.each(restaurantListDietFilterData)('$description', async (testCase) => {
+            const restaurants = Object.keys(testCase.suitabilityByRestaurant).map((restaurantId) => ({
+                ...sampleRestaurant,
+                id: restaurantId,
+                name: restaurantId,
+            }));
+            setupMock(mockListRestaurants, restaurants);
+            mockComputeEffectiveSuitability.mockImplementation(async (restaurantId: string) => (
+                testCase.suitabilityByRestaurant[restaurantId] ?? []
+            ));
+
+            const result = await restaurantController.listRestaurants({
+                selectedDietTagIds: testCase.selectedDietTagIds,
+            });
+
+            expect(result.selectedDietTagIds).toEqual(testCase.selectedDietTagIds);
+            expect(result.restaurants.map((card) => card.restaurant.id)).toEqual(testCase.expectedRestaurantIds);
+        });
+
+        test.each(restaurantListSortData)('$description', async (testCase) => {
+            const restaurants = Object.keys(testCase.suitabilityByRestaurant).map((restaurantId) => ({
+                ...sampleRestaurant,
+                id: restaurantId,
+                name: restaurantId,
+            }));
+            setupMock(mockListRestaurants, restaurants);
+            mockComputeEffectiveSuitability.mockImplementation(async (restaurantId: string) => (
+                testCase.suitabilityByRestaurant[restaurantId] ?? []
+            ));
+
+            const result = await restaurantController.listRestaurants({
+                selectedDietTagIds: testCase.selectedDietTagIds,
+                sort: testCase.sort,
+            });
+
+            expect(result.sort).toBe('selected_diet_score');
+            expect(result.restaurants.map((card) => card.restaurant.id)).toEqual(testCase.expectedRestaurantIds);
+            expect(result.restaurants[0].selectedDietSortScore).toBe(88);
         });
     });
 

@@ -66,7 +66,7 @@ block body
                                         | #{diet.dietTagLabel}
                                         span.ms-1.text-body-secondary #{diet.sharePercent}% share
                         else
-                            p.text-white-50.mb-4 No supported diet profile has been inferred yet.
+                            p.text-white-50.mb-4 No diet summary is available yet.
 
                         .d-flex.flex-wrap.gap-2.restaurant-anchor-nav
                             a.btn.btn-outline-light.btn-sm(href="#overview") Overview
@@ -96,7 +96,7 @@ block body
                                 .restaurant-stat-card
                                     span.restaurant-stat-label Menu duplicates
                                     strong.restaurant-stat-value #{menuSummary.duplicatesFiltered || 0}
-                                    small.text-white-50 deduped for diet scoring
+                                    small.text-white-50 duplicate rows removed for cleaner matching
 
         .row.g-4.mt-1
             .col-xl-8
@@ -167,7 +167,7 @@ block body
                                                     span Variety #{diet.varietyPercent}%
                                 else
                                     .restaurant-panel
-                                        p.text-white-50.mb-0 No diet compatibility data yet. Re-run heuristics after menu updates.
+                                        p.text-white-50.mb-0 No diet summary is available yet. Update the menu or ask an administrator to refresh the analysis.
 
                 section#diets.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
                     .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
@@ -178,8 +178,7 @@ block body
                             i.bi.bi-chevron-down.me-1
                             | Open details
                     .card-body
-                        p.text-white-50.small.mb-1 Snapshot metrics stay above.
-                        p.text-white-50.small.mb-0 Open the detailed analysis here for manual overrides, matched-item evidence, safeguards, and score details.
+                        p.text-white-50.small.mb-0 Review how each diet was matched, which menu items were counted, and any manual confirmations.
                         #dietSuitabilityCollapse.collapse.mt-4
                             .diet-suitability-expanded
                                 include _diet_suitability
@@ -324,7 +323,7 @@ block body
                                                                             | Price not set
                                                                 if item.dietContext
                                                                     details.mt-3
-                                                                        summary.small.text-info Heuristic context
+                                                                        summary.small.text-info Diet notes
                                                                         pre.small.text-white-50.mt-2.mb-0.menu-item-context #{item.dietContext}
 
             .col-xl-4
@@ -366,7 +365,7 @@ block body
                                 p.text-white-50.small.mb-4 No provider cuisines saved.
 
                             if cuisineProfile && cuisineProfile.cuisines && cuisineProfile.cuisines.length > 0
-                                p.text-uppercase.small.text-white-50.mb-2 Heuristic cuisines
+                                p.text-uppercase.small.text-white-50.mb-2 Detected cuisines
                                 .d-flex.flex-column.gap-3
                                     each cuisine in cuisineProfile.cuisines
                                         .restaurant-diet-hero-card
@@ -374,7 +373,7 @@ block body
                                                 span.fw-semibold #{cuisine.label}
                                                 span.badge.rounded-pill(class=cuisine.source === 'provider' ? 'text-bg-info text-dark' : 'text-bg-dark border border-secondary') #{cuisine.score}% #{cuisine.confidence}
                             else
-                                p.text-white-50.small.mb-0 No inferred cuisines yet.
+                                p.text-white-50.small.mb-0 No cuisine summary is available yet.
 
                     .card.text-bg-dark.border-secondary.shadow-sm
                         .card-header

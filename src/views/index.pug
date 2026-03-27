@@ -27,13 +27,13 @@ block body
             .card-body.p-4.p-lg-5
                 .row.g-4.align-items-end
                     .col-lg-7
-                        p.app-eyebrow.mb-2 Delivery decision system
+                        p.app-eyebrow.mb-2 Plan the next order
                         h1.display-4.fw-semibold.mb-3 DeliveryRoulette
                         if user
                             p.lead.text-white-50.mb-4
                                 | Welcome back, 
                                 span.text-white #{displayName}
-                                | . Your restaurant data, menu intelligence, and suggestion tools are all in one place.
+                                | . Your restaurant list, menus, and suggestion tools are all in one place.
                             .d-flex.flex-wrap.gap-2
                                 a.btn.btn-success.btn-lg(href="/suggest")
                                     i.bi.bi-shuffle.me-2
@@ -67,7 +67,7 @@ block body
                                 .app-stat-card
                                     span.app-stat-label Menu Depth
                                     strong.app-stat-value Smart
-                                    small.text-white-50 Dedupe, inference, and manual overrides work together
+                                    small.text-white-50 Cleaner menu data leads to clearer diet matches
                             .col-6
                                 .app-stat-card
                                     span.app-stat-label Workflow
@@ -92,7 +92,7 @@ block body
                                     i.bi.bi-shop
                                 div
                                     h2.h5.mb-1 Restaurants
-                                    p.text-white-50.small.mb-0 Inspect menus, diet fit, providers, and visibility.
+                                    p.text-white-50.small.mb-0 Review menus, diet options, provider links, and visibility.
                             .app-chip-row
                                 span.app-chip Shown in app
                                 span.app-chip Availability
@@ -104,7 +104,7 @@ block body
                                     i.bi.bi-shuffle
                                 div
                                     h2.h5.mb-1 Suggest
-                                    p.text-white-50.small.mb-0 Draw from the filtered restaurant pool with real diet thresholds.
+                                    p.text-white-50.small.mb-0 Pick from the filtered restaurant list with clear diet rules.
                             .app-chip-row
                                 span.app-chip Diet thresholds
                                 span.app-chip Open now
@@ -152,7 +152,7 @@ block body
                                     i.bi.bi-diagram-3
                                 div
                                     h2.h5.mb-1 Restaurant Intelligence
-                                    p.text-white-50.small.mb-0 Manage real menu data instead of flat restaurant rows.
+                                    p.text-white-50.small.mb-0 Work with real menus instead of a simple restaurant list.
                             ul.text-white-50.small.mb-0
                                 li Search restaurants with fuzzy matching
                                 li Inspect provider refs, cuisines, and availability
@@ -165,11 +165,11 @@ block body
                                     i.bi.bi-heart-pulse
                                 div
                                     h2.h5.mb-1 Diet Workflow
-                                    p.text-white-50.small.mb-0 Keep diet defaults and heuristic rules aligned.
+                                    p.text-white-50.small.mb-0 Keep saved diet preferences and shared diet rules aligned.
                             ul.text-white-50.small.mb-0
                                 li Per-user diet defaults feed the suggestion page
-                                li Global heuristic keyword lists stay editable
-                                li Manual item overrides remain possible when heuristics miss
+                                li Shared diet rule lists stay editable for administrators
+                                li Menu items can still be confirmed manually when needed
                                 li Low-quality matches can be filtered out with score thresholds
                     .col-lg-4
                         .app-panel.h-100
@@ -178,11 +178,11 @@ block body
                                     i.bi.bi-arrow-repeat
                                 div
                                     h2.h5.mb-1 Sync And Import
-                                    p.text-white-50.small.mb-0 User-facing imports stay separate from admin maintenance.
+                                    p.text-white-50.small.mb-0 Saved-location imports stay separate from admin maintenance tools.
                             ul.text-white-50.small.mb-0
                                 li Location-specific syncs and direct URL imports
                                 li Suggestion availability follows the saved location
-                                li Global jobs, alerts, and heuristics are admin-only
+                                li Global jobs, alerts, and diet rules are admin-only
                                 li Bulk imports stay in the admin workspace
 
         if !user

@@ -17,10 +17,10 @@ block body
             .card-body.p-4.p-lg-5
                 .row.g-4.align-items-end
                     .col-lg-8
-                        p.text-uppercase.small.text-white-50.mb-2 Suggestion Engine
+                        p.text-uppercase.small.text-white-50.mb-2 Suggestion
                         h1.display-5.fw-semibold.mb-2 Suggest A Restaurant
                         p.lead.text-white-50.mb-0
-                            | Draw from your real restaurant pool without losing diet coverage, availability, or personal preference rules.
+                            | Pick from your restaurant list without losing diet coverage, availability, or personal preference rules.
                     .col-lg-4
                         .row.g-3
                             .col-4
@@ -89,7 +89,7 @@ block body
 
                     .col-lg-4
                         .suggestion-launch-panel
-                            p.text-white-50.small.mb-3 If nothing matches, DeliveryRoulette explains which filter stage emptied the pool and suggests what to change next.
+                            p.text-white-50.small.mb-3 If nothing matches, DeliveryRoulette explains why and suggests what to change next.
                             .d-grid.gap-2
                                 button#suggestBtn.btn.btn-success.btn-lg.py-3(type="submit")
                                     i.bi.bi-dice-5.me-2
@@ -119,7 +119,7 @@ block body
                                         span.text-white-50 0%
                                         strong#minDietScoreValue #{d.minDietScore || 0}%
                                         span.text-white-50 100%
-                                    .form-text.text-white-50 Restaurants only pass inferred diets when their heuristic score reaches this threshold. Manual overrides still count as explicit support.
+                                    .form-text.text-white-50 Restaurants only pass calculated diet matches when they reach this score. Manually confirmed matches still count.
 
                                 if dietTags.length === 0
                                     p.text-white-50.mb-0 No diet tags available.
@@ -161,7 +161,7 @@ block body
                                         select#serviceType.form-select.text-bg-dark(name="serviceType")
                                             option(value="delivery" selected=(d.serviceType !== 'collection')) Delivery
                                             option(value="collection" selected=(d.serviceType === 'collection')) Collection
-                                        .form-text.text-white-50 Use delivery or pickup availability snapshots when filtering the pool.
+                                        .form-text.text-white-50 Use delivery or pickup availability when narrowing the restaurant list.
 
                                     .col-12
                                         label.form-label(for="locationId")
@@ -238,7 +238,7 @@ block body
                     span
                         i.bi.bi-stars.me-2
                         | Suggestion Result
-                    .text-white-50.small The current pick stays visible while rerolling.
+                    .text-white-50.small The current result stays visible while a new pick loads.
                 .card-body.p-4.p-lg-5
                     .d-flex.flex-column.flex-lg-row.justify-content-between.align-items-start.gap-4.mb-4
                         div

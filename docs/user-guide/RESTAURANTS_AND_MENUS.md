@@ -7,6 +7,8 @@ Use the Restaurants area to review the shared restaurant dataset.
 Authenticated users can:
 
 - browse restaurants and menus
+- filter the restaurant list by one or more diets
+- sort filtered results by diet match
 - mark favorites
 - block restaurants from suggestions
 - inspect provider refs, menu coverage, and diet evidence

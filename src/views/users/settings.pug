@@ -20,7 +20,7 @@ block body
                     .col-lg-8
                         p.app-eyebrow.mb-2 Personal defaults
                         h1.display-5.fw-semibold.mb-2 Settings
-                        p.lead.text-white-50.mb-0 Configure saved locations and filter defaults that drive location-aware suggestions and provider sync. The old delivery-area string remains only as compatibility state.
+                        p.lead.text-white-50.mb-0 Choose your saved locations and default filters for suggestions and location imports.
                     .col-lg-4
                         .row.g-3
                             .col-6.col-xl-3.col-lg-6
@@ -80,7 +80,7 @@ block body
                 if userIsAdmin
                     a.btn.btn-sm.btn-outline-info(href="/users/settings/diets")
                         i.bi.bi-sliders.me-1
-                        | Configure Global Diet Heuristics
+                        | Configure Shared Diet Rules
             .card-body
                 form(action="/users/settings" method="post")
                     +csrf
@@ -101,7 +101,7 @@ block body
                                             span.badge.rounded-pill.text-bg-success Coordinates set
                                         else
                                             span.badge.rounded-pill.text-bg-secondary Coordinates optional
-                                p.text-white-50.small.mb-3 This location is the provider-resolution and availability context. If latitude and longitude are left blank, DeliveryRoulette will try to resolve them automatically from the entered address. Manual coordinates always win.
+                                p.text-white-50.small.mb-3 This saved location is used to look up delivery availability. If you leave the coordinates empty, DeliveryRoulette will try to find them from the address.
                                 .row.g-3
                                     .col-12
                                         label.form-label(for="defaultLocationLabel")
@@ -264,14 +264,14 @@ block body
                                     .col-12
                                         label.form-label(for="deliveryAreaDerived")
                                             i.bi.bi-arrow-repeat.me-1
-                                            | Legacy Delivery Area
+                                            | Delivery Area (read-only)
                                         input#deliveryAreaDerived.form-control.text-bg-dark(
                                             type="text"
                                             value=(d.deliveryArea || '')
                                             readonly
                                             placeholder="Derived from the saved default location"
                                         )
-                                        .form-text.text-white-50 This field is transitional only. Saved locations are the real availability key.
+                                        .form-text.text-white-50 This older field is kept for older setups. Your saved location above is what the app uses now.
                     .d-flex.flex-wrap.gap-2.mt-4
                         button.btn.btn-success(type="submit")
                             i.bi.bi-check-lg.me-1
