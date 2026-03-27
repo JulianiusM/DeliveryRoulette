@@ -110,29 +110,34 @@ block body
                                 span.app-chip Open now
                                 span.app-chip History-aware
                     .col-md-6.col-xl-3
-                        a.app-action-card(href="/import")
-                            .d-flex.align-items-center.gap-3
-                                span.app-icon-badge.is-info
-                                    i.bi.bi-upload
-                                div
-                                    h2.h5.mb-1 Import
-                                    p.text-white-50.small.mb-0 Preview bulk data changes before applying them.
-                            .app-chip-row
-                                span.app-chip JSON and CSV
-                                span.app-chip Diff preview
-                                span.app-chip Result audit
-                    .col-md-6.col-xl-3
                         a.app-action-card(href="/providers")
                             .d-flex.align-items-center.gap-3
-                                span.app-icon-badge.is-warning
-                                    i.bi.bi-plug
+                                span.app-icon-badge.is-info
+                                    i.bi.bi-geo-alt
                                 div
-                                    h2.h5.mb-1 Providers
-                                    p.text-white-50.small.mb-0 Run syncs, imports, and maintenance from one place.
+                                    h2.h5.mb-1 Location Imports
+                                    p.text-white-50.small.mb-0 Refresh restaurants and availability for a saved location.
                             .app-chip-row
-                                span.app-chip Listing discovery
-                                span.app-chip Menu import
-                                span.app-chip Maintenance jobs
+                                span.app-chip Saved locations
+                                span.app-chip Listing sync
+                                span.app-chip Direct import
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href=userIsAdmin ? "/admin/operations" : "/help")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-warning
+                                    i.bi.bi-shield-lock
+                                div
+                                    h2.h5.mb-1 #{userIsAdmin ? 'Admin' : 'Help'}
+                                    p.text-white-50.small.mb-0 #{userIsAdmin ? 'Global maintenance, bulk import, and queue review.' : 'Read setup and troubleshooting guides.'}
+                            .app-chip-row
+                                if userIsAdmin
+                                    span.app-chip Bulk import
+                                    span.app-chip Sync queue
+                                    span.app-chip Maintenance
+                                else
+                                    span.app-chip Setup
+                                    span.app-chip Suggestions
+                                    span.app-chip Troubleshooting
 
         section.card.app-section-card
             .card-header
@@ -173,12 +178,12 @@ block body
                                     i.bi.bi-arrow-repeat
                                 div
                                     h2.h5.mb-1 Sync And Import
-                                    p.text-white-50.small.mb-0 Provider changes and bulk imports stay reviewable.
+                                    p.text-white-50.small.mb-0 User-facing imports stay separate from admin maintenance.
                             ul.text-white-50.small.mb-0
-                                li Listing syncs and direct URL imports
-                                li Sync jobs and alerts pages for operational follow-up
-                                li Maintenance reruns for heuristics and provider refreshes
-                                li Import preview and results for bulk updates
+                                li Location-specific syncs and direct URL imports
+                                li Suggestion availability follows the saved location
+                                li Global jobs, alerts, and heuristics are admin-only
+                                li Bulk imports stay in the admin workspace
 
         if !user
             section.card.app-section-card

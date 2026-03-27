@@ -1,93 +1,58 @@
 # DeliveryRoulette Documentation
 
-Welcome to the DeliveryRoulette documentation. This directory contains comprehensive documentation for developers, testers, and AI agents working on the DeliveryRoulette application.
+This directory contains the main developer and user documentation for DeliveryRoulette.
 
 ## Documentation Structure
 
-### 📚 For Developers
+### For Developers
 
-#### Getting Started
-- **[../README.md](../README.md)** - Project overview, setup, and quick start
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development workflow and guidelines
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- [../README.md](../README.md) - Project overview, setup, and quick start
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Development workflow and implementation guidance
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and major design decisions
+- [DATABASE.md](DATABASE.md) - Database entities, migrations, and patterns
+- [CONFIGURATION.md](CONFIGURATION.md) - Runtime configuration, location-aware suggestion settings, security, and geocoding settings
+- [import-schema.md](import-schema.md) - JSON / CSV import format
+- [OPERATIONS.md](OPERATIONS.md) - Runtime operations, health checks, and sync concerns
 
-#### Development Guides
-- **[DATABASE.md](DATABASE.md)** - Database entities, migrations, and patterns
-- **[CONFIGURATION.md](CONFIGURATION.md)** - Configuration management and settings
-- **[import-schema.md](import-schema.md)** - JSON / CSV bulk-import format
-- **[UI_REDESIGN_SUMMARY.md](UI_REDESIGN_SUMMARY.md)** - UI redesign documentation and patterns
-- **[UX_IMPROVEMENTS_2026_01.md](UX_IMPROVEMENTS_2026_01.md)** - UX improvements and bug fixes (January 2026)
+### For Testing
 
-#### Testing
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Complete testing guide (data-driven & keyword-driven)
-- **[TEST_REVIEW.md](TEST_REVIEW.md)** - Comprehensive test suite review
-- **[TEST_RECOMMENDATIONS.md](TEST_RECOMMENDATIONS.md)** - Test improvement recommendations
-- **[FRONTEND_TESTING.md](FRONTEND_TESTING.md)** - Frontend testing with MSW and Testing Library
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Testing patterns and workflow
+- [FRONTEND_TESTING.md](FRONTEND_TESTING.md) - Frontend test guidance
+- [TEST_REVIEW.md](TEST_REVIEW.md) - Test suite review
+- [TEST_RECOMMENDATIONS.md](TEST_RECOMMENDATIONS.md) - Follow-up test improvements
 
-#### Operations
-- **[OPERATIONS.md](OPERATIONS.md)** - Health checks, logging, sync, and backups
+### For End Users
 
-#### Review
-- **[review/REVIEW_REPORT.md](review/REVIEW_REPORT.md)** - Full repository review report (February 2026)
-- **[review/ACTION_ITEMS.md](review/ACTION_ITEMS.md)** - Prioritized action items and follow-up issues
+- [user-guide/README.md](user-guide/README.md) - User guide index
+- [user-guide/GETTING_STARTED.md](user-guide/GETTING_STARTED.md) - First-run setup
+- [user-guide/LOCATIONS_AND_SETTINGS.md](user-guide/LOCATIONS_AND_SETTINGS.md) - Saved locations and defaults
+- [user-guide/SUGGESTIONS.md](user-guide/SUGGESTIONS.md) - Suggestion flow and no-match hints
+- [user-guide/LOCATION_IMPORTS.md](user-guide/LOCATION_IMPORTS.md) - User-facing location imports
+- [user-guide/RESTAURANTS_AND_MENUS.md](user-guide/RESTAURANTS_AND_MENUS.md) - Shared restaurant catalog browsing
+- [user-guide/PERMISSIONS_AND_SECURITY.md](user-guide/PERMISSIONS_AND_SECURITY.md) - User vs admin permissions
+- [user-guide/ADMIN_OPERATIONS.md](user-guide/ADMIN_OPERATIONS.md) - Admin-only maintenance tasks
+- [user-guide/TROUBLESHOOTING.md](user-guide/TROUBLESHOOTING.md) - Recovery steps for common issues
 
-### 🤖 For AI Agents
+### For AI Agents
 
-- **[../AGENTS.md](../AGENTS.md)** - General AI agent guide
-- **[../.github/copilot-instructions.md](../.github/copilot-instructions.md)** - GitHub Copilot instructions
-- **[../.github/copilot/](../.github/copilot/)** - Modular Copilot guidelines
-
-### 👥 For End Users
-
-- **[user-guide/README.md](user-guide/README.md)** - Complete user guide for the DeliveryRoulette app
+- [../AGENTS.md](../AGENTS.md) - Project-specific AI instructions
+- [../.github/copilot-instructions.md](../.github/copilot-instructions.md) - Copilot guidance
 
 ## Quick Links
 
-### I want to...
+- Want to configure location-aware suggestions? Read [CONFIGURATION.md](CONFIGURATION.md).
+- Want to understand provider-backed restaurant availability? Read [ARCHITECTURE.md](ARCHITECTURE.md).
+- Want the user-facing setup flow? Read [user-guide/GETTING_STARTED.md](user-guide/GETTING_STARTED.md).
+- Want the permission split? Read [user-guide/PERMISSIONS_AND_SECURITY.md](user-guide/PERMISSIONS_AND_SECURITY.md).
 
-- **Set up my development environment** → [../README.md](../README.md)
-- **Write tests** → [TESTING_GUIDE.md](TESTING_GUIDE.md)
-- **Understand the codebase** → [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Create a database migration** → [DATABASE.md](DATABASE.md)
-- **Add a new feature** → [DEVELOPMENT.md](DEVELOPMENT.md)
-- **Import restaurants** → [import-schema.md](import-schema.md)
-- **Run in production** → [OPERATIONS.md](OPERATIONS.md)
-- **Use as AI agent** → [../AGENTS.md](../AGENTS.md)
-- **Learn to use the app** → [user-guide/README.md](user-guide/README.md)
-- **Read the review report** → [review/REVIEW_REPORT.md](review/REVIEW_REPORT.md)
+## Documentation Maintenance
 
-## Documentation Standards
+When behavior changes, update:
 
-### For Contributors
+1. the developer doc that describes the feature
+2. the user guide if the workflow changed
+3. the configuration guide if settings changed
+4. the permissions guide if access levels changed
 
-When adding or updating documentation:
-
-1. **Keep it current** - Update docs when code changes
-2. **Be clear** - Write for your audience (developer vs user)
-3. **Use examples** - Show, don't just tell
-4. **Link appropriately** - Cross-reference related docs
-5. **Follow structure** - Use consistent headings and formatting
-
-### Markdown Guidelines
-
-- Use relative links for internal docs
-- Include table of contents for long documents
-- Use code blocks with language specification
-- Add navigation links at top and bottom of long docs
-- Keep line length reasonable for readability
-
-## Getting Help
-
-- **Questions about code?** Check [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Questions about tests?** Check [TESTING_GUIDE.md](TESTING_GUIDE.md)
-- **Questions about operations?** Check [OPERATIONS.md](OPERATIONS.md)
-- **Questions about features?** Check [user-guide/](user-guide/)
-
-## Contributing to Documentation
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for guidelines on contributing documentation changes.
-
----
-
-**Last Updated:** February 2026  
-**Version:** 1.1
+**Last Updated:** March 2026
+**Version:** 1.3

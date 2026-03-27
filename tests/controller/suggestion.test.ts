@@ -36,17 +36,25 @@ import * as userLocationService from '../../src/modules/database/services/UserLo
 jest.mock('../../src/modules/database/services/UserRestaurantPreferenceService');
 import * as userRestaurantPrefService from '../../src/modules/database/services/UserRestaurantPreferenceService';
 
+// Mock the UserLocationImportService
+jest.mock('../../src/modules/sync/UserLocationImportService');
+import * as userLocationImportService from '../../src/modules/sync/UserLocationImportService';
+
 const mockSuggest = suggestionService.suggest as jest.Mock;
+const mockDiagnoseNoMatch = suggestionService.diagnoseNoMatch as jest.Mock;
 const mockGetRecentRestaurantIds = suggestionHistoryService.getRecentRestaurantIds as jest.Mock;
 const mockRecordSuggestion = suggestionHistoryService.recordSuggestion as jest.Mock;
 const mockGetAllDietTags = userDietPrefService.getAllDietTags as jest.Mock;
 const mockGetEffectiveDietFilterIds = userDietPrefService.getEffectiveDietFilterIds as jest.Mock;
 const mockGetByUserId = userPrefService.getByUserId as jest.Mock;
 const mockGetOrBackfillDefaultFromDeliveryArea = userLocationService.getOrBackfillDefaultFromDeliveryArea as jest.Mock;
+const mockListLocationsByUserId = userLocationService.listByUserId as jest.Mock;
 const mockGetByIdForUser = userLocationService.getByIdForUser as jest.Mock;
 const mockTouchLocation = userLocationService.touchLocation as jest.Mock;
 const mockGetDoNotSuggestRestaurantIds = userRestaurantPrefService.getDoNotSuggestRestaurantIds as jest.Mock;
 const mockGetFavoriteRestaurantIds = userRestaurantPrefService.getFavoriteRestaurantIds as jest.Mock;
+const mockQueueSavedLocationRefreshes = userLocationImportService.queueSavedLocationRefreshes as jest.Mock;
+const mockResolveLiveRestaurantCandidates = userLocationImportService.resolveLiveRestaurantCandidates as jest.Mock;
 
 // Import controller after mocking
 import * as suggestionController from '../../src/controller/suggestionController';
@@ -65,7 +73,34 @@ describe('SuggestionController', () => {
             city: 'Springfield',
             postalCode: '12345',
             country: 'USA',
+            isDefault: true,
+            latitude: 40.1,
+            longitude: -73.9,
         });
+        mockListLocationsByUserId.mockResolvedValue([
+            {
+                id: 'loc-1',
+                label: 'Downtown',
+                addressLine1: null,
+                city: 'Springfield',
+                postalCode: '12345',
+                country: 'USA',
+                isDefault: true,
+                latitude: 40.1,
+                longitude: -73.9,
+            },
+            {
+                id: 'loc-2',
+                label: 'Office',
+                addressLine1: null,
+                city: 'Metropolis',
+                postalCode: '54321',
+                country: 'USA',
+                isDefault: false,
+                latitude: null,
+                longitude: null,
+            },
+        ]);
         mockGetByIdForUser.mockResolvedValue({
             id: 'loc-1',
             label: 'Downtown',
@@ -73,8 +108,48 @@ describe('SuggestionController', () => {
             city: 'Springfield',
             postalCode: '12345',
             country: 'USA',
+            isDefault: true,
+            latitude: 40.1,
+            longitude: -73.9,
         });
         mockTouchLocation.mockResolvedValue(undefined);
+        mockDiagnoseNoMatch.mockResolvedValue({
+            blockingStage: 'diet',
+            summary: 'No restaurants satisfy the selected diet filters.',
+            hints: [
+                'Reduce the selected diet tags or lower the minimum diet score.',
+            ],
+            counts: {
+                activeRestaurants: 3,
+                locationRestaurants: 2,
+                alternateServiceRestaurants: 0,
+                locationProviderContexts: 1,
+                locationCoverageRestaurants: 2,
+                locationLatestSnapshots: 2,
+                locationFreshSnapshots: 2,
+                locationExpiredSnapshots: 0,
+                unavailableLocationRestaurants: 0,
+                openRestaurants: 2,
+                cuisineRestaurants: 2,
+                allergenRestaurants: 2,
+                allowedRestaurants: 2,
+                favoriteRestaurants: 2,
+                dietRestaurants: 0,
+            },
+        });
+        mockQueueSavedLocationRefreshes.mockResolvedValue({
+            queuedJobs: [],
+            issues: [],
+        });
+        mockResolveLiveRestaurantCandidates.mockResolvedValue({
+            sourceConfigCount: 1,
+            restaurantIds: [],
+            liveRestaurantCount: 0,
+            matchedRestaurantCount: 0,
+            missingRestaurantCount: 0,
+            queuedImportJobs: [],
+            issues: [],
+        });
         // Default: no do-not-suggest restaurants
         mockGetDoNotSuggestRestaurantIds.mockResolvedValue([]);
         // Default: no favorites
@@ -106,7 +181,10 @@ describe('SuggestionController', () => {
             expect(result.activeLocation).toMatchObject({
                 id: 'loc-1',
                 label: 'Downtown',
+                isDefault: true,
+                hasCoordinates: true,
             });
+            expect(result.savedLocations).toHaveLength(formDataDefaults.expectedSavedLocationCount);
             expect(result.locationRequired).toBe(true);
             expect(result.serviceType).toBe('delivery');
         });
@@ -124,6 +202,7 @@ describe('SuggestionController', () => {
             expect(mockGetEffectiveDietFilterIds).not.toHaveBeenCalled();
             expect(mockGetByUserId).not.toHaveBeenCalled();
             expect(result.activeLocation).toBeNull();
+            expect(result.savedLocations).toEqual([]);
         });
     });
 
@@ -149,8 +228,72 @@ describe('SuggestionController', () => {
             await expect(
                 suggestionController.processSuggestion(testCase.input, 1)
             ).rejects.toMatchObject({
-                message: expect.stringContaining('No restaurants match'),
+                message: expect.stringContaining('No restaurants satisfy'),
+                data: expect.objectContaining({
+                    suggestionDiagnostics: expect.objectContaining({
+                        blockingStage: 'diet',
+                    }),
+                }),
             });
+        });
+
+        test('queues a background location refresh when availability is missing for the selected location', async () => {
+            setupMock(mockSuggest, null);
+            const locationDiagnostics = {
+                blockingStage: 'location',
+                summary: 'No location-specific availability has been imported for delivery at the selected saved location yet.',
+                hints: [
+                    'Open Location Imports and run a listing import for this saved location.',
+                ],
+                counts: {
+                    activeRestaurants: 3,
+                    locationRestaurants: 0,
+                    alternateServiceRestaurants: 0,
+                    locationProviderContexts: 0,
+                    locationCoverageRestaurants: 0,
+                    locationLatestSnapshots: 0,
+                    locationFreshSnapshots: 0,
+                    locationExpiredSnapshots: 0,
+                    unavailableLocationRestaurants: 0,
+                    openRestaurants: 0,
+                    cuisineRestaurants: 0,
+                    allergenRestaurants: 0,
+                    allowedRestaurants: 0,
+                    favoriteRestaurants: 0,
+                    dietRestaurants: 0,
+                },
+            };
+            mockDiagnoseNoMatch
+                .mockResolvedValueOnce(locationDiagnostics)
+                .mockResolvedValueOnce(locationDiagnostics);
+            mockResolveLiveRestaurantCandidates.mockResolvedValueOnce({
+                sourceConfigCount: 0,
+                restaurantIds: [],
+                liveRestaurantCount: 0,
+                matchedRestaurantCount: 0,
+                missingRestaurantCount: 0,
+                queuedImportJobs: [],
+                issues: [],
+            });
+            mockQueueSavedLocationRefreshes.mockResolvedValueOnce({
+                queuedJobs: [{jobId: 'job-queued'}],
+                issues: [],
+            });
+
+            await expect(
+                suggestionController.processSuggestion({}, 1)
+            ).rejects.toMatchObject({
+                data: expect.objectContaining({
+                    suggestionDiagnostics: expect.objectContaining({
+                        blockingStage: 'location',
+                        hints: expect.arrayContaining([
+                            expect.stringContaining('background location import was queued'),
+                        ]),
+                    }),
+                }),
+            });
+
+            expect(mockQueueSavedLocationRefreshes).toHaveBeenCalledWith(1, 'loc-1');
         });
 
         test('filters empty dietTagIds', async () => {
@@ -232,6 +375,125 @@ describe('SuggestionController', () => {
             });
         });
 
+        test('retries suggestions against live provider matches when persisted location snapshots are missing', async () => {
+            mockSuggest
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({
+                    restaurant: {id: 'r-live', name: 'Live Match'},
+                    reason: {matchedDiets: [], totalCandidates: 1},
+                });
+            mockDiagnoseNoMatch.mockResolvedValueOnce({
+                blockingStage: 'location',
+                summary: 'No location-specific availability has been imported for delivery at the selected saved location yet.',
+                hints: [],
+                counts: {
+                    activeRestaurants: 3,
+                    locationRestaurants: 0,
+                    alternateServiceRestaurants: 0,
+                    locationProviderContexts: 0,
+                    locationCoverageRestaurants: 0,
+                    locationLatestSnapshots: 0,
+                    locationFreshSnapshots: 0,
+                    locationExpiredSnapshots: 0,
+                    unavailableLocationRestaurants: 0,
+                    openRestaurants: 0,
+                    cuisineRestaurants: 0,
+                    allergenRestaurants: 0,
+                    allowedRestaurants: 0,
+                    favoriteRestaurants: 0,
+                    dietRestaurants: 0,
+                },
+            });
+            mockResolveLiveRestaurantCandidates.mockResolvedValueOnce({
+                sourceConfigCount: 1,
+                restaurantIds: ['r-live'],
+                liveRestaurantCount: 4,
+                matchedRestaurantCount: 1,
+                missingRestaurantCount: 3,
+                queuedImportJobs: [{jobId: 'job-import-live'}],
+                issues: [],
+            });
+
+            const result = await suggestionController.processSuggestion({}, 1);
+
+            expect(result.restaurant.name).toBe('Live Match');
+            expect(mockResolveLiveRestaurantCandidates).toHaveBeenCalledWith(1, 'loc-1', 'delivery');
+            expect(mockSuggest).toHaveBeenNthCalledWith(2, expect.objectContaining({
+                locationId: 'loc-1',
+                candidateRestaurantIds: ['r-live'],
+            }));
+        });
+
+        test('includes live provider hints when the location is missing and imports were queued for unknown restaurants', async () => {
+            mockSuggest.mockResolvedValue(null);
+            mockDiagnoseNoMatch
+                .mockResolvedValueOnce({
+                    blockingStage: 'location',
+                    summary: 'No location-specific availability has been imported for delivery at the selected saved location yet.',
+                    hints: [],
+                    counts: {
+                        activeRestaurants: 3,
+                        locationRestaurants: 0,
+                        alternateServiceRestaurants: 0,
+                        locationProviderContexts: 0,
+                        locationCoverageRestaurants: 0,
+                        locationLatestSnapshots: 0,
+                        locationFreshSnapshots: 0,
+                        locationExpiredSnapshots: 0,
+                        unavailableLocationRestaurants: 0,
+                        openRestaurants: 0,
+                        cuisineRestaurants: 0,
+                        allergenRestaurants: 0,
+                        allowedRestaurants: 0,
+                        favoriteRestaurants: 0,
+                        dietRestaurants: 0,
+                    },
+                })
+                .mockResolvedValueOnce({
+                    blockingStage: 'location',
+                    summary: 'No location-specific availability has been imported for delivery at the selected saved location yet.',
+                    hints: [],
+                    counts: {
+                        activeRestaurants: 3,
+                        locationRestaurants: 0,
+                        alternateServiceRestaurants: 0,
+                        locationProviderContexts: 0,
+                        locationCoverageRestaurants: 0,
+                        locationLatestSnapshots: 0,
+                        locationFreshSnapshots: 0,
+                        locationExpiredSnapshots: 0,
+                        unavailableLocationRestaurants: 0,
+                        openRestaurants: 0,
+                        cuisineRestaurants: 0,
+                        allergenRestaurants: 0,
+                        allowedRestaurants: 0,
+                        favoriteRestaurants: 0,
+                        dietRestaurants: 0,
+                    },
+                });
+            mockResolveLiveRestaurantCandidates.mockResolvedValueOnce({
+                sourceConfigCount: 1,
+                restaurantIds: [],
+                liveRestaurantCount: 5,
+                matchedRestaurantCount: 0,
+                missingRestaurantCount: 5,
+                queuedImportJobs: [{jobId: 'job-import-1'}, {jobId: 'job-import-2'}],
+                issues: [],
+            });
+
+            await expect(
+                suggestionController.processSuggestion({}, 1)
+            ).rejects.toMatchObject({
+                data: expect.objectContaining({
+                    suggestionDiagnostics: expect.objectContaining({
+                        hints: expect.arrayContaining([
+                            expect.stringContaining('Queued 2 restaurant import jobs'),
+                        ]),
+                    }),
+                }),
+            });
+        });
+
         test('passes favorite restaurant IDs for logged-in user', async () => {
             mockGetFavoriteRestaurantIds.mockResolvedValue(['r-fav-1', 'r-fav-2']);
             setupMock(mockSuggest, {
@@ -273,6 +535,16 @@ describe('SuggestionController', () => {
                     minDietScore: 10,
                 })
             );
+        });
+
+        test('rejects unknown saved locations explicitly requested by the client', async () => {
+            mockGetByIdForUser.mockResolvedValueOnce(null);
+
+            await expect(
+                suggestionController.processSuggestion({locationId: 'loc-missing'}, 5)
+            ).rejects.toMatchObject({
+                message: expect.stringContaining('selected saved location'),
+            });
         });
 
         test('honors advanced threshold and toggle filters', async () => {

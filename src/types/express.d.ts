@@ -15,6 +15,7 @@ declare module "express-serve-static-core" {
     interface Locals {
         data?: any,
         user?: User | null,
+        userIsAdmin?: boolean,
         version: string,
         settings?: Partial<Settings>,
     }

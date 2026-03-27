@@ -18,11 +18,13 @@ import syncRouter from './routes/sync';
 import syncAlertsRouter from './routes/syncAlerts';
 import syncJobsRouter from './routes/syncJobs';
 import providersRouter from './routes/providers';
+import adminRouter from './routes/admin';
 import healthRouter from './routes/health';
 import settings from './modules/settings';
 import {handleGenericError} from './middleware/genericErrorHandler';
 import {requestIdMiddleware} from './middleware/requestIdMiddleware';
 import logger from './modules/logger';
+import {isAdminSession} from './middleware/authMiddleware';
 
 // Version aus package.json lesen
 import {version} from '../package.json';
@@ -41,17 +43,45 @@ app.use(pinoHttp({logger, genReqId: (req) => req.id}));
 
 // Basic Content-Security-Policy header
 app.use((_req, res, next) => {
+    const cspParts = [
+        "default-src 'self'",
+        "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'",
+        "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+        "font-src 'self' https://cdn.jsdelivr.net",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+    ];
+    if (process.env.NODE_ENV === 'production') {
+        cspParts.push('upgrade-insecure-requests');
+    }
+
     res.setHeader(
         'Content-Security-Policy',
-        [
-            "default-src 'self'",
-            "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'",
-            "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
-            "font-src 'self' https://cdn.jsdelivr.net",
-            "img-src 'self' data:",
-            "connect-src 'self'",
-        ].join('; '),
+        cspParts.join('; '),
     );
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Origin-Agent-Cluster', '?1');
+    res.setHeader(
+        'Permissions-Policy',
+        [
+            'camera=()',
+            'geolocation=()',
+            'microphone=()',
+            'payment=()',
+            'usb=()',
+        ].join(', '),
+    );
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     next();
 });
 
@@ -127,6 +157,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use(function (req: Request, res: Response, next: NextFunction) {
     res.locals.user = req.session.user;
+    res.locals.userIsAdmin = isAdminSession(req.session);
     res.locals.version = version;
     // Make CSRF token available to all templates
     res.locals.csrfToken = req.csrfToken ? req.csrfToken() : '';
@@ -152,6 +183,7 @@ app.use('/api/sync', syncRouter);
 app.use('/sync/alerts', syncAlertsRouter);
 app.use('/sync/jobs', syncJobsRouter);
 app.use('/providers', providersRouter);
+app.use('/admin', adminRouter);
 
 app.use('/health', healthRouter);
 app.get('/healthz', (_req, res) => res.redirect(301, '/health'));

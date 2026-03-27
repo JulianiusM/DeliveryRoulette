@@ -6,10 +6,12 @@ block meta
 block body
     - const d = data || {}
     - const selectedDietCount = (d.dietTags || []).filter((tag) => tag.selected).length
-    - const defaultLocation = d.defaultLocation || {}
+    - const defaultLocation = d.defaultLocation || null
+    - const locationEditor = d.locationEditor || {}
     - const savedLocations = d.savedLocations || []
-    - const hasSavedLocation = !!(defaultLocation.label || defaultLocation.addressLine1 || defaultLocation.city || defaultLocation.postalCode || defaultLocation.country || defaultLocation.latitude || defaultLocation.longitude)
-    - const hasCoordinates = defaultLocation.latitude !== '' && defaultLocation.longitude !== ''
+    - const hasSavedLocation = !!defaultLocation
+    - const hasCoordinates = !!(defaultLocation && defaultLocation.latitude !== null && defaultLocation.longitude !== null)
+    - const editingExistingLocation = !!locationEditor.id
 
     .app-shell.py-3
         section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-info
@@ -18,12 +20,12 @@ block body
                     .col-lg-8
                         p.app-eyebrow.mb-2 Personal defaults
                         h1.display-5.fw-semibold.mb-2 Settings
-                        p.lead.text-white-50.mb-0 Configure the saved location and filters that drive location-aware suggestions and provider syncs. The old delivery-area string is still stored only as a compatibility fallback.
+                        p.lead.text-white-50.mb-0 Configure saved locations and filter defaults that drive location-aware suggestions and provider sync. The old delivery-area string remains only as compatibility state.
                     .col-lg-4
                         .row.g-3
                             .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
-                                    span.app-stat-label Location
+                                    span.app-stat-label Default
                                     strong.app-stat-value #{hasSavedLocation ? 'Set' : '-'}
                             .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
@@ -35,33 +37,71 @@ block body
                                     strong.app-stat-value #{selectedDietCount}
                             .col-6.col-xl-3.col-lg-6
                                 .app-stat-card
-                                    span.app-stat-label Cuisines
-                                    strong.app-stat-value #{[d.cuisineIncludes, d.cuisineExcludes].filter(Boolean).length}
+                                    span.app-stat-label Locations
+                                    strong.app-stat-value #{savedLocations.length}
 
         section.card.app-section-card
+            .card-header
+                span
+                    i.bi.bi-signpost-2.me-2
+                    | Recommended Flow
+            .card-body
+                .row.g-4
+                    .col-lg-4
+                        .app-panel.h-100
+                            h2.h5.mb-2
+                                i.bi.bi-1-circle.me-2
+                                | Save A Location
+                            p.text-white-50.small.mb-0 Add or update the saved address that should drive delivery availability and suggestions.
+                    .col-lg-4
+                        .app-panel.h-100
+                            h2.h5.mb-2
+                                i.bi.bi-2-circle.me-2
+                                | Refresh Location Imports
+                            p.text-white-50.small.mb-3 Run a location import so providers refresh restaurant availability for the selected saved location.
+                            a.btn.btn-sm.btn-outline-light(href="/providers")
+                                i.bi.bi-geo-alt.me-1
+                                | Open Location Imports
+                    .col-lg-4
+                        .app-panel.h-100
+                            h2.h5.mb-2
+                                i.bi.bi-3-circle.me-2
+                                | Suggest
+                            p.text-white-50.small.mb-3 Once the background import finishes, Suggestions can filter against that saved location.
+                            a.btn.btn-sm.btn-outline-success(href="/suggest")
+                                i.bi.bi-shuffle.me-1
+                                | Open Suggestions
+
+        section.card.app-section-card.mt-4
             .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
                 span
                     i.bi.bi-gear-fill.me-2
                     | Suggestion Defaults
-                a.btn.btn-sm.btn-outline-info(href="/users/settings/diets")
-                    i.bi.bi-sliders.me-1
-                    | Configure Global Diet Heuristics
+                if userIsAdmin
+                    a.btn.btn-sm.btn-outline-info(href="/users/settings/diets")
+                        i.bi.bi-sliders.me-1
+                        | Configure Global Diet Heuristics
             .card-body
                 form(action="/users/settings" method="post")
                     +csrf
-                    input(type="hidden" name="defaultLocationId" value=(defaultLocation.id || ''))
+                    input(type="hidden" name="defaultLocationId" value=(locationEditor.id || ''))
                     .row.g-4
                         .col-xl-6
                             .app-panel.h-100
                                 .d-flex.justify-content-between.align-items-start.flex-wrap.gap-2.mb-3
-                                    h2.h5.mb-0
-                                        i.bi.bi-geo-alt-fill.me-2
-                                        | Saved Default Location
-                                    if hasCoordinates
-                                        span.badge.rounded-pill.text-bg-success Coordinates set
-                                    else
-                                        span.badge.rounded-pill.text-bg-secondary Coordinates optional
-                                p.text-white-50.small.mb-3 This location is the primary context for provider resolution, sync, and suggestion filtering. Add latitude and longitude for the most reliable Lieferando-style availability.
+                                    div
+                                        h2.h5.mb-1
+                                            i.bi.bi-geo-alt-fill.me-2
+                                            | Location Editor
+                                        p.text-white-50.small.mb-0 #{editingExistingLocation ? 'Editing a saved location.' : 'Create a saved location.'}
+                                    .d-flex.flex-wrap.gap-2
+                                        if locationEditor.makeDefault
+                                            span.badge.rounded-pill.text-bg-info Default after save
+                                        if locationEditor.latitude && locationEditor.longitude
+                                            span.badge.rounded-pill.text-bg-success Coordinates set
+                                        else
+                                            span.badge.rounded-pill.text-bg-secondary Coordinates optional
+                                p.text-white-50.small.mb-3 This location is the provider-resolution and availability context. If latitude and longitude are left blank, DeliveryRoulette will try to resolve them automatically from the entered address. Manual coordinates always win.
                                 .row.g-3
                                     .col-12
                                         label.form-label(for="defaultLocationLabel")
@@ -71,7 +111,7 @@ block body
                                             type="text"
                                             name="defaultLocationLabel"
                                             maxlength="150"
-                                            value=(defaultLocation.label || '')
+                                            value=(locationEditor.label || '')
                                             placeholder="e.g. Home, Office, Weekend Flat"
                                         )
                                     .col-12
@@ -82,7 +122,7 @@ block body
                                             type="text"
                                             name="defaultLocationAddressLine1"
                                             maxlength="255"
-                                            value=(defaultLocation.addressLine1 || '')
+                                            value=(locationEditor.addressLine1 || '')
                                             placeholder="Street and house number"
                                         )
                                     .col-12
@@ -93,7 +133,7 @@ block body
                                             type="text"
                                             name="defaultLocationAddressLine2"
                                             maxlength="255"
-                                            value=(defaultLocation.addressLine2 || '')
+                                            value=(locationEditor.addressLine2 || '')
                                             placeholder="Apartment, building, floor"
                                         )
                                     .col-md-5
@@ -104,7 +144,7 @@ block body
                                             type="text"
                                             name="defaultLocationCity"
                                             maxlength="100"
-                                            value=(defaultLocation.city || '')
+                                            value=(locationEditor.city || '')
                                             placeholder="City"
                                         )
                                     .col-md-3
@@ -115,7 +155,7 @@ block body
                                             type="text"
                                             name="defaultLocationPostalCode"
                                             maxlength="20"
-                                            value=(defaultLocation.postalCode || '')
+                                            value=(locationEditor.postalCode || '')
                                             placeholder="93073"
                                         )
                                     .col-md-4
@@ -126,7 +166,7 @@ block body
                                             type="text"
                                             name="defaultLocationCountry"
                                             maxlength="100"
-                                            value=(defaultLocation.country || '')
+                                            value=(locationEditor.country || '')
                                             placeholder="Germany"
                                         )
                                     .col-md-6
@@ -136,7 +176,7 @@ block body
                                         input#defaultLocationLatitude.form-control.text-bg-dark(
                                             type="text"
                                             name="defaultLocationLatitude"
-                                            value=(defaultLocation.latitude || '')
+                                            value=(locationEditor.latitude || '')
                                             placeholder="48.9889211"
                                             inputmode="decimal"
                                         )
@@ -147,32 +187,28 @@ block body
                                         input#defaultLocationLongitude.form-control.text-bg-dark(
                                             type="text"
                                             name="defaultLocationLongitude"
-                                            value=(defaultLocation.longitude || '')
+                                            value=(locationEditor.longitude || '')
                                             placeholder="12.1984299"
                                             inputmode="decimal"
                                         )
-                                if savedLocations.length
-                                    .mt-4
-                                        h3.h6.text-uppercase.text-white-50.mb-3 Saved Locations
-                                        .d-flex.flex-column.gap-2
-                                            each location in savedLocations
-                                                - const summaryParts = [location.addressLine1, [location.postalCode, location.city].filter(Boolean).join(' '), location.country].filter(Boolean)
-                                                .rounded-3.border.border-secondary-subtle.p-3
-                                                    .d-flex.justify-content-between.align-items-start.flex-wrap.gap-2
-                                                        div
-                                                            strong.d-block #{location.label}
-                                                            if summaryParts.length
-                                                                small.text-white-50 #{summaryParts.join(' / ')}
-                                                        .d-flex.flex-wrap.gap-2
-                                                            if location.isDefault
-                                                                span.badge.rounded-pill.text-bg-info Default
-                                                            if location.latitude !== null && location.longitude !== null
-                                                                span.badge.rounded-pill.text-bg-success Geo-tagged
-                                                            else
-                                                                span.badge.rounded-pill.text-bg-secondary No coords
-                                else
-                                    .rounded-3.border.border-secondary-subtle.p-3.mt-4
-                                        p.text-white-50.small.mb-0 No saved locations yet. Saving the form above will create your first default location.
+                                    .col-12
+                                        .form-text.text-white-50 Automatic lookup uses the address fields above. If the lookup cannot find a result, refine the address or enter coordinates manually.
+                                    .col-12
+                                        label.suggestion-switch(for="defaultLocationMakeDefault")
+                                            input#defaultLocationMakeDefault.form-check-input(
+                                                type="checkbox"
+                                                name="defaultLocationMakeDefault"
+                                                checked=!!locationEditor.makeDefault
+                                            )
+                                            span Make this location the default selection after saving
+                                .d-flex.flex-wrap.gap-2.mt-3
+                                    button.btn.btn-primary(type="submit")
+                                        i.bi.bi-check-lg.me-1
+                                        | #{editingExistingLocation ? 'Update Location And Filters' : 'Save Location And Filters'}
+                                    if editingExistingLocation
+                                        a.btn.btn-outline-light(href="/users/settings")
+                                            i.bi.bi-plus-lg.me-1
+                                            | New Location
                         .col-xl-6
                             .app-panel.h-100
                                 h2.h5.mb-3
@@ -225,21 +261,69 @@ block body
                                             placeholder="e.g. Fast Food, Sushi"
                                         )
                                         .form-text.text-white-50 Comma-separated list of cuisines to exclude.
-                                .mt-3
-                                    label.form-label(for="deliveryAreaDerived")
-                                        i.bi.bi-arrow-repeat.me-1
-                                        | Legacy Delivery Area
-                                    input#deliveryAreaDerived.form-control.text-bg-dark(
-                                        type="text"
-                                        value=(d.deliveryArea || '')
-                                        readonly
-                                        placeholder="Derived from the saved default location"
-                                    )
-                                    .form-text.text-white-50 This value is kept only for transition and backfill. The saved location above is the real availability key.
+                                    .col-12
+                                        label.form-label(for="deliveryAreaDerived")
+                                            i.bi.bi-arrow-repeat.me-1
+                                            | Legacy Delivery Area
+                                        input#deliveryAreaDerived.form-control.text-bg-dark(
+                                            type="text"
+                                            value=(d.deliveryArea || '')
+                                            readonly
+                                            placeholder="Derived from the saved default location"
+                                        )
+                                        .form-text.text-white-50 This field is transitional only. Saved locations are the real availability key.
                     .d-flex.flex-wrap.gap-2.mt-4
                         button.btn.btn-success(type="submit")
                             i.bi.bi-check-lg.me-1
-                            | Save Settings
+                            | Save All Changes
                         a.btn.btn-outline-light(href="/users/dashboard")
                             i.bi.bi-arrow-left.me-1
                             | Back To Dashboard
+
+        section.card.app-section-card.mt-4
+            .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
+                span
+                    i.bi.bi-pin-map.me-2
+                    | Saved Locations
+                if defaultLocation
+                    span.app-chip
+                        i.bi.bi-geo-alt.me-1
+                        | Default #{defaultLocation.label}
+            .card-body
+                if savedLocations.length
+                    .d-flex.flex-column.gap-3
+                        each location in savedLocations
+                            - const summaryParts = [location.addressLine1, [location.postalCode, location.city].filter(Boolean).join(' '), location.country].filter(Boolean)
+                            article.rounded-3.border.border-secondary-subtle.p-3
+                                .d-flex.justify-content-between.align-items-start.flex-wrap.gap-2
+                                    div
+                                        strong.d-block #{location.label}
+                                        if summaryParts.length
+                                            small.text-white-50 #{summaryParts.join(' / ')}
+                                    .d-flex.flex-wrap.gap-2
+                                        if location.isDefault
+                                            span.badge.rounded-pill.text-bg-info Default
+                                        if location.id === locationEditor.id
+                                            span.badge.rounded-pill.text-bg-light.text-dark Editing
+                                        if location.latitude !== null && location.longitude !== null
+                                            span.badge.rounded-pill.text-bg-success Geo-tagged
+                                        else
+                                            span.badge.rounded-pill.text-bg-secondary No coords
+                                .d-flex.flex-wrap.gap-2.mt-3
+                                    a.btn.btn-sm.btn-outline-light(href=`/users/settings?locationId=${encodeURIComponent(location.id)}`)
+                                        i.bi.bi-pencil.me-1
+                                        | Edit
+                                    if !location.isDefault
+                                        form(method="post" action=`/users/settings/locations/${encodeURIComponent(location.id)}/default`)
+                                            +csrf
+                                            button.btn.btn-sm.btn-outline-info(type="submit")
+                                                i.bi.bi-pin-angle.me-1
+                                                | Make Default
+                                    form(method="post" action=`/users/settings/locations/${encodeURIComponent(location.id)}/delete`)
+                                        +csrf
+                                        button.btn.btn-sm.btn-outline-danger(type="submit")
+                                            i.bi.bi-trash.me-1
+                                            | Remove
+                else
+                    .rounded-3.border.border-secondary-subtle.p-3
+                        p.text-white-50.small.mb-0 No saved locations yet. Saving the editor form will create your first location.

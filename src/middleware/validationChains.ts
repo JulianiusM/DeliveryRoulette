@@ -52,6 +52,7 @@ export const validateSettings = [
     body('defaultLocationCountry').optional().trim().isLength({max: 100}).withMessage('Country must be at most 100 characters'),
     body('defaultLocationLatitude').optional({checkFalsy: true}).trim().isFloat({min: -90, max: 90}).withMessage('Latitude must be between -90 and 90'),
     body('defaultLocationLongitude').optional({checkFalsy: true}).trim().isFloat({min: -180, max: 180}).withMessage('Longitude must be between -180 and 180'),
+    body('defaultLocationMakeDefault').optional().isIn(['on', 'true', '1', 'yes', '']).withMessage('Default location toggle is invalid'),
     body('defaultLocationLabel').custom((value, {req}) => {
         const label = typeof value === 'string' ? value.trim() : '';
         const relatedFields = [
@@ -129,6 +130,7 @@ export const validateImportApply = [
 
 export const validateProviderSync = [
     body('listingUrl').trim().isURL().withMessage('Valid listing URL is required'),
+    body('locationId').optional({checkFalsy: true}).trim().isUUID().withMessage('Location must be a valid saved location'),
 ];
 
 export const validateProviderImportUrl = [

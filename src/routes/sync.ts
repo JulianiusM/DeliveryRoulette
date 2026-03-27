@@ -1,5 +1,5 @@
 import express from 'express';
-import {requireAuth} from '../middleware/authMiddleware';
+import {requireAdmin} from '../middleware/authMiddleware';
 import * as syncController from '../controller/syncController';
 import {SyncJobStatus} from '../modules/database/entities/sync/SyncJob';
 
@@ -11,7 +11,7 @@ const router = express.Router();
  * Accepts optional JSON body `{ providerKey: "uber_eats" }`.
  * When providerKey is omitted, all registered connectors are synced.
  */
-router.post('/', requireAuth, async (req, res, next) => {
+router.post('/', requireAdmin, async (req, res, next) => {
     try {
         const {providerKey} = req.body ?? {};
         const result = await syncController.triggerSync(providerKey);
@@ -25,7 +25,7 @@ router.post('/', requireAuth, async (req, res, next) => {
  * GET /api/sync/jobs
  * List recent sync jobs for status polling.
  */
-router.get('/jobs', requireAuth, async (req, res, next) => {
+router.get('/jobs', requireAdmin, async (req, res, next) => {
     try {
         const providerKey = typeof req.query.providerKey === 'string' ? req.query.providerKey : undefined;
         const statusRaw = typeof req.query.status === 'string' ? req.query.status : undefined;
@@ -50,7 +50,7 @@ router.get('/jobs', requireAuth, async (req, res, next) => {
  * GET /api/sync/jobs/:id
  * Get one sync job by ID.
  */
-router.get('/jobs/:id', requireAuth, async (req, res, next) => {
+router.get('/jobs/:id', requireAdmin, async (req, res, next) => {
     try {
         const job = await syncController.getSyncJob(req.params.id);
         res.json({job});

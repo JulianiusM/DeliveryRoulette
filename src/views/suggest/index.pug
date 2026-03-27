@@ -10,10 +10,9 @@ block body
     - const selectedDietLabels = dietTags.filter((tag) => selectedDietTagIds.includes(tag.id)).map((tag) => tag.label)
     - const favoriteMode = d.favoriteMode || 'prefer'
     - const activeLocation = d.activeLocation || null
+    - const savedLocations = d.savedLocations || []
 
     form#suggestionForm.suggestion-page.py-3
-        if activeLocation
-            input#locationId(type="hidden" name="locationId" value=activeLocation.id)
         section.card.border-0.shadow-lg.overflow-hidden.restaurant-list-hero.suggestion-hero-card
             .card-body.p-4.p-lg-5
                 .row.g-4.align-items-end
@@ -90,6 +89,7 @@ block body
 
                     .col-lg-4
                         .suggestion-launch-panel
+                            p.text-white-50.small.mb-3 If nothing matches, DeliveryRoulette explains which filter stage emptied the pool and suggests what to change next.
                             .d-grid.gap-2
                                 button#suggestBtn.btn.btn-success.btn-lg.py-3(type="submit")
                                     i.bi.bi-dice-5.me-2
@@ -164,6 +164,22 @@ block body
                                         .form-text.text-white-50 Use delivery or pickup availability snapshots when filtering the pool.
 
                                     .col-12
+                                        label.form-label(for="locationId")
+                                            i.bi.bi-geo-alt.me-1
+                                            | Saved Location
+                                        if savedLocations.length
+                                            select#locationId.form-select.text-bg-dark(name="locationId")
+                                                each location in savedLocations
+                                                    option(
+                                                        value=location.id
+                                                        selected=!!(activeLocation && activeLocation.id === location.id)
+                                                    ) #{location.label}#{location.isDefault ? ' (Default)' : ''}#{location.hasCoordinates ? '' : ' - no coords'}
+                                            .form-text.text-white-50 Choose the saved location that should scope restaurant availability for this draw.
+                                        else
+                                            input#locationId.form-control.text-bg-dark(type="text" value="" disabled placeholder="No saved location configured")
+                                            .form-text.text-warning A saved location is required before suggestions can use location-aware availability.
+
+                                    .col-12
                                         label.form-label(for="openOnly")
                                             i.bi.bi-clock.me-1
                                             | Availability
@@ -214,7 +230,7 @@ block body
             .card-body.text-center.py-5
                 i.bi.bi-compass.display-4.text-white-50.d-block.mb-3
                 h2.h4.mb-2 No suggestion generated yet
-                p.text-white-50.mb-0 Run the defaults or open the advanced filters to refine the draw.
+                p.text-white-50.mb-0 Run the defaults or open the advanced filters to refine the draw. If the pool is empty, the page shows hints for location, opening hours, diet, cuisine, and import/sync issues.
 
         section#suggestionResult.d-none.mt-4
             .card.text-bg-dark.border-secondary.shadow-sm.suggestion-result-card

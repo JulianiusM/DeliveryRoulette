@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import {AppDataSource} from '../dataSource';
 import {coerceLimit, generateUniqueToken, maskEmail, SQL_ALLOW_LIST} from '../../lib/util';
-import {User} from '../entities/user/User';
+import {User, UserRole} from '../entities/user/User';
 import {MoreThan} from "typeorm";
 import type {OidcClaims, UserInfo} from "../../../types/UserTypes";
 import settings from '../../settings';
@@ -10,17 +10,18 @@ export async function registerUser(username: string, name: string, password: str
     const repo = AppDataSource.getRepository(User);
     const hashed = await bcrypt.hash(password, 10);
 
-    const user = repo.create({username, name, password: hashed, email, isActive: false});
+    const user = repo.create({username, name, password: hashed, email, role: 'user', isActive: false});
     const result = await repo.save(user);
     return result.id;
 }
 
 export async function getUserByUsername(username: string) {
     const repo = AppDataSource.getRepository(User);
-    return await repo.findOne({
+    const user = await repo.findOne({
         where: {username},
-        select: ['id', 'name', 'username', 'email', 'isActive']
+        select: ['id', 'name', 'username', 'email', 'role', 'isActive']
     });
+    return await persistBootstrapAdminRoleIfNeeded(repo, user);
 }
 
 export async function verifyPassword(userId: number, password: string) {
@@ -48,7 +49,7 @@ export async function verifyActivationToken(token: string) {
             activationToken: token,
             activationTokenExpiration: MoreThan(new Date())
         },
-        select: ['id', 'name', 'username', 'email', 'isActive']
+        select: ['id', 'name', 'username', 'email', 'role', 'isActive']
     });
 }
 
@@ -79,7 +80,7 @@ export async function verifyPasswordResetToken(token: string) {
             resetToken: token,
             resetTokenExpiration: MoreThan(new Date())
         },
-        select: ['id', 'name', 'username', 'email', 'isActive']
+        select: ['id', 'name', 'username', 'email', 'role', 'isActive']
     });
 }
 
@@ -124,10 +125,11 @@ async function toUniqueUsername(base: string): Promise<string> {
  */
 export async function getUserByOidc(oidcIssuer: string, oidcSub: string) {
     const repo = AppDataSource.getRepository(User);
-    return await repo.findOne({
+    const user = await repo.findOne({
         where: {oidcIssuer, oidcSub},
-        select: ['id', 'name', 'username', 'email', 'isActive'],
+        select: ['id', 'name', 'username', 'email', 'role', 'isActive'],
     });
+    return await persistBootstrapAdminRoleIfNeeded(repo, user);
 }
 
 /**
@@ -170,6 +172,7 @@ export async function findOrCreateUserFromOidc(
                 user.oidcIssuer = oidcIssuer;
                 user.oidcSub = sub;
                 if (user.isActive !== true) user.isActive = true;
+                applyBootstrapAdminRole(user);
                 await repo.save(user);
             }
         }
@@ -198,6 +201,10 @@ export async function findOrCreateUserFromOidc(
                 email: emailToUse,
                 password: null,
                 isActive: true,
+                role: resolveDefaultRole({
+                    username: uniqueUsername,
+                    email: emailToUse,
+                }),
                 oidcIssuer,
                 oidcSub: sub,
             });
@@ -220,7 +227,7 @@ export async function findOrCreateUserFromOidc(
             }
         }
 
-        return user;
+        return await persistBootstrapAdminRoleIfNeeded(repo, user);
     });
 }
 
@@ -323,5 +330,53 @@ export async function searchUsersSubstringStrict(query: string, limit = 10): Pro
 
 /** Optional helpers you might find useful elsewhere */
 export async function getUserById(id: number): Promise<User | null> {
-    return await AppDataSource.getRepository(User).findOne({where: {id}});
+    const repo = AppDataSource.getRepository(User);
+    const user = await repo.findOne({where: {id}});
+    return await persistBootstrapAdminRoleIfNeeded(repo, user);
+}
+
+function resolveDefaultRole(user: Pick<User, 'username' | 'email'>): UserRole {
+    return isConfiguredAdminIdentity(user) ? 'admin' : 'user';
+}
+
+function applyBootstrapAdminRole(user: User): User {
+    if (user.role === 'admin') {
+        return user;
+    }
+
+    if (isConfiguredAdminIdentity(user)) {
+        user.role = 'admin';
+    } else if (!user.role) {
+        user.role = 'user';
+    }
+
+    return user;
+}
+
+async function persistBootstrapAdminRoleIfNeeded(
+    repo: import('typeorm').Repository<User>,
+    user: User | null,
+): Promise<User | null> {
+    if (!user) {
+        return null;
+    }
+
+    const beforeRole = user.role || 'user';
+    applyBootstrapAdminRole(user);
+    if (user.role !== beforeRole) {
+        user.updatedAt = new Date();
+        await repo.save(user);
+    }
+
+    return user;
+}
+
+function isConfiguredAdminIdentity(user: Pick<User, 'username' | 'email'>): boolean {
+    const adminUsernames = new Set(settings.value.adminUsernames.map((entry) => entry.toLowerCase()));
+    const adminEmails = new Set(settings.value.adminEmails.map((entry) => entry.toLowerCase()));
+    const username = typeof user.username === 'string' ? user.username.trim().toLowerCase() : '';
+    const email = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+
+    return (username.length > 0 && adminUsernames.has(username))
+        || (email.length > 0 && adminEmails.has(email));
 }

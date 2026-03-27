@@ -65,6 +65,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         ],
         negativeKeywords: [
             // EN
+            'meat', 'sausage',
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
             'calamari', 'squid', 'doner', 'doener', 'shawarma', 'schawarma',
@@ -73,6 +74,8 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'paneer', 'ricotta', 'parmesan',
             'yoghurt', 'yogurt', 'mayonnaise', 'mayo', 'honey', 'gyros',
             // DE
+            'fleisch', 'fleischgericht', 'fleischgerichte',
+            'wurst', 'bratwurst', 'currywurst', 'schnitzel', 'hackfleisch',
             'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
             'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn',
@@ -97,7 +100,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'mayonnaise', 'mayo',
             // DE
             'huhn', 'hähnchen', 'rind', 'schwein', 'fisch',
-            'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
+            'schnitzel', 'wurst', 'bratwurst', 'currywurst', 'hackfleisch',
             'soße', 'sosse',
         ],
     },
@@ -126,10 +129,13 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
         ],
         negativeKeywords: [
             // EN
+            'meat', 'sausage',
             'beef', 'chicken', 'pork', 'ham', 'bacon', 'fish', 'salmon', 'tuna',
             'shrimp', 'prawn', 'seafood', 'lamb', 'duck', 'turkey',
             'calamari', 'squid', 'doner', 'doener', 'shawarma', 'schawarma',
             // DE
+            'fleisch', 'fleischgericht', 'fleischgerichte',
+            'wurst', 'bratwurst', 'currywurst', 'schnitzel', 'hackfleisch',
             'rind', 'rindfleisch', 'huhn', 'hähnchen', 'schwein', 'schweinefleisch',
             'speck', 'schinken', 'fisch', 'lachs', 'thunfisch',
             'garnelen', 'meeresfrüchte', 'lamm', 'ente', 'pute', 'truthahn', 'gyros',
@@ -148,7 +154,7 @@ export const DEFAULT_DIET_TAGS: readonly DefaultDietTag[] = [
             'steak', 'nugget', 'nuggets', 'sausage', 'mince',
             // DE
             'huhn', 'hähnchen', 'rind', 'schwein', 'fisch',
-            'schnitzel', 'wurst', 'bratwurst', 'hackfleisch',
+            'schnitzel', 'wurst', 'bratwurst', 'currywurst', 'hackfleisch',
         ],
     },
     {

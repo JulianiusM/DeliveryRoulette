@@ -7,6 +7,7 @@ type ServiceType = 'delivery' | 'collection';
 interface SuggestionPayload {
     dietTagIds: string[];
     locationId?: string;
+    locationLabel?: string;
     serviceType: ServiceType;
     excludeAllergens: string;
     cuisineIncludes: string;
@@ -16,6 +17,28 @@ interface SuggestionPayload {
     respectDoNotSuggest: boolean;
     favoriteMode: FavoriteMode;
     minDietScore: number;
+}
+
+interface SuggestionNoMatchDiagnostics {
+    blockingStage?: string;
+    hints?: string[];
+    counts?: {
+        activeRestaurants?: number;
+        locationRestaurants?: number;
+        alternateServiceRestaurants?: number;
+        locationProviderContexts?: number;
+        locationCoverageRestaurants?: number;
+        locationLatestSnapshots?: number;
+        locationFreshSnapshots?: number;
+        locationExpiredSnapshots?: number;
+        unavailableLocationRestaurants?: number;
+        openRestaurants?: number;
+        cuisineRestaurants?: number;
+        allergenRestaurants?: number;
+        allowedRestaurants?: number;
+        favoriteRestaurants?: number;
+        dietRestaurants?: number;
+    };
 }
 
 let initialized = false;
@@ -89,7 +112,11 @@ async function runSuggestion(): Promise<void> {
         }
 
         if (alertBox) {
-            renderLocalAlert(err.message || 'No restaurants match your filters.', alertBox);
+            renderLocalAlert(
+                err.message || 'No restaurants match your filters.',
+                alertBox,
+                err?.data?.suggestionDiagnostics,
+            );
         }
     } finally {
         setLoadingState(false, hadVisibleResult);
@@ -102,7 +129,11 @@ function collectPayload(): SuggestionPayload {
     const dietTagIds = Array.from(dietCheckboxes).map((checkbox) => checkbox.value);
     const serviceTypeValue = (document.getElementById('serviceType') as HTMLSelectElement | null)?.value;
     const serviceType: ServiceType = serviceTypeValue === 'collection' ? 'collection' : 'delivery';
-    const locationId = (document.getElementById('locationId') as HTMLInputElement | null)?.value?.trim() || undefined;
+    const locationSelect = document.getElementById('locationId') as HTMLSelectElement | HTMLInputElement | null;
+    const locationId = locationSelect?.value?.trim() || undefined;
+    const locationLabel = locationSelect instanceof HTMLSelectElement
+        ? locationSelect.selectedOptions[0]?.textContent?.trim() || undefined
+        : undefined;
 
     const favoriteModeValue = (document.getElementById('favoriteMode') as HTMLSelectElement | null)?.value;
     const favoriteMode: FavoriteMode = favoriteModeValue === 'only' || favoriteModeValue === 'ignore'
@@ -112,6 +143,7 @@ function collectPayload(): SuggestionPayload {
     return {
         dietTagIds,
         locationId,
+        locationLabel,
         serviceType,
         excludeAllergens: (document.getElementById('excludeAllergens') as HTMLInputElement | null)?.value || '',
         cuisineIncludes: (document.getElementById('cuisineIncludes') as HTMLInputElement | null)?.value || '',
@@ -280,6 +312,9 @@ function renderFilterSummary(payload: SuggestionPayload): void {
     }
 
     filterBadges.push(payload.serviceType === 'collection' ? 'Collection availability' : 'Delivery availability');
+    if (payload.locationLabel) {
+        filterBadges.push(`Location ${payload.locationLabel}`);
+    }
     filterBadges.push(payload.openOnly ? 'Open now only' : 'Open and closed');
     filterBadges.push(payload.excludeRecentlySuggested ? 'Recent repeats blocked' : 'Recent repeats allowed');
     filterBadges.push(payload.respectDoNotSuggest ? 'Blocked restaurants hidden' : 'Blocked restaurants allowed');
@@ -317,14 +352,83 @@ function clearLocalAlerts(): void {
     }
 }
 
-function renderLocalAlert(message: string, container: HTMLElement): void {
+function renderLocalAlert(
+    message: string,
+    container: HTMLElement,
+    diagnostics?: SuggestionNoMatchDiagnostics,
+): void {
     container.innerHTML = '';
 
     const alert = document.createElement('div');
     alert.className = 'alert alert-info shadow-sm mb-0';
     alert.role = 'alert';
-    alert.textContent = message;
+
+    const title = document.createElement('div');
+    title.className = 'fw-semibold mb-2';
+    title.textContent = message;
+    alert.appendChild(title);
+
+    const countBadges = renderDiagnosticCounts(diagnostics?.counts);
+    if (countBadges) {
+        alert.appendChild(countBadges);
+    }
+
+    const hints = Array.isArray(diagnostics?.hints)
+        ? diagnostics.hints.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        : [];
+    if (hints.length > 0) {
+        const intro = document.createElement('p');
+        intro.className = 'mb-2 small';
+        intro.textContent = 'Try one or more of these next steps:';
+        alert.appendChild(intro);
+
+        const list = document.createElement('ul');
+        list.className = 'mb-0 small';
+        for (const hint of hints) {
+            const item = document.createElement('li');
+            item.textContent = hint;
+            list.appendChild(item);
+        }
+        alert.appendChild(list);
+    }
+
     container.appendChild(alert);
+}
+
+function renderDiagnosticCounts(counts?: SuggestionNoMatchDiagnostics['counts']): HTMLDivElement | null {
+    if (!counts) {
+        return null;
+    }
+
+    const entries: Array<[string, number | undefined]> = [
+        ['Active', counts.activeRestaurants],
+        ['At location', counts.locationRestaurants],
+        ['Providers', counts.locationProviderContexts],
+        ['Coverage', counts.locationCoverageRestaurants],
+        ['Snapshots', counts.locationFreshSnapshots],
+        ['Expired', counts.locationExpiredSnapshots],
+        ['Unavailable', counts.unavailableLocationRestaurants],
+        ['Open', counts.openRestaurants],
+        ['Cuisine', counts.cuisineRestaurants],
+        ['Allergen-safe', counts.allergenRestaurants],
+        ['Allowed', counts.allowedRestaurants],
+        ['Favorites', counts.favoriteRestaurants],
+        ['Diet match', counts.dietRestaurants],
+    ];
+
+    const usableEntries = entries.filter(([, value]) => typeof value === 'number');
+    if (usableEntries.length === 0) {
+        return null;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'd-flex flex-wrap gap-2 mb-3';
+
+    for (const [label, value] of usableEntries) {
+        wrap.appendChild(createBadge(`${label} ${value}`, 'text-bg-dark border border-secondary'));
+    }
+
+    return wrap;
 }
 
 function setLoadingState(isLoading: boolean, keepResultVisible: boolean): void {

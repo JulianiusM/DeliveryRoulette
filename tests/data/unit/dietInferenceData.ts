@@ -327,6 +327,24 @@ export const inferForTagData = [
         expectedMatchedItemIds: [],
     },
     {
+        description: 'negative hit: "Currywurst mit Pommes" in meat category does not match vegan',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {id: 'item-1', name: 'Currywurst mit Pommes', description: null, categoryName: 'Fleischgerichte'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
+        description: 'negative hit: "Currywurst mit Pommes" in meat category does not match vegetarian',
+        tag: buildTestTag('VEGETARIAN', 'tag-vegetarian'),
+        items: [
+            {id: 'item-1', name: 'Currywurst mit Pommes', description: null, categoryName: 'Fleischgerichte'},
+        ],
+        expectedMatchCount: 0,
+        expectedMatchedItemIds: [],
+    },
+    {
         description: 'negative hit: "Milchreis" does not match lactose-free',
         tag: buildTestTag('LACTOSE_FREE', 'tag-lactose-free'),
         items: [
@@ -794,6 +812,20 @@ export const inferForTagData = [
         expectedMatchCount: 0,
         expectedMatchedItemIds: [],
     },
+    {
+        description: 'qualified sausage-style names still match vegan when explicitly plant-based',
+        tag: buildTestTag('VEGAN', 'tag-vegan'),
+        items: [
+            {
+                id: 'item-1',
+                name: 'Plant-based Currywurst',
+                description: 'mit Pommes frites',
+                categoryName: 'Specials',
+            },
+        ],
+        expectedMatchCount: 1,
+        expectedMatchedItemIds: ['item-1'],
+    },
 ];
 
 export const heuristicCoverageCases = [
@@ -933,7 +965,7 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '8.2.0',
+    expectedCurrent: '8.2.1',
 };
 
 

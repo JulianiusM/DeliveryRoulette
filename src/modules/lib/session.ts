@@ -28,3 +28,39 @@ export function persistSession(session: Request['session']): Promise<void> {
     });
 }
 
+export function regenerateSession(session: Request['session']): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const regenerate = session.regenerate?.bind(session);
+        if (!regenerate) {
+            resolve();
+            return;
+        }
+
+        regenerate((err) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve();
+        });
+    });
+}
+
+export function destroySession(session: Request['session']): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const destroy = session.destroy?.bind(session);
+        if (!destroy) {
+            resolve();
+            return;
+        }
+
+        destroy((err) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve();
+        });
+    });
+}
+

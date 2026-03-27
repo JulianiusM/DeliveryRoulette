@@ -62,34 +62,44 @@ html(lang="en")
                             li.nav-item.dropdown
                                 a.nav-link.dropdown-toggle.app-nav-pill(href="#" id="navOperations" role="button" data-bs-toggle="dropdown" aria-expanded="false")
                                     i.bi.bi-grid-1x2.me-1
-                                    | Operations
+                                    | My Setup
                                 ul.dropdown-menu.dropdown-menu-dark(aria-labelledby="navOperations")
                                     li
-                                        h6.dropdown-header Core Workflows
+                                        h6.dropdown-header Personal Workflows
                                     li
-                                        a.dropdown-item(href="/import")
-                                            i.bi.bi-upload.me-1
-                                            | Import
+                                        a.dropdown-item(href="/providers")
+                                            i.bi.bi-geo-alt.me-1
+                                            | Location Imports
                                     li
                                         a.dropdown-item(href="/help")
                                             i.bi.bi-question-circle.me-1
                                             | Help
-                                    li
-                                        hr.dropdown-divider
-                                    li
-                                        h6.dropdown-header Operations
-                                    li
-                                        a.dropdown-item(href="/providers")
-                                            i.bi.bi-plug.me-1
-                                            | Providers
-                                    li
-                                        a.dropdown-item(href="/sync/jobs")
-                                            i.bi.bi-list-check.me-1
-                                            | Sync Jobs
-                                    li
-                                        a.dropdown-item(href="/sync/alerts")
-                                            i.bi.bi-bell.me-1
-                                            | Sync Alerts
+                            if userIsAdmin
+                                li.nav-item.dropdown
+                                    a.nav-link.dropdown-toggle.app-nav-pill(href="#" id="navAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false")
+                                        i.bi.bi-shield-lock.me-1
+                                        | Admin
+                                    ul.dropdown-menu.dropdown-menu-dark(aria-labelledby="navAdmin")
+                                        li
+                                            a.dropdown-item(href="/admin/operations")
+                                                i.bi.bi-shield-lock.me-1
+                                                | Admin Operations
+                                        li
+                                            a.dropdown-item(href="/import")
+                                                i.bi.bi-upload.me-1
+                                                | Bulk Import
+                                        li
+                                            a.dropdown-item(href="/sync/jobs")
+                                                i.bi.bi-list-check.me-1
+                                                | Sync Jobs
+                                        li
+                                            a.dropdown-item(href="/sync/alerts")
+                                                i.bi.bi-bell.me-1
+                                                | Sync Alerts
+                                        li
+                                            a.dropdown-item(href="/users/settings/diets")
+                                                i.bi.bi-sliders.me-1
+                                                | Diet Heuristics
 
                         // Right side: user account
                         ul.navbar-nav.ms-auto

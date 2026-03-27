@@ -5,6 +5,7 @@ import * as menuController from "../controller/menuController";
 import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import {getSessionUserId} from '../modules/lib/util';
+import {requireAdmin} from '../middleware/authMiddleware';
 import {handleValidationError} from '../middleware/validationErrorHandler';
 import {
     validateRestaurant, validateProviderRef, validateDietOverride,
@@ -26,12 +27,12 @@ app.get('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // GET /restaurants/new - Show create form
-app.get('/new', asyncHandler(async (_req: Request, res: Response) => {
+app.get('/new', requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
     renderer.renderWithData(res, 'restaurants/form', {editing: false});
 }));
 
 // POST /restaurants/new - Create restaurant
-app.post('/new', validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/new', requireAdmin, validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const restaurant = await restaurantController.createRestaurant(req.body);
     res.redirect(`/restaurants/${restaurant.id}`);
 }));
@@ -44,13 +45,13 @@ app.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // GET /restaurants/:id/edit - Show edit form
-app.get('/:id/edit', asyncHandler(async (req: Request, res: Response) => {
+app.get('/:id/edit', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const data = await restaurantController.getRestaurantEditData(req.params.id);
     renderer.renderWithData(res, 'restaurants/form', data);
 }));
 
 // POST /restaurants/:id/edit - Update restaurant
-app.post('/:id/edit', validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/edit', requireAdmin, validateRestaurant, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const restaurant = await restaurantController.updateRestaurant(req.params.id, req.body);
     res.redirect(`/restaurants/${restaurant.id}`);
 }));
@@ -58,26 +59,26 @@ app.post('/:id/edit', validateRestaurant, handleValidationError, asyncHandler(as
 // ── Provider Reference routes ───────────────────────────────
 
 // POST /restaurants/:id/providers - Add provider reference
-app.post('/:id/providers', validateProviderRef, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/providers', requireAdmin, validateProviderRef, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await restaurantController.addProviderRef(req.params.id, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // POST /restaurants/:id/providers/:refId/delete - Remove provider reference
-app.post('/:id/providers/:refId/delete', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/providers/:refId/delete', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     await restaurantController.removeProviderRef(req.params.id, req.params.refId);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // POST /restaurants/:id/providers/:refId/sync-menu - Queue menu-only sync for this provider ref
-app.post('/:id/providers/:refId/sync-menu', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/providers/:refId/sync-menu', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const result = await restaurantController.queueProviderRefMenuSync(req.params.id, req.params.refId);
-    req.flash('info', `Menu sync job queued (${result.jobId}). Track progress on Sync Jobs.`);
-    res.redirect('/sync/jobs');
+    req.flash('info', `Menu sync queued (${result.jobId}). The restaurant menu will refresh in the background.`);
+    res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // POST /restaurants/:id/diet/recompute - Run diet heuristics immediately
-app.post('/:id/diet/recompute', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/diet/recompute', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const count = await restaurantController.runDietInference(req.params.id);
     req.flash('info', `Diet analysis rerun completed (${count} tag results updated).`);
     res.redirect(`/restaurants/${req.params.id}`);
@@ -86,14 +87,14 @@ app.post('/:id/diet/recompute', asyncHandler(async (req: Request, res: Response)
 // ── Diet Override routes ────────────────────────────────────
 
 // POST /restaurants/:id/diet-overrides - Add/update diet override
-app.post('/:id/diet-overrides', validateDietOverride, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/diet-overrides', requireAdmin, validateDietOverride, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const userId = getSessionUserId(req.session) ?? 0;
     await restaurantController.addDietOverride(req.params.id, req.body, userId);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // POST /restaurants/:id/diet-overrides/:overrideId/delete - Remove diet override
-app.post('/:id/diet-overrides/:overrideId/delete', asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/diet-overrides/:overrideId/delete', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     await restaurantController.removeDietOverride(req.params.id, req.params.overrideId);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -129,25 +130,25 @@ app.post('/:id/toggle-do-not-suggest', asyncHandler(async (req: Request, res: Re
 // ── Menu Category routes ────────────────────────────────────
 
 // GET /restaurants/:id/menu/categories/new
-app.get('/:id/menu/categories/new', asyncHandler(async (req: Request, res: Response) => {
+app.get('/:id/menu/categories/new', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const data = await menuController.getCategoryFormData(req.params.id);
     renderer.renderWithData(res, 'restaurants/menu/categoryForm', data);
 }));
 
 // POST /restaurants/:id/menu/categories/new
-app.post('/:id/menu/categories/new', validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/new', requireAdmin, validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.createCategory(req.params.id, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // GET /restaurants/:id/menu/categories/:catId/edit
-app.get('/:id/menu/categories/:catId/edit', asyncHandler(async (req: Request, res: Response) => {
+app.get('/:id/menu/categories/:catId/edit', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const data = await menuController.getCategoryEditData(req.params.id, req.params.catId);
     renderer.renderWithData(res, 'restaurants/menu/categoryForm', data);
 }));
 
 // POST /restaurants/:id/menu/categories/:catId/edit
-app.post('/:id/menu/categories/:catId/edit', validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/:catId/edit', requireAdmin, validateMenuCategory, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.updateCategory(req.params.id, req.params.catId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
@@ -155,25 +156,25 @@ app.post('/:id/menu/categories/:catId/edit', validateMenuCategory, handleValidat
 // ── Menu Item routes ────────────────────────────────────────
 
 // GET /restaurants/:id/menu/categories/:catId/items/new
-app.get('/:id/menu/categories/:catId/items/new', asyncHandler(async (req: Request, res: Response) => {
+app.get('/:id/menu/categories/:catId/items/new', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const data = await menuController.getItemFormData(req.params.id, req.params.catId);
     renderer.renderWithData(res, 'restaurants/menu/itemForm', data);
 }));
 
 // POST /restaurants/:id/menu/categories/:catId/items/new
-app.post('/:id/menu/categories/:catId/items/new', validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/categories/:catId/items/new', requireAdmin, validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.createItem(req.params.id, req.params.catId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));
 
 // GET /restaurants/:id/menu/items/:itemId/edit
-app.get('/:id/menu/items/:itemId/edit', asyncHandler(async (req: Request, res: Response) => {
+app.get('/:id/menu/items/:itemId/edit', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
     const data = await menuController.getItemEditData(req.params.id, req.params.itemId);
     renderer.renderWithData(res, 'restaurants/menu/itemForm', data);
 }));
 
 // POST /restaurants/:id/menu/items/:itemId/edit
-app.post('/:id/menu/items/:itemId/edit', validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
+app.post('/:id/menu/items/:itemId/edit', requireAdmin, validateMenuItem, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     await menuController.updateItem(req.params.id, req.params.itemId, req.body);
     res.redirect(`/restaurants/${req.params.id}`);
 }));

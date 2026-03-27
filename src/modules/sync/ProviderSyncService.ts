@@ -238,12 +238,18 @@ export async function queueImportFromUrl(
     providerKey: ProviderKey,
     menuUrl: string,
 ): Promise<QueuedSyncJob> {
+    const syncQuery = encodeImportUrlSyncQuery({
+        menuUrl: menuUrl.trim(),
+    });
+    const existing = await findActiveQueuedJob(providerKey, syncQuery);
+    if (existing) {
+        return toQueuedJob(existing);
+    }
+
     const repo = AppDataSource.getRepository(SyncJob);
     const job = repo.create({
         providerKey,
-        syncQuery: encodeImportUrlSyncQuery({
-            menuUrl: menuUrl.trim(),
-        }),
+        syncQuery,
         status: 'pending',
     });
     const saved = await repo.save(job);
@@ -257,13 +263,19 @@ export async function queueListingSync(
     listingUrl: string,
     providerLocationRefId?: string | null,
 ): Promise<QueuedSyncJob> {
+    const syncQuery = encodeListingSyncQuery({
+        listingUrl: listingUrl.trim(),
+        providerLocationRefId: providerLocationRefId ?? null,
+    });
+    const existing = await findActiveQueuedJob(providerKey, syncQuery);
+    if (existing) {
+        return toQueuedJob(existing);
+    }
+
     const repo = AppDataSource.getRepository(SyncJob);
     const job = repo.create({
         providerKey,
-        syncQuery: encodeListingSyncQuery({
-            listingUrl: listingUrl.trim(),
-            providerLocationRefId: providerLocationRefId ?? null,
-        }),
+        syncQuery,
         status: 'pending',
     });
     const saved = await repo.save(job);

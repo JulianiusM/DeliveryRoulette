@@ -31,6 +31,20 @@ export async function getByIdForRestaurant(
     return await repo.findOne({where: {id, restaurantId}});
 }
 
+export async function getByProviderIdentity(
+    providerKey: string,
+    identity: {
+        externalId?: string | null;
+        providerNativeId?: string | null;
+    },
+): Promise<RestaurantProviderRef | null> {
+    const repo = AppDataSource.getRepository(RestaurantProviderRef);
+    return await findByIdentity(repo, providerKey, {
+        externalId: normalizeIdentity(identity.externalId),
+        providerNativeId: normalizeIdentity(identity.providerNativeId),
+    });
+}
+
 export async function addProviderRef(data: ProviderRefUpsertInput): Promise<RestaurantProviderRef> {
     const repo = AppDataSource.getRepository(RestaurantProviderRef);
     const ref = repo.create({

@@ -2,7 +2,7 @@
  * Generic provider controller.
  *
  * Handles all provider operations through the generic connector interface.
- * No individual connector is referenced — the UI and actions are
+ * No individual connector is referenced - the UI and actions are
  * dynamically generated based on connector capabilities.
  */
 import * as ConnectorRegistry from '../providers/ConnectorRegistry';
@@ -25,19 +25,44 @@ export interface ProviderInfo {
     listingUrl?: string;
 }
 
+export interface ProviderLocationOption {
+    id: string;
+    label: string;
+    addressLine1: string;
+    city: string;
+    postalCode: string;
+    country: string;
+    isDefault: boolean;
+    hasCoordinates: boolean;
+}
+
 export interface ProviderMaintenanceInfo {
     heuristicRefreshRunning: boolean;
     providerRefreshVersion: string;
+}
+
+export interface ProvidersPageData {
+    providers: ProviderInfo[];
+    maintenance: ProviderMaintenanceInfo;
+    savedLocations: ProviderLocationOption[];
+    activeLocation: ProviderLocationOption | null;
+}
+
+export function getProviderMaintenanceInfo(): ProviderMaintenanceInfo {
+    return {
+        heuristicRefreshRunning: isHeuristicRefreshRunning(),
+        providerRefreshVersion: settings.value.providerRefreshVersion,
+    };
 }
 
 /**
  * Get data for the generic providers settings page.
  * Lists all registered connectors with their capabilities and saved configs.
  */
-export async function getProvidersPageData(userId: string): Promise<{
-    providers: ProviderInfo[];
-    maintenance: ProviderMaintenanceInfo;
-}> {
+export async function getProvidersPageData(
+    userId: string,
+    locationId?: string | null,
+): Promise<ProvidersPageData> {
     const keys = ConnectorRegistry.registeredKeys();
     const providers: ProviderInfo[] = [];
 
@@ -46,7 +71,6 @@ export async function getProvidersPageData(userId: string): Promise<{
         if (!connector) continue;
 
         const caps = connector.capabilities();
-        // Only show connectors with listing or import capabilities
         if (!caps.canDiscoverFromListingUrl && !caps.canImportFromUrl) continue;
 
         const config = await getSourceConfig(userId, key);
@@ -58,19 +82,25 @@ export async function getProvidersPageData(userId: string): Promise<{
         });
     }
 
+    const {savedLocations, activeLocation} = await getUserLocationSelection(userId, locationId);
+
     return {
         providers,
-        maintenance: {
-            heuristicRefreshRunning: isHeuristicRefreshRunning(),
-            providerRefreshVersion: settings.value.providerRefreshVersion,
-        },
+        maintenance: getProviderMaintenanceInfo(),
+        savedLocations,
+        activeLocation,
     };
 }
 
 /**
  * Trigger a listing-based sync for a provider.
  */
-export async function syncProvider(userId: string, providerKey: string, listingUrl: string): Promise<QueuedSyncJob> {
+export async function syncProvider(
+    userId: string,
+    providerKey: string,
+    listingUrl: string,
+    locationId?: string | null,
+): Promise<QueuedSyncJob> {
     if (!listingUrl?.trim()) {
         throw new ExpectedError('Please provide a listing URL', 'error', 400);
     }
@@ -82,7 +112,6 @@ export async function syncProvider(userId: string, providerKey: string, listingU
         throw new ExpectedError('This provider does not support listing-based discovery', 'error', 400);
     }
 
-    // Validate URL through the connector
     if (connector.validateListingUrl) {
         try {
             connector.validateListingUrl(listingUrl.trim());
@@ -93,18 +122,12 @@ export async function syncProvider(userId: string, providerKey: string, listingU
     }
 
     const normalizedListingUrl = listingUrl.trim();
-
-    // Save config
     await saveSourceConfig(userId, providerKey, normalizedListingUrl);
 
     let providerLocationRefId: string | null = null;
     const numericUserId = Number(userId);
     if (Number.isInteger(numericUserId) && numericUserId > 0 && connector.resolveLocation) {
-        const preference = await userPreferenceService.getByUserId(numericUserId);
-        const activeLocation = await userLocationService.getOrBackfillDefaultFromDeliveryArea(
-            numericUserId,
-            preference?.deliveryArea ?? null,
-        );
+        const activeLocation = await resolveUserLocationForProvider(numericUserId, locationId);
 
         if (activeLocation) {
             const resolution = await connector.resolveLocation({
@@ -151,7 +174,6 @@ export async function importFromUrl(userId: string, providerKey: string, menuUrl
         throw new ExpectedError('This provider does not support URL-based import', 'error', 400);
     }
 
-    // Validate URL through the connector
     if (connector.validateImportUrl) {
         try {
             connector.validateImportUrl(menuUrl.trim());
@@ -178,8 +200,6 @@ export async function triggerProviderRefresh(): Promise<QueuedSyncJob> {
     return await queueProviderRefresh(true);
 }
 
-// ── Internal helpers ──────────────────────────────────────────
-
 function resolveConnector(providerKey: string) {
     if (!Object.values(ProviderKey).includes(providerKey as ProviderKey)) {
         throw new ExpectedError(`Unknown provider key: ${providerKey}`, 'error', 400);
@@ -189,6 +209,87 @@ function resolveConnector(providerKey: string) {
         throw new ExpectedError(`No connector registered for: ${providerKey}`, 'error', 400);
     }
     return connector;
+}
+
+async function getUserLocationSelection(
+    userId: string,
+    locationId?: string | null,
+): Promise<{
+    savedLocations: ProviderLocationOption[];
+    activeLocation: ProviderLocationOption | null;
+}> {
+    const numericUserId = Number(userId);
+    if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
+        return {
+            savedLocations: [],
+            activeLocation: null,
+        };
+    }
+
+    const preference = await userPreferenceService.getByUserId(numericUserId);
+    const defaultLocation = await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+        numericUserId,
+        preference?.deliveryArea ?? null,
+    );
+    const savedLocations = (await userLocationService.listByUserId(numericUserId))
+        .map(mapUserLocationToOption)
+        .filter((location): location is ProviderLocationOption => Boolean(location));
+    const normalizedLocationId = typeof locationId === 'string' ? locationId.trim() : '';
+    const activeLocation = normalizedLocationId
+        ? savedLocations.find((location) => location.id === normalizedLocationId) ?? mapUserLocationToOption(defaultLocation)
+        : mapUserLocationToOption(defaultLocation);
+
+    return {
+        savedLocations,
+        activeLocation,
+    };
+}
+
+async function resolveUserLocationForProvider(
+    userId: number,
+    locationId?: string | null,
+) {
+    const normalizedLocationId = typeof locationId === 'string' ? locationId.trim() : '';
+    if (normalizedLocationId) {
+        const selectedLocation = await userLocationService.getByIdForUser(userId, normalizedLocationId);
+        if (!selectedLocation) {
+            throw new ExpectedError('Selected saved location was not found.', 'error', 404);
+        }
+        return selectedLocation;
+    }
+
+    const preference = await userPreferenceService.getByUserId(userId);
+    return await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+        userId,
+        preference?.deliveryArea ?? null,
+    );
+}
+
+function mapUserLocationToOption(location?: {
+    id: string;
+    label: string;
+    addressLine1?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    isDefault?: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
+} | null): ProviderLocationOption | null {
+    if (!location) {
+        return null;
+    }
+
+    return {
+        id: location.id,
+        label: location.label,
+        addressLine1: location.addressLine1 ?? '',
+        city: location.city ?? '',
+        postalCode: location.postalCode ?? '',
+        country: location.country ?? '',
+        isDefault: Boolean(location.isDefault),
+        hasCoordinates: Number.isFinite(location.latitude) && Number.isFinite(location.longitude),
+    };
 }
 
 async function getSourceConfig(userId: string, providerKey: string): Promise<ProviderSourceConfig | null> {

@@ -20,7 +20,7 @@ block body
                     .col-lg-8
                         p.app-eyebrow.mb-2 Personal workspace
                         h1.display-5.fw-semibold.mb-2 Welcome, #{displayName}
-                        p.lead.text-white-50.mb-0 Your defaults, favorites, and operational shortcuts live here. This is the fastest place to branch into restaurants, suggestions, imports, and sync follow-up.
+                        p.lead.text-white-50.mb-0 Your defaults, favorites, and working shortcuts live here. Use this page for user-facing restaurant tasks; admin maintenance is separated out.
                     .col-lg-4
                         .row.g-3
                             .col-6.col-xl-3.col-lg-6
@@ -75,10 +75,19 @@ block body
                         a.app-action-card(href="/providers")
                             .d-flex.align-items-center.gap-3
                                 span.app-icon-badge.is-warning
-                                    i.bi.bi-plug
+                                    i.bi.bi-geo-alt
                                 div
-                                    h2.h5.mb-1 Providers
-                                    p.text-white-50.small.mb-0 Monitor imports, jobs, and refresh maintenance.
+                                    h2.h5.mb-1 Location Imports
+                                    p.text-white-50.small.mb-0 Refresh restaurants and availability for a saved location.
+                    if userIsAdmin
+                        .col-md-6.col-xl-3
+                            a.app-action-card(href="/admin/operations")
+                                .d-flex.align-items-center.gap-3
+                                    span.app-icon-badge.is-danger
+                                        i.bi.bi-shield-lock
+                                    div
+                                        h2.h5.mb-1 Admin
+                                        p.text-white-50.small.mb-0 Run global maintenance, imports, and queue review.
 
         section.card.app-section-card
             .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
@@ -99,7 +108,7 @@ block body
                                     - const locationSummaryParts = [defaultLocation.addressLine1, [defaultLocation.postalCode, defaultLocation.city].filter(Boolean).join(' '), defaultLocation.country].filter(Boolean)
                                     if locationSummaryParts.length
                                         p.text-white-50.small.mb-1 #{locationSummaryParts.join(' / ')}
-                                    if defaultLocation.latitude !== '' && defaultLocation.longitude !== ''
+                                    if defaultLocation.latitude !== null && defaultLocation.longitude !== null
                                         span.badge.rounded-pill.text-bg-success Coordinates set
                                     else
                                         span.badge.rounded-pill.text-bg-secondary Coordinates missing

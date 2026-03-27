@@ -1,0 +1,90 @@
+extends ../layout
+
+block meta
+    title Admin Operations | DeliveryRoulette
+
+block body
+    - const maintenance = data.maintenance || {}
+
+    .app-shell.py-3
+        section.card.border-0.shadow-lg.overflow-hidden.app-hero-card.is-danger
+            .card-body.p-4.p-lg-5
+                .row.g-4.align-items-end
+                    .col-lg-8
+                        p.app-eyebrow.mb-2 Administration
+                        h1.display-5.fw-semibold.mb-2 Admin Operations
+                        p.lead.text-white-50.mb-0 Global maintenance, bulk imports, sync queue review, and heuristic controls live here. User-facing location imports stay on the Location Imports page.
+                    .col-lg-4
+                        .row.g-3
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Heuristics
+                                    strong.app-stat-value #{maintenance.heuristicRefreshRunning ? 'Running' : 'Idle'}
+                            .col-6
+                                .app-stat-card
+                                    span.app-stat-label Refresh ver.
+                                    strong.app-stat-value #{maintenance.providerRefreshVersion || 'n/a'}
+
+        section.card.app-section-card
+            .card-header
+                i.bi.bi-shield-lock.me-2
+                | Global Maintenance
+            .card-body
+                .row.g-4
+                    .col-lg-6
+                        .app-panel.app-provider-maintenance-card.h-100
+                            h2.h5.mb-2 Re-run All Heuristics
+                            p.text-white-50.small.mb-3 Refresh stored inference results for all restaurants after scoring, keyword, or rule changes.
+                            form(method="POST" action="/admin/maintenance/heuristics")
+                                +csrf
+                                button.btn.btn-outline-info(type="submit" disabled=maintenance.heuristicRefreshRunning)
+                                    i.bi.bi-cpu.me-1
+                                    | #{maintenance.heuristicRefreshRunning ? 'Heuristic Refresh Running' : 'Re-run All Heuristics'}
+                    .col-lg-6
+                        .app-panel.app-provider-maintenance-card.h-100
+                            h2.h5.mb-2 Reimport Provider Data
+                            p.text-white-50.small.mb-3 Queue a provider-backed refresh when connector mapping or upstream provider payloads change globally.
+                            form(method="POST" action="/admin/maintenance/reimport")
+                                +csrf
+                                button.btn.btn-outline-success(type="submit")
+                                    i.bi.bi-arrow-repeat.me-1
+                                    | Reimport Provider Data
+
+        section.card.app-section-card.mt-4
+            .card-header
+                i.bi.bi-diagram-3.me-2
+                | Admin Shortcuts
+            .card-body
+                .row.g-4
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/import")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-info
+                                    i.bi.bi-upload
+                                div
+                                    h2.h5.mb-1 Bulk Import
+                                    p.text-white-50.small.mb-0 Review and apply global JSON or CSV imports.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/sync/jobs")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-warning
+                                    i.bi.bi-list-check
+                                div
+                                    h2.h5.mb-1 Sync Jobs
+                                    p.text-white-50.small.mb-0 Track the global background queue and job failures.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/sync/alerts")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-danger
+                                    i.bi.bi-bell
+                                div
+                                    h2.h5.mb-1 Sync Alerts
+                                    p.text-white-50.small.mb-0 Review stale or broken provider and diet signals.
+                    .col-md-6.col-xl-3
+                        a.app-action-card(href="/users/settings/diets")
+                            .d-flex.align-items-center.gap-3
+                                span.app-icon-badge.is-success
+                                    i.bi.bi-sliders
+                                div
+                                    h2.h5.mb-1 Diet Heuristics
+                                    p.text-white-50.small.mb-0 Edit global diet keyword and dish rules.

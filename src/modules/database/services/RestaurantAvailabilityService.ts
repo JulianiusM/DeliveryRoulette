@@ -33,6 +33,24 @@ export interface RecordServiceSnapshotInput {
     rawPayloadJson?: string | null;
 }
 
+export interface LocationAvailabilityStats {
+    providerLocationCount: number;
+    coverageCount: number;
+    latestSnapshotCount: number;
+    freshSnapshotCount: number;
+    expiredSnapshotCount: number;
+    availableRestaurantCount: number;
+    unavailableRestaurantCount: number;
+}
+
+interface LatestLocationSnapshotRow {
+    coverageId: string;
+    restaurantId: string;
+    isAvailable: boolean | number | string | null;
+    isTemporaryOffline: boolean | number | string | null;
+    expiresAt: Date | string | null;
+}
+
 export async function upsertCoverageFromListing(
     data: UpsertCoverageInput,
 ): Promise<RestaurantProviderCoverage> {
@@ -98,8 +116,89 @@ export async function listAvailableRestaurantIdsForLocation(
     serviceType: ProviderServiceType,
     asOf: Date = new Date(),
 ): Promise<string[]> {
-    const snapshotRepo = AppDataSource.getRepository(RestaurantProviderServiceSnapshot);
+    const rows = await listLatestLocationSnapshotRows(sourceLocationId, serviceType);
+    const freshRestaurantIds = new Set<string>();
+    const staleRestaurantIds = new Set<string>();
+    let freshSnapshotCount = 0;
 
+    for (const row of rows) {
+        if (!toBooleanFlag(row.isAvailable) || toBooleanFlag(row.isTemporaryOffline)) {
+            if (isFreshSnapshot(row.expiresAt, asOf)) {
+                freshSnapshotCount++;
+            }
+            continue;
+        }
+
+        if (isFreshSnapshot(row.expiresAt, asOf)) {
+            freshSnapshotCount++;
+            freshRestaurantIds.add(row.restaurantId);
+            continue;
+        }
+
+        staleRestaurantIds.add(row.restaurantId);
+    }
+
+    if (freshSnapshotCount > 0) {
+        return [...freshRestaurantIds];
+    }
+
+    return [...staleRestaurantIds];
+}
+
+export async function getLocationAvailabilityStats(
+    sourceLocationId: string,
+    serviceType: ProviderServiceType,
+    asOf: Date = new Date(),
+): Promise<LocationAvailabilityStats> {
+    const locationRepo = AppDataSource.getRepository(ProviderLocationRef);
+    const coverageRepo = AppDataSource.getRepository(RestaurantProviderCoverage);
+    const [providerLocationCount, coverageCount, rows] = await Promise.all([
+        locationRepo.count({
+            where: {sourceLocationId},
+        }),
+        coverageRepo.createQueryBuilder('coverage')
+            .innerJoin(ProviderLocationRef, 'location_ref', 'location_ref.id = coverage.providerLocationRefId')
+            .where('location_ref.sourceLocationId = :sourceLocationId', {sourceLocationId})
+            .andWhere('coverage.status = :coverageStatus', {coverageStatus: 'active'})
+            .getCount(),
+        listLatestLocationSnapshotRows(sourceLocationId, serviceType),
+    ]);
+
+    const availableRestaurantIds = new Set<string>();
+    const unavailableRestaurantIds = new Set<string>();
+    let freshSnapshotCount = 0;
+    let expiredSnapshotCount = 0;
+
+    for (const row of rows) {
+        if (!isFreshSnapshot(row.expiresAt, asOf)) {
+            expiredSnapshotCount++;
+            continue;
+        }
+
+        freshSnapshotCount++;
+        if (toBooleanFlag(row.isAvailable) && !toBooleanFlag(row.isTemporaryOffline)) {
+            availableRestaurantIds.add(row.restaurantId);
+        } else {
+            unavailableRestaurantIds.add(row.restaurantId);
+        }
+    }
+
+    return {
+        providerLocationCount,
+        coverageCount,
+        latestSnapshotCount: rows.length,
+        freshSnapshotCount,
+        expiredSnapshotCount,
+        availableRestaurantCount: availableRestaurantIds.size,
+        unavailableRestaurantCount: unavailableRestaurantIds.size,
+    };
+}
+
+async function listLatestLocationSnapshotRows(
+    sourceLocationId: string,
+    serviceType: ProviderServiceType,
+): Promise<LatestLocationSnapshotRow[]> {
+    const snapshotRepo = AppDataSource.getRepository(RestaurantProviderServiceSnapshot);
     const latestSnapshotQb = snapshotRepo.createQueryBuilder('latest')
         .select('latest.coverageId', 'coverage_id')
         .addSelect('latest.serviceType', 'service_type')
@@ -107,7 +206,7 @@ export async function listAvailableRestaurantIdsForLocation(
         .groupBy('latest.coverageId')
         .addGroupBy('latest.serviceType');
 
-    const rows = await snapshotRepo.createQueryBuilder('snapshot')
+    return await snapshotRepo.createQueryBuilder('snapshot')
         .innerJoin(RestaurantProviderCoverage, 'coverage', 'coverage.id = snapshot.coverageId')
         .innerJoin(ProviderLocationRef, 'location_ref', 'location_ref.id = coverage.providerLocationRefId')
         .innerJoin(
@@ -123,11 +222,40 @@ export async function listAvailableRestaurantIdsForLocation(
         .where('location_ref.sourceLocationId = :sourceLocationId', {sourceLocationId})
         .andWhere('coverage.status = :coverageStatus', {coverageStatus: 'active'})
         .andWhere('snapshot.serviceType = :serviceType', {serviceType})
-        .andWhere('snapshot.isAvailable = :isAvailable', {isAvailable: 1})
-        .andWhere('snapshot.isTemporaryOffline = :isTemporaryOffline', {isTemporaryOffline: 0})
-        .andWhere('(snapshot.expiresAt IS NULL OR snapshot.expiresAt > :asOf)', {asOf})
-        .select('DISTINCT coverage.restaurantId', 'restaurantId')
-        .getRawMany<{restaurantId: string}>();
+        .select([
+            'coverage.id AS coverageId',
+            'coverage.restaurantId AS restaurantId',
+            'snapshot.isAvailable AS isAvailable',
+            'snapshot.isTemporaryOffline AS isTemporaryOffline',
+            'snapshot.expiresAt AS expiresAt',
+        ])
+        .getRawMany<LatestLocationSnapshotRow>();
+}
 
-    return rows.map((row) => row.restaurantId);
+function toBooleanFlag(value: boolean | number | string | null): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    if (typeof value === 'string') {
+        return ['1', 'true', 'yes'].includes(value.toLowerCase());
+    }
+    return false;
+}
+
+function isFreshSnapshot(
+    expiresAt: Date | string | null,
+    asOf: Date,
+): boolean {
+    if (!expiresAt) {
+        return true;
+    }
+
+    const parsed = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
+    if (Number.isNaN(parsed.getTime())) {
+        return false;
+    }
+    return parsed > asOf;
 }

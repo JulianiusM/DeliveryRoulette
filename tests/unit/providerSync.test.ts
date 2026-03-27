@@ -123,6 +123,8 @@ const mockRegisteredKeys = ConnectorRegistry.registeredKeys as jest.Mock;
 import {
     runSync,
     isLocked,
+    queueImportFromUrl,
+    queueListingSync,
     queueMenuSyncByProviderRef,
     queueProviderRefreshIfNeeded,
     recoverInterruptedJobs,
@@ -286,6 +288,44 @@ describe('ProviderSyncService', () => {
             const job = await queueMenuSyncByProviderRef('rest-1', 'ref-1');
 
             expect(job.jobId).toBe('job-existing');
+            expect(mockCreateJob).not.toHaveBeenCalled();
+            expect(mockSaveJob).not.toHaveBeenCalled();
+        });
+
+        test('reuses an existing active listing job instead of queueing a duplicate location import', async () => {
+            const listingUrl = 'https://www.lieferando.de/en/delivery/food/neutraubling-93073';
+            mockFindJobs.mockResolvedValue([
+                {
+                    id: 'job-existing-listing',
+                    providerKey: ProviderKey.UBER_EATS,
+                    syncQuery: `listing-url:${encodeURIComponent(listingUrl)}|provider-loc-1`,
+                    status: 'pending',
+                    createdAt: new Date('2026-03-07T10:05:00Z'),
+                },
+            ]);
+
+            const job = await queueListingSync(ProviderKey.UBER_EATS, listingUrl, 'provider-loc-1');
+
+            expect(job.jobId).toBe('job-existing-listing');
+            expect(mockCreateJob).not.toHaveBeenCalled();
+            expect(mockSaveJob).not.toHaveBeenCalled();
+        });
+
+        test('reuses an existing active import-url job instead of queueing a duplicate restaurant import', async () => {
+            const menuUrl = 'https://www.lieferando.de/en/menu/bella-bollywood';
+            mockFindJobs.mockResolvedValue([
+                {
+                    id: 'job-existing-import',
+                    providerKey: ProviderKey.UBER_EATS,
+                    syncQuery: `import-url:${encodeURIComponent(menuUrl)}`,
+                    status: 'pending',
+                    createdAt: new Date('2026-03-07T10:10:00Z'),
+                },
+            ]);
+
+            const job = await queueImportFromUrl(ProviderKey.UBER_EATS, menuUrl);
+
+            expect(job.jobId).toBe('job-existing-import');
             expect(mockCreateJob).not.toHaveBeenCalled();
             expect(mockSaveJob).not.toHaveBeenCalled();
         });

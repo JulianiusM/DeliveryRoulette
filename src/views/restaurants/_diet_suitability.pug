@@ -1,36 +1,40 @@
 .diet-suitability-content
     .d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
         p.text-white-50.small.mb-0 Manual overrides sit on top of heuristics. Re-run heuristics after menu imports, then open the relevant diet below if you need the evidence.
-        .d-flex.gap-2
-            form(method="POST" action=`/restaurants/${r.id}/diet/recompute`)
-                +csrf
-                button.btn.btn-sm.btn-outline-info(type="submit" title="Re-run heuristic analysis")
-                    i.bi.bi-arrow-repeat.me-1
-                    | Re-run Heuristics
-            button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
-                i.bi.bi-plus-lg.me-1
-                | Add Override
+        if userIsAdmin
+            .d-flex.gap-2
+                form(method="POST" action=`/restaurants/${r.id}/diet/recompute`)
+                    +csrf
+                    button.btn.btn-sm.btn-outline-info(type="submit" title="Re-run heuristic analysis")
+                        i.bi.bi-arrow-repeat.me-1
+                        | Re-run Heuristics
+                button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addOverrideForm")
+                    i.bi.bi-plus-lg.me-1
+                    | Add Override
 
-    #addOverrideForm.collapse.mt-4
-        form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
-            +csrf
-            .row.g-2
-                .col-md-4
-                    select.form-select.form-select-sm(name="dietTagId" required)
-                        option(value="" disabled selected) Select diet tag...
-                        each dt in dietSuitability
-                            option(value=dt.dietTagId) #{dt.dietTagLabel}
-                .col-md-3
-                    select.form-select.form-select-sm(name="supported" required)
-                        option(value="" disabled selected) Supports?
-                        option(value="true") Yes - Supports
-                        option(value="false") No - Does not support
-                .col-md-3
-                    input.form-control.form-control-sm(type="text" name="notes" placeholder="Notes (optional)")
-                .col-md-2
-                    button.btn.btn-sm.btn-success.w-100(type="submit")
-                        i.bi.bi-plus-lg.me-1
-                        | Add
+    if userIsAdmin
+        #addOverrideForm.collapse.mt-4
+            form(method="POST" action=`/restaurants/${r.id}/diet-overrides`)
+                +csrf
+                .row.g-2
+                    .col-md-4
+                        select.form-select.form-select-sm(name="dietTagId" required)
+                            option(value="" disabled selected) Select diet tag...
+                            each dt in dietSuitability
+                                option(value=dt.dietTagId) #{dt.dietTagLabel}
+                    .col-md-3
+                        select.form-select.form-select-sm(name="supported" required)
+                            option(value="" disabled selected) Supports?
+                            option(value="true") Yes - Supports
+                            option(value="false") No - Does not support
+                    .col-md-3
+                        input.form-control.form-control-sm(type="text" name="notes" placeholder="Notes (optional)")
+                    .col-md-2
+                        button.btn.btn-sm.btn-success.w-100(type="submit")
+                            i.bi.bi-plus-lg.me-1
+                            | Add
+    else if user
+        p.text-white-50.small.mt-3.mb-0 Manual diet overrides are restricted to administrators because they affect the shared catalog.
 
     if dietSuitability.length === 0
         .restaurant-empty-state.mt-4
@@ -93,7 +97,7 @@
                                 if ds.source === 'override' || ds.source === 'inference'
                                     button.btn.btn-sm.btn-outline-light(type="button" data-bs-toggle="collapse" data-bs-target=`#explanation-${ds.dietTagId}` title="Show explanation")
                                         i.bi.bi-chevron-down
-                                if ds.source === 'override' && ds.override
+                                if userIsAdmin && ds.source === 'override' && ds.override
                                     form.d-inline(method="POST" action=`/restaurants/${r.id}/diet-overrides/${ds.override.id}/delete`)
                                         +csrf
                                         button.btn.btn-sm.btn-outline-danger(type="submit" title="Remove Override")

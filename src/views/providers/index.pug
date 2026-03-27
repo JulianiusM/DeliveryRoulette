@@ -1,11 +1,12 @@
 extends ../layout
 
 block meta
-    title Providers | DeliveryRoulette
+    title Location Imports | DeliveryRoulette
 
 block body
-    - const maintenance = data.maintenance || {}
     - const providers = data.providers || []
+    - const savedLocations = data.savedLocations || []
+    - const activeLocation = data.activeLocation || null
     - const discoveryCount = providers.filter((provider) => provider.capabilities.canDiscoverFromListingUrl).length
     - const importCount = providers.filter((provider) => provider.capabilities.canImportFromUrl).length
 
@@ -14,9 +15,9 @@ block body
             .card-body.p-4.p-lg-5
                 .row.g-4.align-items-end
                     .col-lg-8
-                        p.app-eyebrow.mb-2 Provider operations
-                        h1.display-5.fw-semibold.mb-2 Providers
-                        p.lead.text-white-50.mb-0 Configure discovery and direct imports, then use maintenance actions when provider schemas or menu data change.
+                        p.app-eyebrow.mb-2 User imports
+                        h1.display-5.fw-semibold.mb-2 Location Imports
+                        p.lead.text-white-50.mb-0 Use your saved locations to import restaurants and refresh location-aware availability. Global maintenance and queue review are handled in the admin area.
                     .col-lg-4
                         .row.g-3
                             .col-4
@@ -35,53 +36,18 @@ block body
                                     strong.app-stat-value #{importCount}
                                     small.text-white-50 Restaurant URL imports available
                 .app-chip-row.mt-4
-                    a.btn.btn-outline-light.btn-sm(href="/sync/jobs")
-                        i.bi.bi-list-check.me-1
-                        | View Sync Jobs
-                    a.btn.btn-outline-light.btn-sm(href="/sync/alerts")
-                        i.bi.bi-bell.me-1
-                        | View Sync Alerts
-
-        section.card.app-section-card
-            .card-header
-                i.bi.bi-tools.me-2
-                | Maintenance
-            .card-body
-                .row.g-4
-                    .col-lg-6
-                        .app-panel.app-provider-maintenance-card.h-100
-                            .app-chip-row
-                                span.app-chip
-                                    i.bi.bi-cpu
-                                    | Heuristic refresh #{maintenance.heuristicRefreshRunning ? 'running' : 'idle'}
-                            div
-                                h2.h5.mb-2 Re-run All Heuristics
-                                p.text-white-50.small.mb-0 Refresh stored inference results for all restaurants after scoring or keyword engine changes.
-                            form.mt-auto(method="POST" action="/providers/maintenance/heuristics")
-                                +csrf
-                                button.btn.btn-outline-info(type="submit" disabled=maintenance.heuristicRefreshRunning)
-                                    i.bi.bi-cpu.me-1
-                                    | #{maintenance.heuristicRefreshRunning ? 'Heuristic Refresh Running' : 'Re-run All Heuristics'}
-                    .col-lg-6
-                        .app-panel.app-provider-maintenance-card.h-100
-                            .app-chip-row
-                                span.app-chip
-                                    i.bi.bi-arrow-repeat
-                                    | Provider refresh version #{maintenance.providerRefreshVersion || 'n/a'}
-                            div
-                                h2.h5.mb-2 Reimport Provider Data
-                                p.text-white-50.small.mb-0 Queue provider-backed restaurant refreshes again when connector parsing, mapping, or upstream data shape changes.
-                            form.mt-auto(method="POST" action="/providers/maintenance/reimport")
-                                +csrf
-                                button.btn.btn-outline-success(type="submit")
-                                    i.bi.bi-arrow-repeat.me-1
-                                    | Reimport Provider Data
-                .app-status-card.is-info.mt-4
-                    .d-flex.align-items-start.gap-3
-                        i.bi.bi-info-circle.fs-4
-                        div
-                            h2.h6.text-uppercase.text-white-50.mb-2 Operational note
-                            p.text-white-50.mb-0 Startup maintenance already handles stale heuristic results and refresh-version driven reimports automatically. Use these actions when you need an explicit rerun.
+                    if activeLocation
+                        span.app-chip
+                            i.bi.bi-geo-alt
+                            | Active location #{activeLocation.label}
+                    else
+                        span.app-chip
+                            i.bi.bi-exclamation-triangle
+                            | No saved location selected
+                    if savedLocations.length
+                        span.app-chip
+                            i.bi.bi-pin-map
+                            | #{savedLocations.length} saved locations
 
         if providers.length === 0
             .app-empty-state
@@ -133,9 +99,26 @@ block body
                                                 h3.h5.mb-2
                                                     i.bi.bi-geo-alt.me-2
                                                     | Discovery From Listing URL
-                                                p.text-white-50.small.mb-3 Paste a delivery area listing URL to discover restaurants for this provider.
+                                                p.text-white-50.small.mb-3 Paste a listing URL and choose the saved location that should scope discovery and availability. When you edit that location later, DeliveryRoulette queues a refresh automatically.
                                                 form(method="POST" action=`/providers/${provider.providerKey}/sync`)
                                                     +csrf
+                                                    if savedLocations.length
+                                                        .mb-3
+                                                            label.form-label(for=`locationId-${provider.providerKey}`) Saved Location
+                                                            select.form-select.text-bg-dark.border-secondary(
+                                                                id=`locationId-${provider.providerKey}`
+                                                                name="locationId"
+                                                            )
+                                                                each location in savedLocations
+                                                                    option(
+                                                                        value=location.id
+                                                                        selected=!!(activeLocation && activeLocation.id === location.id)
+                                                                    ) #{location.label}#{location.isDefault ? ' (Default)' : ''}#{location.hasCoordinates ? '' : ' - no coords'}
+                                                            .form-text.text-white-50 Choose the user location that should resolve provider area and availability. If no coordinates are stored, sync falls back to coarser listing behavior.
+                                                    else
+                                                        .alert.alert-warning.py-2.mb-3
+                                                            i.bi.bi-exclamation-triangle.me-1
+                                                            | No saved location configured. Save one in Settings first so suggestions can use location-aware availability.
                                                     .mb-3
                                                         label.form-label(for=`listingUrl-${provider.providerKey}`)= provider.capabilities.listingUrlLabel || 'Listing URL'
                                                         input.form-control.text-bg-dark.border-secondary(

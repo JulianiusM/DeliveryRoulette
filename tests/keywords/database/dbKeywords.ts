@@ -69,6 +69,7 @@ export async function createUsersTable(ds: DataSource): Promise<void> {
             \`username\` varchar(50) NOT NULL,
             \`name\` varchar(50) NOT NULL,
             \`email\` varchar(100) NOT NULL,
+            \`role\` varchar(20) NOT NULL DEFAULT 'user',
             \`PASSWORD\` varchar(255) NULL,
             \`is_active\` tinyint(1) NULL DEFAULT 0,
             \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

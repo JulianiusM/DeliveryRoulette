@@ -19,6 +19,12 @@ jest.mock('../../src/modules/lib/openingHours');
 import * as openingHours from '../../src/modules/lib/openingHours';
 const mockComputeIsOpenNow = openingHours.computeIsOpenNowFromOpeningHours as jest.Mock;
 
+// Mock location availability lookups
+jest.mock('../../src/modules/database/services/RestaurantAvailabilityService');
+import * as restaurantAvailabilityService from '../../src/modules/database/services/RestaurantAvailabilityService';
+const mockListAvailableRestaurantIdsForLocation = restaurantAvailabilityService.listAvailableRestaurantIdsForLocation as jest.Mock;
+const mockGetLocationAvailabilityStats = restaurantAvailabilityService.getLocationAvailabilityStats as jest.Mock;
+
 import {AppDataSource} from '../../src/modules/database/dataSource';
 import * as suggestionService from '../../src/modules/database/services/SuggestionService';
 
@@ -32,12 +38,26 @@ const sampleRestaurants = [
 
 // Mock query builder chain
 function createMockQueryBuilder(results: any[]) {
+    let filteredRestaurantIds: string[] | null = null;
     const qb: any = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
+        andWhere: jest.fn((query: string, params?: Record<string, any>) => {
+            if (query.includes('availableRestaurantIds') && Array.isArray(params?.availableRestaurantIds)) {
+                filteredRestaurantIds = params.availableRestaurantIds;
+            }
+            if (query.includes('candidateRestaurantIds') && Array.isArray(params?.candidateRestaurantIds)) {
+                filteredRestaurantIds = params.candidateRestaurantIds;
+            }
+            return qb;
+        }),
         orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(results),
+        getMany: jest.fn().mockImplementation(async () => {
+            if (!filteredRestaurantIds) {
+                return results;
+            }
+            return results.filter((entry) => filteredRestaurantIds!.includes(entry.id));
+        }),
     };
     return qb;
 }
@@ -45,6 +65,16 @@ function createMockQueryBuilder(results: any[]) {
 describe('SuggestionService', () => {
     beforeEach(() => {
         jest.resetAllMocks();
+        mockListAvailableRestaurantIdsForLocation.mockResolvedValue(['r1', 'r2', 'r3']);
+        mockGetLocationAvailabilityStats.mockResolvedValue({
+            providerLocationCount: 1,
+            coverageCount: 3,
+            latestSnapshotCount: 3,
+            freshSnapshotCount: 3,
+            expiredSnapshotCount: 0,
+            availableRestaurantCount: 3,
+            unavailableRestaurantCount: 0,
+        });
     });
 
     describe('pickRandom', () => {
@@ -270,6 +300,22 @@ describe('SuggestionService', () => {
             const result = await suggestionService.findActiveRestaurants({openOnly: false});
             expect(result).toHaveLength(3);
             expect(mockComputeIsOpenNow).not.toHaveBeenCalled();
+        });
+
+        test('uses explicit candidateRestaurantIds before persisted location availability', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+
+            const result = await suggestionService.findActiveRestaurants({
+                candidateRestaurantIds: ['r2'],
+                locationId: 'loc-1',
+                serviceType: 'delivery',
+            });
+
+            expect(result.map((entry) => entry.id)).toEqual(['r2']);
+            expect(mockListAvailableRestaurantIdsForLocation).not.toHaveBeenCalled();
         });
     });
 
@@ -550,6 +596,83 @@ describe('SuggestionService', () => {
                 confidence: 'MEDIUM',
                 meetsScoreThreshold: true,
             });
+        });
+    });
+
+    describe('diagnoseNoMatch', () => {
+        test('reports location-stage failures when nothing is available at the selected location', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+            mockListAvailableRestaurantIdsForLocation
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce(['r1']);
+            mockGetLocationAvailabilityStats.mockResolvedValueOnce({
+                providerLocationCount: 0,
+                coverageCount: 0,
+                latestSnapshotCount: 0,
+                freshSnapshotCount: 0,
+                expiredSnapshotCount: 0,
+                availableRestaurantCount: 0,
+                unavailableRestaurantCount: 0,
+            });
+
+            const diagnostics = await suggestionService.diagnoseNoMatch({
+                locationId: 'loc-1',
+                serviceType: 'delivery',
+            });
+
+            expect(diagnostics.blockingStage).toBe('location');
+            expect(diagnostics.counts.activeRestaurants).toBe(3);
+            expect(diagnostics.counts.locationRestaurants).toBe(0);
+            expect(diagnostics.counts.alternateServiceRestaurants).toBe(1);
+            expect(diagnostics.counts.locationCoverageRestaurants).toBe(0);
+            expect(diagnostics.summary).toContain('No location-specific availability has been imported');
+        });
+
+        test('reports open-stage failures when only closed restaurants remain', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+            mockComputeIsOpenNow
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(false)
+                .mockReturnValueOnce(false);
+
+            const diagnostics = await suggestionService.diagnoseNoMatch({
+                locationId: 'loc-1',
+                serviceType: 'delivery',
+                openOnly: true,
+            });
+
+            expect(diagnostics.blockingStage).toBe('open');
+            expect(diagnostics.counts.locationRestaurants).toBe(3);
+            expect(diagnostics.counts.openRestaurants).toBe(0);
+            expect(diagnostics.summary).toContain('none are open');
+        });
+
+        test('reports diet-stage failures when no restaurant satisfies the required diets', async () => {
+            const mockQb = createMockQueryBuilder(sampleRestaurants);
+            (AppDataSource.getRepository as jest.Mock).mockReturnValue({
+                createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+            });
+            mockComputeEffectiveSuitability.mockResolvedValue([
+                {dietTagId: 'tag-vegan', dietTagKey: 'VEGAN', dietTagLabel: 'Vegan', supported: false, source: 'none'},
+            ]);
+
+            const diagnostics = await suggestionService.diagnoseNoMatch({
+                locationId: 'loc-1',
+                serviceType: 'delivery',
+                dietTagIds: ['tag-vegan'],
+                minDietScore: 10,
+            });
+
+            expect(diagnostics.blockingStage).toBe('diet');
+            expect(diagnostics.counts.favoriteRestaurants).toBe(3);
+            expect(diagnostics.counts.dietRestaurants).toBe(0);
+            expect(diagnostics.hints[0]).toContain('Reduce the selected diet tags');
         });
     });
 });

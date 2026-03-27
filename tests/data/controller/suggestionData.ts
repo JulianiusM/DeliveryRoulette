@@ -102,4 +102,5 @@ export const formDataDefaults = {
     expectedDietTagCount: 3,
     expectedSelectedCount: 2,
     expectedMinDietScore: 10,
+    expectedSavedLocationCount: 2,
 };

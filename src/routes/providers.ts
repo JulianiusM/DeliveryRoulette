@@ -15,25 +15,9 @@ const router = express.Router();
  */
 router.get('/', requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const userId = String(req.session.user!.id);
-    const data = await providerController.getProvidersPageData(userId);
+    const locationId = typeof req.query.locationId === 'string' ? req.query.locationId : '';
+    const data = await providerController.getProvidersPageData(userId, locationId);
     renderer.renderWithData(res, 'providers/index', data);
-}));
-
-router.post('/maintenance/heuristics', requireAuth, asyncHandler(async (_req: Request, res: Response) => {
-    const result = providerController.triggerHeuristicRefresh();
-    if (result.started) {
-        _req.flash('info', 'Heuristic refresh started in the background for all restaurants.');
-    } else {
-        _req.flash('info', 'A heuristic refresh is already running.');
-    }
-
-    res.redirect('/providers');
-}));
-
-router.post('/maintenance/reimport', requireAuth, asyncHandler(async (req: Request, res: Response) => {
-    const result = await providerController.triggerProviderRefresh();
-    req.flash('info', `Provider refresh job queued (${result.jobId}). Track progress on Sync Jobs.`);
-    res.redirect('/sync/jobs');
 }));
 
 /**
@@ -43,11 +27,11 @@ router.post('/maintenance/reimport', requireAuth, asyncHandler(async (req: Reque
 router.post('/:providerKey/sync', requireAuth, validateProviderSync, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     const userId = String(req.session.user!.id);
     const {providerKey} = req.params;
-    const {listingUrl} = req.body;
-    const result = await providerController.syncProvider(userId, providerKey, listingUrl);
-    req.flash('info', `Sync job queued (${result.jobId}). Track progress on Sync Jobs.`);
+    const {listingUrl, locationId} = req.body;
+    const result = await providerController.syncProvider(userId, providerKey, listingUrl, locationId);
+    req.flash('info', `Location import queued (${result.jobId}). Restaurants and availability will refresh in the background for the selected saved location.`);
 
-    res.redirect('/sync/jobs');
+    res.redirect(buildProvidersRedirectPath(locationId));
 }));
 
 /**
@@ -59,9 +43,16 @@ router.post('/:providerKey/import-url', requireAuth, validateProviderImportUrl, 
     const {providerKey} = req.params;
     const {menuUrl} = req.body;
     const result = await providerController.importFromUrl(userId, providerKey, menuUrl);
-    req.flash('info', `Import job queued (${result.jobId}). Track progress on Sync Jobs.`);
+    req.flash('info', `Restaurant import queued (${result.jobId}). The restaurant and menu will refresh in the background.`);
 
-    res.redirect('/sync/jobs');
+    res.redirect('/providers');
 }));
+
+function buildProvidersRedirectPath(locationId?: string): string {
+    const normalizedLocationId = typeof locationId === 'string' ? locationId.trim() : '';
+    return normalizedLocationId
+        ? `/providers?locationId=${encodeURIComponent(normalizedLocationId)}`
+        : '/providers';
+}
 
 export default router;

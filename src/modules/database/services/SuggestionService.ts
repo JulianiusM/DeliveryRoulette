@@ -16,6 +16,8 @@ export type SuggestionFavoriteMode = 'prefer' | 'only' | 'ignore';
 // ── Types ───────────────────────────────────────────────────
 
 export interface SuggestionFilters {
+    /** Explicit restaurant IDs already resolved for the active location. */
+    candidateRestaurantIds?: string[];
     /** Saved user location ID used to scope provider availability snapshots */
     locationId?: string;
     /** Delivery vs pickup availability filter. Defaults to delivery. */
@@ -70,6 +72,29 @@ export interface SuggestionResult {
     reason: SuggestionReason;
 }
 
+export interface SuggestionNoMatchDiagnostics {
+    blockingStage: 'empty' | 'location' | 'open' | 'cuisine' | 'allergen' | 'blocked' | 'favorites' | 'diet' | 'unknown';
+    summary: string;
+    hints: string[];
+    counts: {
+        activeRestaurants: number;
+        locationRestaurants: number;
+        alternateServiceRestaurants: number;
+        locationProviderContexts: number;
+        locationCoverageRestaurants: number;
+        locationLatestSnapshots: number;
+        locationFreshSnapshots: number;
+        locationExpiredSnapshots: number;
+        unavailableLocationRestaurants: number;
+        openRestaurants: number;
+        cuisineRestaurants: number;
+        allergenRestaurants: number;
+        allowedRestaurants: number;
+        favoriteRestaurants: number;
+        dietRestaurants: number;
+    };
+}
+
 // ── Core logic ──────────────────────────────────────────────
 
 /**
@@ -81,7 +106,13 @@ export async function findActiveRestaurants(filters: SuggestionFilters): Promise
         .leftJoinAndSelect('r.providerCuisines', 'rc')
         .where('r.is_active = :active', {active: 1});
 
-    if (filters.locationId) {
+    if (filters.candidateRestaurantIds !== undefined) {
+        const candidateRestaurantIds = [...new Set((filters.candidateRestaurantIds ?? []).filter(Boolean))];
+        if (candidateRestaurantIds.length === 0) {
+            return [];
+        }
+        qb.andWhere('r.id IN (:...candidateRestaurantIds)', {candidateRestaurantIds});
+    } else if (filters.locationId) {
         const availableRestaurantIds = await restaurantAvailabilityService.listAvailableRestaurantIdsForLocation(
             filters.locationId,
             filters.serviceType ?? 'delivery',
@@ -238,10 +269,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     if (activeRestaurants.length === 0) return null;
 
     // Hard-exclude do-not-suggest restaurants (no fallback)
-    const doNotSuggestIds = new Set(filters.doNotSuggestIds ?? []);
-    let candidates = doNotSuggestIds.size > 0
-        ? activeRestaurants.filter(r => !doNotSuggestIds.has(r.id))
-        : activeRestaurants;
+    let candidates = applyDoNotSuggestFilter(activeRestaurants, filters.doNotSuggestIds ?? []);
 
     if (candidates.length === 0) return null;
 
@@ -252,7 +280,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     const minDietScore = Math.max(0, Math.min(100, filters.minDietScore ?? 0));
 
     if (favoriteMode === 'only') {
-        candidates = candidates.filter((restaurant) => favoriteIds.has(restaurant.id));
+        candidates = applyFavoriteOnlyFilter(candidates, filters.favoriteIds ?? []);
         if (candidates.length === 0) {
             return null;
         }
@@ -282,13 +310,7 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
     }
 
     // Filter by diet compatibility
-    const compatible: Array<{restaurant: Restaurant; matchedDiets: DietMatchDetail[]}> = [];
-    for (const restaurant of candidates) {
-        const check = await checkDietCompatibility(restaurant.id, dietTagIds, minDietScore);
-        if (check.compatible) {
-            compatible.push({restaurant, matchedDiets: check.matchedDiets});
-        }
-    }
+    const compatible = await filterCompatibleRestaurants(candidates, dietTagIds, minDietScore);
 
     if (compatible.length === 0) return null;
 
@@ -312,6 +334,328 @@ export async function suggest(filters: SuggestionFilters): Promise<SuggestionRes
             totalCandidates: pool.length,
         },
     };
+}
+
+export async function diagnoseNoMatch(filters: SuggestionFilters): Promise<SuggestionNoMatchDiagnostics> {
+    const currentService = filters.serviceType ?? 'delivery';
+    const alternateService: ProviderServiceType = currentService === 'delivery' ? 'collection' : 'delivery';
+    const candidateRestaurantIds = filters.candidateRestaurantIds;
+    const counts: SuggestionNoMatchDiagnostics['counts'] = {
+        activeRestaurants: 0,
+        locationRestaurants: 0,
+        alternateServiceRestaurants: 0,
+        locationProviderContexts: 0,
+        locationCoverageRestaurants: 0,
+        locationLatestSnapshots: 0,
+        locationFreshSnapshots: 0,
+        locationExpiredSnapshots: 0,
+        unavailableLocationRestaurants: 0,
+        openRestaurants: 0,
+        cuisineRestaurants: 0,
+        allergenRestaurants: 0,
+        allowedRestaurants: 0,
+        favoriteRestaurants: 0,
+        dietRestaurants: 0,
+    };
+
+    const activeRestaurants = await findActiveRestaurants({});
+    counts.activeRestaurants = activeRestaurants.length;
+    if (activeRestaurants.length === 0) {
+        return {
+            blockingStage: 'empty',
+            summary: 'No active restaurants are available yet.',
+            hints: [
+                'Import restaurants from a file or run a provider sync to populate the pool.',
+                'Check the Restaurants page and reactivate any places you still want to consider.',
+                'If restaurants were synced before, run a fresh import or provider sync to refresh the data.',
+            ],
+            counts,
+        };
+    }
+
+    const locationRestaurants = await findActiveRestaurants({
+        candidateRestaurantIds,
+        locationId: filters.locationId,
+        serviceType: currentService,
+    });
+    counts.locationRestaurants = locationRestaurants.length;
+
+    if (filters.locationId) {
+        counts.alternateServiceRestaurants = (
+            await findActiveRestaurants({
+                locationId: filters.locationId,
+                serviceType: alternateService,
+            })
+        ).length;
+    }
+
+    if (locationRestaurants.length === 0) {
+        const locationAvailabilityStats = filters.locationId
+            ? await restaurantAvailabilityService.getLocationAvailabilityStats(filters.locationId, currentService)
+            : null;
+
+        counts.locationProviderContexts = locationAvailabilityStats?.providerLocationCount ?? 0;
+        counts.locationCoverageRestaurants = locationAvailabilityStats?.coverageCount ?? 0;
+        counts.locationLatestSnapshots = locationAvailabilityStats?.latestSnapshotCount ?? 0;
+        counts.locationFreshSnapshots = locationAvailabilityStats?.freshSnapshotCount ?? 0;
+        counts.locationExpiredSnapshots = locationAvailabilityStats?.expiredSnapshotCount ?? 0;
+        counts.unavailableLocationRestaurants = locationAvailabilityStats?.unavailableRestaurantCount ?? 0;
+
+        return buildLocationStageDiagnostics(
+            counts,
+            currentService,
+            alternateService,
+            locationAvailabilityStats,
+        );
+    }
+
+    const openRestaurants = await findActiveRestaurants({
+        candidateRestaurantIds,
+        locationId: filters.locationId,
+        serviceType: currentService,
+        openOnly: filters.openOnly,
+    });
+    counts.openRestaurants = openRestaurants.length;
+    if (filters.openOnly && openRestaurants.length === 0) {
+        const hints = [
+            'Turn off "Only restaurants that are open right now" for this draw.',
+            'Check imported opening hours or re-sync provider data if they look stale.',
+            'Try again later if this is outside normal delivery hours.',
+        ];
+        if (counts.alternateServiceRestaurants > 0) {
+            hints.splice(1, 0, `Try ${labelForServiceType(alternateService)} if some places only offer that service right now.`);
+        }
+
+        return {
+            blockingStage: 'open',
+            summary: 'Restaurants exist for this location, but none are open right now.',
+            hints,
+            counts,
+        };
+    }
+
+    const cuisineRestaurants = await findActiveRestaurants({
+        candidateRestaurantIds,
+        locationId: filters.locationId,
+        serviceType: currentService,
+        openOnly: filters.openOnly,
+        cuisineIncludes: filters.cuisineIncludes,
+        cuisineExcludes: filters.cuisineExcludes,
+    });
+    counts.cuisineRestaurants = cuisineRestaurants.length;
+    if ((filters.cuisineIncludes?.length ?? 0) > 0 || (filters.cuisineExcludes?.length ?? 0) > 0) {
+        if (cuisineRestaurants.length === 0) {
+            return {
+                blockingStage: 'cuisine',
+                summary: 'Your cuisine filters removed all remaining restaurants.',
+                hints: [
+                    'Clear or relax the cuisine include/exclude filters.',
+                    'Check whether the expected cuisine tags exist on the restaurant pages.',
+                    'Reimport or re-sync provider data if cuisine metadata looks stale or incomplete.',
+                ],
+                counts,
+            };
+        }
+    }
+
+    const allergenRestaurants = await findActiveRestaurants({
+        candidateRestaurantIds,
+        locationId: filters.locationId,
+        serviceType: currentService,
+        openOnly: filters.openOnly,
+        cuisineIncludes: filters.cuisineIncludes,
+        cuisineExcludes: filters.cuisineExcludes,
+        excludeAllergens: filters.excludeAllergens,
+    });
+    counts.allergenRestaurants = allergenRestaurants.length;
+    if ((filters.excludeAllergens?.length ?? 0) > 0 && allergenRestaurants.length === 0) {
+        return {
+            blockingStage: 'allergen',
+            summary: 'Allergen exclusion removed all remaining restaurants.',
+            hints: [
+                'Remove one or more excluded allergens for this draw if the list is too strict.',
+                'Reimport or re-sync menus so allergen information is up to date.',
+                'Review restaurant menus manually to confirm whether safe items exist.',
+            ],
+            counts,
+        };
+    }
+
+    const allowedRestaurants = applyDoNotSuggestFilter(allergenRestaurants, filters.doNotSuggestIds ?? []);
+    counts.allowedRestaurants = allowedRestaurants.length;
+    if (allergenRestaurants.length > 0 && allowedRestaurants.length === 0) {
+        return {
+            blockingStage: 'blocked',
+            summary: 'All remaining restaurants are blocked by your Do Not Suggest settings.',
+            hints: [
+                'Unblock one or more restaurants from their detail pages.',
+                'Turn off "Respect restaurants you blocked from suggestions" for this draw.',
+                'Add more restaurants or sync more providers if the pool is too small.',
+            ],
+            counts,
+        };
+    }
+
+    const favoriteMode = filters.favoriteMode ?? 'prefer';
+    const favoriteRestaurants = favoriteMode === 'only'
+        ? applyFavoriteOnlyFilter(allowedRestaurants, filters.favoriteIds ?? [])
+        : allowedRestaurants;
+    counts.favoriteRestaurants = favoriteRestaurants.length;
+    if (favoriteMode === 'only' && favoriteRestaurants.length === 0) {
+        return {
+            blockingStage: 'favorites',
+            summary: 'Favorites-only mode left no eligible restaurants.',
+            hints: [
+                'Switch Favorites from "Only favorites" to "Prefer favorites".',
+                'Mark more restaurants as favorites on their detail pages.',
+                'Check whether your favorite restaurants are blocked, closed, or unavailable at this location.',
+            ],
+            counts,
+        };
+    }
+
+    const dietTagIds = filters.dietTagIds ?? [];
+    if (dietTagIds.length > 0) {
+        counts.dietRestaurants = (await filterCompatibleRestaurants(
+            favoriteRestaurants,
+            dietTagIds,
+            Math.max(0, Math.min(100, filters.minDietScore ?? 0)),
+        )).length;
+
+        if (counts.dietRestaurants === 0) {
+            return {
+                blockingStage: 'diet',
+                summary: 'No restaurants satisfy the selected diet filters.',
+                hints: [
+                    'Reduce the selected diet tags or lower the minimum diet score.',
+                    'Review manual diet overrides on restaurant pages if a place should qualify.',
+                    'Reimport or re-sync menus so diet inference uses current menu data.',
+                ],
+                counts,
+            };
+        }
+    } else {
+        counts.dietRestaurants = favoriteRestaurants.length;
+    }
+
+    return {
+        blockingStage: 'unknown',
+        summary: 'No restaurants matched after all filters were applied.',
+        hints: [
+            'Relax one or more filters and try again.',
+            'Re-sync providers or reimport restaurants if the data may be stale.',
+        ],
+        counts,
+    };
+}
+
+function buildLocationStageDiagnostics(
+    counts: SuggestionNoMatchDiagnostics['counts'],
+    currentService: ProviderServiceType,
+    alternateService: ProviderServiceType,
+    locationAvailabilityStats: restaurantAvailabilityService.LocationAvailabilityStats | null,
+): SuggestionNoMatchDiagnostics {
+    const hints = [
+        'Choose another saved location if you order to multiple addresses.',
+        'Check the saved location in Settings and verify that its address and coordinates are correct.',
+    ];
+    if (counts.alternateServiceRestaurants > 0) {
+        hints.unshift(`Try switching from ${labelForServiceType(currentService)} to ${labelForServiceType(alternateService)}.`);
+    }
+
+    if (!locationAvailabilityStats || locationAvailabilityStats.providerLocationCount === 0 || locationAvailabilityStats.coverageCount === 0) {
+        return {
+            blockingStage: 'location',
+            summary: `No location-specific availability has been imported for ${labelForServiceType(currentService)} at the selected saved location yet.`,
+            hints: [
+                'Open Location Imports and run a listing import for this saved location.',
+                'If you just created or edited this saved location, wait for the queued location import to finish and try again.',
+                ...hints,
+            ],
+            counts,
+        };
+    }
+
+    if (locationAvailabilityStats.latestSnapshotCount === 0) {
+        return {
+            blockingStage: 'location',
+            summary: `Restaurants were linked to this location, but no ${labelForServiceType(currentService)} availability snapshots were stored yet.`,
+            hints: [
+                'Run a fresh location import so provider availability snapshots are created for this saved location.',
+                'If this provider only supports another service type, switch the draw to that service and try again.',
+                ...hints,
+            ],
+            counts,
+        };
+    }
+
+    if (locationAvailabilityStats.freshSnapshotCount === 0 && locationAvailabilityStats.expiredSnapshotCount > 0) {
+        return {
+            blockingStage: 'location',
+            summary: `Availability data exists for this saved location, but the stored ${labelForServiceType(currentService)} snapshots expired.`,
+            hints: [
+                'Run a location import again to refresh location-aware availability.',
+                'If you just edited this saved location, wait for the queued refresh to finish and try again.',
+                ...hints,
+            ],
+            counts,
+        };
+    }
+
+    if (locationAvailabilityStats.unavailableRestaurantCount > 0) {
+        return {
+            blockingStage: 'location',
+            summary: `Restaurants were imported for this saved location, but none currently offer ${labelForServiceType(currentService)}.`,
+            hints: [
+                'Try again later if this is outside normal service hours.',
+                'Run a location import again if provider availability may have changed.',
+                ...hints,
+            ],
+            counts,
+        };
+    }
+
+    return {
+        blockingStage: 'location',
+        summary: `No restaurants are currently available for ${labelForServiceType(currentService)} at the selected saved location.`,
+        hints: [
+            'If you just created or edited this saved location, wait for the queued location import to finish and try again.',
+            'Run a provider sync for this saved location so location-specific availability is refreshed.',
+            ...hints,
+        ],
+        counts,
+    };
+}
+
+function applyDoNotSuggestFilter(restaurants: Restaurant[], doNotSuggestIds: string[]): Restaurant[] {
+    const doNotSuggestIdSet = new Set(doNotSuggestIds);
+    return doNotSuggestIdSet.size > 0
+        ? restaurants.filter((restaurant) => !doNotSuggestIdSet.has(restaurant.id))
+        : restaurants;
+}
+
+function applyFavoriteOnlyFilter(restaurants: Restaurant[], favoriteIds: string[]): Restaurant[] {
+    const favoriteIdSet = new Set(favoriteIds);
+    return restaurants.filter((restaurant) => favoriteIdSet.has(restaurant.id));
+}
+
+async function filterCompatibleRestaurants(
+    restaurants: Restaurant[],
+    dietTagIds: string[],
+    minDietScore: number,
+): Promise<Array<{restaurant: Restaurant; matchedDiets: DietMatchDetail[]}>> {
+    const compatible: Array<{restaurant: Restaurant; matchedDiets: DietMatchDetail[]}> = [];
+    for (const restaurant of restaurants) {
+        const check = await checkDietCompatibility(restaurant.id, dietTagIds, minDietScore);
+        if (check.compatible) {
+            compatible.push({restaurant, matchedDiets: check.matchedDiets});
+        }
+    }
+    return compatible;
+}
+
+function labelForServiceType(serviceType: ProviderServiceType): string {
+    return serviceType === 'collection' ? 'collection' : 'delivery';
 }
 
 function restaurantMatchesCuisineQuery(restaurant: Restaurant, query: string): boolean {

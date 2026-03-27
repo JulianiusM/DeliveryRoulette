@@ -33,6 +33,8 @@ export type Settings = {
     smtpUser: string;
 
     localLoginEnabled: boolean;
+    adminUsernames: string[];
+    adminEmails: string[];
     oidcEnabled: boolean;
     oidcName: string;
     oidcIssuerBaseUrl: string;
@@ -92,6 +94,14 @@ export type Settings = {
     providerAvailabilityDynamicSnapshotTtlSeconds: number;
     providerRefreshVersion: string;
 
+    // Address geocoding configuration
+    addressGeocodingEnabled: boolean;
+    addressGeocodingBaseUrl: string;
+    addressGeocodingUserAgent: string;
+    addressGeocodingTimeoutMs: number;
+    addressGeocodingMinIntervalMs: number;
+    addressGeocodingCacheTtlMs: number;
+
     // Diet inference engine configuration
     inferenceHighConfidenceMinRatio: number;
     inferenceHighConfidenceMinStrongSignals: number;
@@ -148,6 +158,8 @@ const defaults: Settings = {
     oidcRedirectUrl: "http://localhost:3000/user/oidc/callback",
 
     localLoginEnabled: true,
+    adminUsernames: [],
+    adminEmails: [],
 
     sessionSecret:
         "CHANGE__" + crypto.randomBytes(32).toString("base64url").slice(0, 20),
@@ -207,6 +219,14 @@ const defaults: Settings = {
     providerAvailabilityDynamicSnapshotTtlSeconds: 30 * 60, // 30 minutes
     providerRefreshVersion: "1.0.0",
 
+    // Address geocoding
+    addressGeocodingEnabled: true,
+    addressGeocodingBaseUrl: "https://nominatim.openstreetmap.org/search",
+    addressGeocodingUserAgent: "",
+    addressGeocodingTimeoutMs: 8_000,
+    addressGeocodingMinIntervalMs: 1_100,
+    addressGeocodingCacheTtlMs: 24 * 60 * 60 * 1000,
+
     // Diet inference engine configuration
     inferenceHighConfidenceMinRatio: 0.3,
     inferenceHighConfidenceMinStrongSignals: 2,
@@ -257,6 +277,8 @@ const keyMap: Record<string, keyof Settings> = {
     OIDC_ISSUER_BASE_URL: "oidcIssuerBaseUrl",
     OIDC_REDIRECT_URL: "oidcRedirectUrl",
     LOCAL_LOGIN_ENABLED: "localLoginEnabled",
+    ADMIN_USERNAMES: "adminUsernames",
+    ADMIN_EMAILS: "adminEmails",
     SESSION_SECRET: "sessionSecret",
     APP_PORT: "appPort",
     IMPRINT_URL: "imprintUrl",
@@ -288,6 +310,12 @@ const keyMap: Record<string, keyof Settings> = {
     PROVIDER_AVAILABILITY_LISTING_SNAPSHOT_TTL_SECONDS: "providerAvailabilityListingSnapshotTtlSeconds",
     PROVIDER_AVAILABILITY_DYNAMIC_SNAPSHOT_TTL_SECONDS: "providerAvailabilityDynamicSnapshotTtlSeconds",
     PROVIDER_REFRESH_VERSION: "providerRefreshVersion",
+    ADDRESS_GEOCODING_ENABLED: "addressGeocodingEnabled",
+    ADDRESS_GEOCODING_BASE_URL: "addressGeocodingBaseUrl",
+    ADDRESS_GEOCODING_USER_AGENT: "addressGeocodingUserAgent",
+    ADDRESS_GEOCODING_TIMEOUT_MS: "addressGeocodingTimeoutMs",
+    ADDRESS_GEOCODING_MIN_INTERVAL_MS: "addressGeocodingMinIntervalMs",
+    ADDRESS_GEOCODING_CACHE_TTL_MS: "addressGeocodingCacheTtlMs",
     INFERENCE_HIGH_CONFIDENCE_MIN_RATIO: "inferenceHighConfidenceMinRatio",
     INFERENCE_HIGH_CONFIDENCE_MIN_STRONG_SIGNALS: "inferenceHighConfidenceMinStrongSignals",
     INFERENCE_HIGH_CONFIDENCE_MIN_UNIQUE_ITEMS: "inferenceHighConfidenceMinUniqueItems",
@@ -343,6 +371,10 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     providerCacheMenuTtlSeconds: (v) => Number(v),
     providerAvailabilityListingSnapshotTtlSeconds: (v) => Number(v),
     providerAvailabilityDynamicSnapshotTtlSeconds: (v) => Number(v),
+    addressGeocodingEnabled: (v) => /^(1|true|yes|on)$/i.test(v),
+    addressGeocodingTimeoutMs: (v) => Number(v),
+    addressGeocodingMinIntervalMs: (v) => Number(v),
+    addressGeocodingCacheTtlMs: (v) => Number(v),
     inferenceHighConfidenceMinRatio: (v) => Number(v),
     inferenceHighConfidenceMinStrongSignals: (v) => Number(v),
     inferenceMediumConfidenceMinRatio: (v) => Number(v),
@@ -363,8 +395,17 @@ const coerce: Partial<Record<keyof Settings, (v: string) => any>> = {
     smtpPool: (v) => /^(1|true|yes|on)$/i.test(v),
     smtpSecure: (v) => /^(1|true|yes|on)$/i.test(v),
     localLoginEnabled: (v) => /^(1|true|yes|on)$/i.test(v),
+    adminUsernames: (v) => splitListSetting(v),
+    adminEmails: (v) => splitListSetting(v),
     oidcEnabled: (v) => /^(1|true|yes|on)$/i.test(v),
 };
+
+function splitListSetting(value: string): string[] {
+    return value
+        .split(/[;\n,]/g)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+}
 
 // Apply environment variable overrides AFTER reading CSV.
 // In E2E: E2E_* vars override; otherwise plain vars override.

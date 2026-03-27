@@ -5,7 +5,7 @@ import mailer from "../modules/email";
 import {ExpectedError, ValidationError} from "../modules/lib/errors";
 import {Request} from "express";
 import * as oidc from "../modules/oidc";
-import {persistSession} from "../modules/lib/session";
+import {persistSession, regenerateSession} from "../modules/lib/session";
 
 const CREATE_TEMPLATE = 'users/register';
 const LOGIN_TEMPLATE = 'users/login';
@@ -68,6 +68,7 @@ export async function loginUser(body: any, session: Request["session"]) {
         throw new ValidationError(LOGIN_TEMPLATE, errorMsg, returnInfo);
     }
 
+    await regenerateSession(session);
     session.user = user;
     await persistSession(session);
 }

@@ -2,6 +2,8 @@ import * as userPreferenceService from "../modules/database/services/UserPrefere
 import * as userDietPreferenceService from "../modules/database/services/UserDietPreferenceService";
 import * as dietTagService from "../modules/database/services/DietTagService";
 import * as userLocationService from "../modules/database/services/UserLocationService";
+import * as addressGeocodingService from "../modules/lib/addressGeocoding";
+import * as userLocationImportService from "../modules/sync/UserLocationImportService";
 import {ValidationError} from "../modules/lib/errors";
 import {requireAuthenticatedUser} from "../middleware/authMiddleware";
 
@@ -20,7 +22,7 @@ export interface DietTagOption {
     selected: boolean;
 }
 
-export interface DefaultLocationFormData {
+export interface LocationEditorFormData {
     id: string;
     label: string;
     addressLine1: string;
@@ -30,6 +32,7 @@ export interface DefaultLocationFormData {
     country: string;
     latitude: string;
     longitude: string;
+    makeDefault: boolean;
 }
 
 export interface SavedLocationSummary {
@@ -50,8 +53,10 @@ export interface SettingsFormData {
     cuisineIncludes: string;
     cuisineExcludes: string;
     dietTags: DietTagOption[];
-    defaultLocation: DefaultLocationFormData;
+    defaultLocation: SavedLocationSummary | null;
+    locationEditor: LocationEditorFormData;
     savedLocations: SavedLocationSummary[];
+    notices?: string[];
 }
 
 export interface DietHeuristicSettingsFormData {
@@ -83,7 +88,13 @@ interface LocationFormInput {
     longitudeText: string;
     latitude: number | null;
     longitude: number | null;
+    makeDefault: boolean;
     hasAnyValue: boolean;
+}
+
+interface LocationCoordinateResolution {
+    locationInput: LocationFormInput;
+    notices: string[];
 }
 
 function parseWhitelistInput(raw: unknown): string[] {
@@ -94,9 +105,14 @@ function parseWhitelistInput(raw: unknown): string[] {
         .filter((entry) => entry.length > 0);
 }
 
-export async function getSettings(userId?: number): Promise<SettingsFormData> {
+export async function getSettings(
+    userId?: number,
+    editorLocationId?: string | null,
+): Promise<SettingsFormData> {
     requireAuthenticatedUser(userId);
-    return await buildSettingsFormData(userId);
+    return await buildSettingsFormData(userId, {
+        editorLocationId: normalizeText(editorLocationId),
+    });
 }
 
 export async function saveSettings(userId: number | undefined, body: any): Promise<SettingsFormData> {
@@ -106,42 +122,143 @@ export async function saveSettings(userId: number | undefined, body: any): Promi
     const submittedDeliveryArea = normalizeText(body.deliveryArea);
     const trimmedIncludes = normalizeText(body.cuisineIncludes);
     const trimmedExcludes = normalizeText(body.cuisineExcludes);
-    const locationInput = parseLocationFormInput(body);
     const dietTagIds = normalizeDietTagIds(body.dietTagIds);
+    const locationInput = parseLocationFormInput(body);
+    const existingEditedLocation = locationInput.id
+        ? await userLocationService.getByIdForUser(userId, locationInput.id)
+        : null;
+    const existingDefaultLocation = await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+        userId,
+        existingPref?.deliveryArea ?? null,
+    );
 
     const draftPreference: SettingsPreferenceValues = {
-        deliveryArea: submittedDeliveryArea || existingPref?.deliveryArea || '',
+        deliveryArea: submittedDeliveryArea || existingDefaultLocation?.label || existingPref?.deliveryArea || '',
         cuisineIncludes: trimmedIncludes || null,
         cuisineExcludes: trimmedExcludes || null,
     };
 
-    await validateSettingsInput(userId, draftPreference, dietTagIds, locationInput);
+    await validateSettingsInput(userId, draftPreference, dietTagIds, locationInput, existingDefaultLocation?.id ?? '');
+    const coordinateResolution = await resolveLocationCoordinatesIfNeeded(
+        userId,
+        draftPreference,
+        dietTagIds,
+        locationInput,
+        existingDefaultLocation?.id ?? '',
+    );
 
-    let effectiveDeliveryArea = draftPreference.deliveryArea;
-    if (locationInput.hasAnyValue) {
-        const savedLocation = await userLocationService.upsertDefaultLocationForUser(userId, {
-            id: locationInput.id || null,
-            label: locationInput.label,
-            addressLine1: locationInput.addressLine1 || null,
-            addressLine2: locationInput.addressLine2 || null,
-            city: locationInput.city || null,
-            postalCode: locationInput.postalCode || null,
-            country: locationInput.country || null,
-            latitude: locationInput.latitude,
-            longitude: locationInput.longitude,
+    let currentDefaultLocation = existingDefaultLocation;
+    let savedLocationId = coordinateResolution.locationInput.id;
+    let locationImportNotices: string[] = [];
+    if (coordinateResolution.locationInput.hasAnyValue) {
+        const savedLocation = await userLocationService.upsertLocationForUser(userId, {
+            id: coordinateResolution.locationInput.id || null,
+            label: coordinateResolution.locationInput.label,
+            addressLine1: coordinateResolution.locationInput.addressLine1 || null,
+            addressLine2: coordinateResolution.locationInput.addressLine2 || null,
+            city: coordinateResolution.locationInput.city || null,
+            postalCode: coordinateResolution.locationInput.postalCode || null,
+            country: coordinateResolution.locationInput.country || null,
+            latitude: coordinateResolution.locationInput.latitude,
+            longitude: coordinateResolution.locationInput.longitude,
+        }, {
+            makeDefault: coordinateResolution.locationInput.makeDefault,
         });
-        effectiveDeliveryArea = savedLocation.label;
+        savedLocationId = savedLocation.id;
+        currentDefaultLocation = savedLocation.isDefault
+            ? savedLocation
+            : await userLocationService.getDefaultByUserId(userId);
+
+        if (shouldQueueLocationRefresh(existingEditedLocation, coordinateResolution.locationInput)) {
+            const refreshResult = await userLocationImportService.queueSavedLocationRefreshes(userId, savedLocation.id);
+            locationImportNotices = buildLocationImportNotices(refreshResult, savedLocation.label);
+        }
     }
 
     const pref = await userPreferenceService.upsert(userId, {
-        deliveryArea: effectiveDeliveryArea,
+        deliveryArea: currentDefaultLocation?.label ?? draftPreference.deliveryArea,
         cuisineIncludes: trimmedIncludes || null,
         cuisineExcludes: trimmedExcludes || null,
     });
 
     await userDietPreferenceService.replaceForUser(userId, dietTagIds);
 
-    return await buildSettingsFormData(userId, {preference: pref});
+    const formData = await buildSettingsFormData(userId, {
+        preference: pref,
+        selectedDietTagIds: dietTagIds,
+        editorLocationId: savedLocationId || currentDefaultLocation?.id || '',
+    });
+    if (coordinateResolution.notices.length > 0) {
+        formData.notices = coordinateResolution.notices;
+    }
+    if (locationImportNotices.length > 0) {
+        formData.notices = [...(formData.notices ?? []), ...locationImportNotices];
+    }
+    return formData;
+}
+
+export async function setDefaultLocation(
+    userId: number | undefined,
+    locationId: string,
+): Promise<SettingsFormData> {
+    requireAuthenticatedUser(userId);
+
+    const normalizedId = normalizeText(locationId);
+    const savedLocation = await userLocationService.setDefaultLocationForUser(userId, normalizedId);
+    if (!savedLocation) {
+        throw new ValidationError(
+            SETTINGS_TEMPLATE,
+            'Saved location not found.',
+            await buildSettingsFormData(userId),
+        );
+    }
+
+    const preference = await userPreferenceService.getByUserId(userId);
+    const pref = await userPreferenceService.upsert(userId, {
+        deliveryArea: savedLocation.label,
+        cuisineIncludes: preference?.cuisineIncludes ?? null,
+        cuisineExcludes: preference?.cuisineExcludes ?? null,
+    });
+
+    const formData = await buildSettingsFormData(userId, {
+        preference: pref,
+        editorLocationId: savedLocation.id,
+    });
+    const refreshResult = await userLocationImportService.queueSavedLocationRefreshes(userId, savedLocation.id);
+    const locationImportNotices = buildLocationImportNotices(refreshResult, savedLocation.label);
+    if (locationImportNotices.length > 0) {
+        formData.notices = locationImportNotices;
+    }
+    return formData;
+}
+
+export async function deleteSavedLocation(
+    userId: number | undefined,
+    locationId: string,
+): Promise<SettingsFormData> {
+    requireAuthenticatedUser(userId);
+
+    const normalizedId = normalizeText(locationId);
+    const deleted = await userLocationService.deleteLocationForUser(userId, normalizedId);
+    if (!deleted.deleted) {
+        throw new ValidationError(
+            SETTINGS_TEMPLATE,
+            'Saved location not found.',
+            await buildSettingsFormData(userId),
+        );
+    }
+
+    const preference = await userPreferenceService.getByUserId(userId);
+    const pref = await userPreferenceService.upsert(userId, {
+        deliveryArea: deleted.newDefaultLocation?.label ?? '',
+        cuisineIncludes: preference?.cuisineIncludes ?? null,
+        cuisineExcludes: preference?.cuisineExcludes ?? null,
+    });
+
+    return await buildSettingsFormData(userId, {
+        preference: pref,
+        editorLocationId: deleted.newDefaultLocation?.id ?? deleted.remainingLocations[0]?.id ?? '',
+    });
 }
 
 export async function getDietHeuristicSettings(userId?: number): Promise<DietHeuristicSettingsFormData> {
@@ -198,7 +315,9 @@ async function buildSettingsFormData(
     overrides: {
         preference?: SettingsPreferenceValues | null;
         selectedDietTagIds?: string[];
-        defaultLocation?: DefaultLocationFormData;
+        defaultLocation?: SavedLocationSummary | null;
+        locationEditor?: LocationEditorFormData;
+        editorLocationId?: string;
     } = {},
 ): Promise<SettingsFormData> {
     const preference = overrides.preference ?? await userPreferenceService.getByUserId(userId);
@@ -215,13 +334,17 @@ async function buildSettingsFormData(
         resolveSelectedDietTagIds(userId, overrides.selectedDietTagIds),
     ]);
 
-    const persistedDefaultLocation = overrides.defaultLocation
-        ? null
-        : await userLocationService.getOrBackfillDefaultFromDeliveryArea(
+    const persistedDefaultLocation = overrides.defaultLocation !== undefined
+        ? overrides.defaultLocation
+        : mapLocationToSummary(await userLocationService.getOrBackfillDefaultFromDeliveryArea(
             userId,
             effectivePreference?.deliveryArea ?? null,
-        );
+        ));
+
     const savedLocations = await userLocationService.listByUserId(userId);
+    const editorSource = overrides.locationEditor
+        ? null
+        : await resolveEditorLocation(userId, overrides.editorLocationId ?? '', persistedDefaultLocation?.id ?? '');
 
     return {
         deliveryArea: effectivePreference?.deliveryArea || '',
@@ -233,19 +356,12 @@ async function buildSettingsFormData(
             label: tag.label,
             selected: selectedIds.has(tag.id),
         })),
-        defaultLocation: overrides.defaultLocation ?? mapLocationToFormData(persistedDefaultLocation),
-        savedLocations: savedLocations.map((location) => ({
-            id: location.id,
-            label: location.label,
-            addressLine1: location.addressLine1 ?? '',
-            addressLine2: location.addressLine2 ?? '',
-            city: location.city ?? '',
-            postalCode: location.postalCode ?? '',
-            country: location.country ?? '',
-            latitude: location.latitude ?? null,
-            longitude: location.longitude ?? null,
-            isDefault: Boolean(location.isDefault),
-        })),
+        defaultLocation: persistedDefaultLocation,
+        locationEditor: overrides.locationEditor ?? mapLocationToFormData(
+            editorSource,
+            persistedDefaultLocation?.id ?? '',
+        ),
+        savedLocations: savedLocations.map((location) => mapLocationToSummary(location)!),
     };
 }
 
@@ -258,7 +374,27 @@ async function resolveSelectedDietTagIds(userId: number, draftIds?: string[]): P
     return new Set(userPrefs.map((pref) => pref.dietTagId));
 }
 
-function mapLocationToFormData(location?: {
+async function resolveEditorLocation(
+    userId: number,
+    editorLocationId: string,
+    defaultLocationId: string,
+) {
+    const requestedId = normalizeText(editorLocationId);
+    if (requestedId) {
+        const requested = await userLocationService.getByIdForUser(userId, requestedId);
+        if (requested) {
+            return requested;
+        }
+    }
+
+    if (defaultLocationId) {
+        return await userLocationService.getByIdForUser(userId, defaultLocationId);
+    }
+
+    return null;
+}
+
+function mapLocationToSummary(location?: {
     id: string;
     label: string;
     addressLine1?: string | null;
@@ -268,7 +404,40 @@ function mapLocationToFormData(location?: {
     country?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-} | null): DefaultLocationFormData {
+    isDefault?: boolean;
+} | null): SavedLocationSummary | null {
+    if (!location) {
+        return null;
+    }
+
+    return {
+        id: location.id,
+        label: location.label,
+        addressLine1: location.addressLine1 ?? '',
+        addressLine2: location.addressLine2 ?? '',
+        city: location.city ?? '',
+        postalCode: location.postalCode ?? '',
+        country: location.country ?? '',
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
+        isDefault: Boolean(location.isDefault),
+    };
+}
+
+function mapLocationToFormData(
+    location?: {
+        id: string;
+        label: string;
+        addressLine1?: string | null;
+        addressLine2?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        country?: string | null;
+        latitude?: number | null;
+        longitude?: number | null;
+    } | null,
+    defaultLocationId: string = '',
+): LocationEditorFormData {
     return {
         id: location?.id ?? '',
         label: location?.label ?? '',
@@ -279,6 +448,7 @@ function mapLocationToFormData(location?: {
         country: location?.country ?? '',
         latitude: formatCoordinate(location?.latitude),
         longitude: formatCoordinate(location?.longitude),
+        makeDefault: Boolean(location?.id) && location?.id === defaultLocationId,
     };
 }
 
@@ -292,6 +462,7 @@ function parseLocationFormInput(body: any): LocationFormInput {
     const country = normalizeText(body.defaultLocationCountry);
     const latitudeText = normalizeText(body.defaultLocationLatitude);
     const longitudeText = normalizeText(body.defaultLocationLongitude);
+    const makeDefault = parseBooleanLike(body.defaultLocationMakeDefault);
 
     return {
         id,
@@ -305,6 +476,7 @@ function parseLocationFormInput(body: any): LocationFormInput {
         longitudeText,
         latitude: parseCoordinate(latitudeText),
         longitude: parseCoordinate(longitudeText),
+        makeDefault,
         hasAnyValue: [
             label,
             addressLine1,
@@ -328,11 +500,77 @@ function normalizeDietTagIds(rawDietTagIds: unknown): string[] {
         .filter(Boolean);
 }
 
+async function resolveLocationCoordinatesIfNeeded(
+    userId: number,
+    preference: SettingsPreferenceValues,
+    dietTagIds: string[],
+    locationInput: LocationFormInput,
+    defaultLocationId: string,
+): Promise<LocationCoordinateResolution> {
+    const hasManualCoordinates = Boolean(locationInput.latitudeText) && Boolean(locationInput.longitudeText);
+    if (!locationInput.hasAnyValue || hasManualCoordinates) {
+        return {locationInput, notices: []};
+    }
+
+    const geocodeResult = await addressGeocodingService.resolveCoordinates({
+        addressLine1: locationInput.addressLine1,
+        addressLine2: locationInput.addressLine2,
+        city: locationInput.city,
+        postalCode: locationInput.postalCode,
+        country: locationInput.country,
+    });
+
+    if (geocodeResult.status === 'resolved') {
+        return {
+            locationInput: {
+                ...locationInput,
+                latitude: geocodeResult.latitude ?? null,
+                longitude: geocodeResult.longitude ?? null,
+                latitudeText: geocodeResult.latitude !== undefined ? String(geocodeResult.latitude) : locationInput.latitudeText,
+                longitudeText: geocodeResult.longitude !== undefined ? String(geocodeResult.longitude) : locationInput.longitudeText,
+            },
+            notices: [],
+        };
+    }
+
+    if (geocodeResult.status === 'no_match') {
+        await throwSettingsValidationError(
+            userId,
+            'Coordinates could not be resolved from the entered address. Refine the address or enter latitude and longitude manually.',
+            preference,
+            dietTagIds,
+            locationInput,
+            defaultLocationId,
+        );
+    }
+
+    if (geocodeResult.status === 'disabled') {
+        return {
+            locationInput,
+            notices: [
+                'The location was saved without coordinates because automatic coordinate lookup is disabled.',
+            ],
+        };
+    }
+
+    if (geocodeResult.status === 'error') {
+        return {
+            locationInput,
+            notices: [
+                'The location was saved, but coordinates could not be resolved right now. Retry later or enter them manually.',
+            ],
+        };
+    }
+
+    return {locationInput, notices: []};
+}
+
 async function validateSettingsInput(
     userId: number,
     preference: SettingsPreferenceValues,
     dietTagIds: string[],
     locationInput: LocationFormInput,
+    defaultLocationId: string,
 ): Promise<void> {
     if (preference.deliveryArea.length > MAX_DELIVERY_AREA_LENGTH) {
         await throwSettingsValidationError(
@@ -341,16 +579,18 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
     if (locationInput.label.length > MAX_LOCATION_LABEL_LENGTH) {
         await throwSettingsValidationError(
             userId,
-            'Default location label must be 150 characters or less.',
+            'Location label must be 150 characters or less.',
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -361,6 +601,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -371,6 +612,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -381,6 +623,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -391,6 +634,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -401,16 +645,18 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
     if (locationInput.hasAnyValue && !locationInput.label) {
         await throwSettingsValidationError(
             userId,
-            'Default location label is required when saving a location.',
+            'Location label is required when saving a location.',
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -423,6 +669,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -433,6 +680,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 
@@ -443,6 +691,7 @@ async function validateSettingsInput(
             preference,
             dietTagIds,
             locationInput,
+            defaultLocationId,
         );
     }
 }
@@ -453,11 +702,12 @@ async function throwSettingsValidationError(
     preference: SettingsPreferenceValues,
     dietTagIds: string[],
     locationInput: LocationFormInput,
+    defaultLocationId: string,
 ): Promise<never> {
     const formData = await buildSettingsFormData(userId, {
         preference,
         selectedDietTagIds: dietTagIds,
-        defaultLocation: {
+        locationEditor: {
             id: locationInput.id,
             label: locationInput.label,
             addressLine1: locationInput.addressLine1,
@@ -467,6 +717,7 @@ async function throwSettingsValidationError(
             country: locationInput.country,
             latitude: locationInput.latitudeText,
             longitude: locationInput.longitudeText,
+            makeDefault: locationInput.makeDefault || Boolean(locationInput.id && locationInput.id === defaultLocationId),
         },
     });
     throw new ValidationError(SETTINGS_TEMPLATE, message, formData);
@@ -489,6 +740,76 @@ function parseCoordinate(value: string): number | null {
     return numeric;
 }
 
+function parseBooleanLike(value: unknown): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'string') {
+        return /^(1|true|yes|on)$/i.test(value);
+    }
+    return false;
+}
+
 function formatCoordinate(value?: number | null): string {
     return Number.isFinite(value) ? String(value) : '';
+}
+
+function shouldQueueLocationRefresh(
+    existingLocation: {
+        label: string;
+        addressLine1?: string | null;
+        addressLine2?: string | null;
+        city?: string | null;
+        postalCode?: string | null;
+        country?: string | null;
+        latitude?: number | null;
+        longitude?: number | null;
+        isDefault?: boolean;
+    } | null,
+    locationInput: LocationFormInput,
+): boolean {
+    if (!existingLocation) {
+        return true;
+    }
+
+    return existingLocation.label !== locationInput.label
+        || normalizeText(existingLocation.addressLine1) !== locationInput.addressLine1
+        || normalizeText(existingLocation.addressLine2) !== locationInput.addressLine2
+        || normalizeText(existingLocation.city) !== locationInput.city
+        || normalizeText(existingLocation.postalCode) !== locationInput.postalCode
+        || normalizeText(existingLocation.country) !== locationInput.country
+        || normalizeCoordinateValue(existingLocation.latitude) !== normalizeCoordinateValue(locationInput.latitude)
+        || normalizeCoordinateValue(existingLocation.longitude) !== normalizeCoordinateValue(locationInput.longitude)
+        || (Boolean(existingLocation.isDefault) !== locationInput.makeDefault && locationInput.makeDefault);
+}
+
+function normalizeCoordinateValue(value?: number | null): number | null {
+    return Number.isFinite(value) ? Number(value) : null;
+}
+
+function buildLocationImportNotices(
+    refreshResult: userLocationImportService.QueuedLocationImportResult,
+    locationLabel: string,
+): string[] {
+    const notices: string[] = [];
+
+    if (refreshResult.queuedJobs.length > 0) {
+        notices.push(
+            `Queued ${refreshResult.queuedJobs.length} location refresh job(s) for ${locationLabel}. Suggestions will use the updated availability after those background imports finish.`,
+        );
+    }
+
+    if (refreshResult.issues.length > 0) {
+        notices.push(
+            `Some saved location imports could not be refreshed automatically: ${refreshResult.issues.map((issue) => `${issue.providerKey} (${issue.reason})`).join('; ')}`,
+        );
+    }
+
+    if (refreshResult.queuedJobs.length === 0 && refreshResult.issues.length === 0) {
+        notices.push(
+            'No saved location import sources are configured yet. Open Location Imports to populate location-aware availability for suggestions.',
+        );
+    }
+
+    return notices;
 }

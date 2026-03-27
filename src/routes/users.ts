@@ -7,6 +7,7 @@ import renderer from "../modules/renderer";
 import {asyncHandler} from '../modules/lib/asyncHandler';
 import settings from "../modules/settings";
 import {ExpectedError} from "../modules/lib/errors";
+import {requireAdmin, requireAuth} from '../middleware/authMiddleware';
 import {handleValidationError} from '../middleware/validationErrorHandler';
 import {
     validateRegister, validateLogin, validateForgotPassword,
@@ -55,6 +56,10 @@ app.get('/manage-dashboard', asyncHandler(async (req: Request, res: Response) =>
     }
     // For now, redirect to regular dashboard
     res.redirect('/users/dashboard');
+}));
+
+app.get('/profile', requireAuth, asyncHandler((req: Request, res: Response) => {
+    renderer.render(res, 'users/profile');
 }));
 
 // Registrierung von Benutzern
@@ -127,7 +132,8 @@ app.get('/settings', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
     }
-    const data = await settingsController.getSettings(req.session.user.id);
+    const locationId = typeof req.query.locationId === 'string' ? req.query.locationId : '';
+    const data = await settingsController.getSettings(req.session.user.id, locationId);
     renderer.renderWithData(res, 'users/settings', data);
 }));
 
@@ -135,25 +141,43 @@ app.post('/settings', asyncHandler(async (req: Request, res: Response) => {
     if (!req.session.user) {
         return res.redirect('/users/login');
     }
-    await settingsController.saveSettings(req.session.user.id, req.body);
+    const data = await settingsController.saveSettings(req.session.user.id, req.body);
+    for (const notice of data.notices ?? []) {
+        req.flash('info', notice);
+    }
     req.flash('success', 'Settings saved successfully');
-    res.redirect('/users/settings');
+    res.redirect(buildSettingsRedirectPath(data.locationEditor.id));
+}));
+
+app.post('/settings/locations/:id/default', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    const data = await settingsController.setDefaultLocation(req.session.user.id, req.params.id);
+    for (const notice of data.notices ?? []) {
+        req.flash('info', notice);
+    }
+    req.flash('success', 'Default location updated');
+    res.redirect(buildSettingsRedirectPath(data.locationEditor.id));
+}));
+
+app.post('/settings/locations/:id/delete', asyncHandler(async (req: Request, res: Response) => {
+    if (!req.session.user) {
+        return res.redirect('/users/login');
+    }
+    const data = await settingsController.deleteSavedLocation(req.session.user.id, req.params.id);
+    req.flash('success', 'Saved location removed');
+    res.redirect(buildSettingsRedirectPath(data.locationEditor.id));
 }));
 
 // Global diet heuristic configuration
-app.get('/settings/diets', asyncHandler(async (req: Request, res: Response) => {
-    if (!req.session.user) {
-        return res.redirect('/users/login');
-    }
-    const data = await settingsController.getDietHeuristicSettings(req.session.user.id);
+app.get('/settings/diets', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+    const data = await settingsController.getDietHeuristicSettings(req.session.user!.id);
     renderer.renderWithData(res, 'users/diet-settings', data);
 }));
 
-app.post('/settings/diets', asyncHandler(async (req: Request, res: Response) => {
-    if (!req.session.user) {
-        return res.redirect('/users/login');
-    }
-    await settingsController.saveDietHeuristicSettings(req.session.user.id, req.body);
+app.post('/settings/diets', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+    await settingsController.saveDietHeuristicSettings(req.session.user!.id, req.body);
     req.flash('success', 'Diet heuristic settings saved');
     res.redirect('/users/settings/diets');
 }));
@@ -169,5 +193,12 @@ app.get('/oidc/callback', asyncHandler(async (req: Request, res: Response) => {
     await userController.loginUserWithOidcCallback(req);
     res.redirect('/users/dashboard'); // or wherever you want to land post-login
 }));
+
+function buildSettingsRedirectPath(locationId?: string | null): string {
+    const normalizedLocationId = typeof locationId === 'string' ? locationId.trim() : '';
+    return normalizedLocationId
+        ? `/users/settings?locationId=${encodeURIComponent(normalizedLocationId)}`
+        : '/users/settings';
+}
 
 export default app;

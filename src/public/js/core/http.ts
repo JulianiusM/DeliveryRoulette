@@ -37,14 +37,20 @@ export async function http(method: string, url: string, body?: any): Promise<any
     const ct = res.headers.get('content-type') || '';
     let data = ct.includes('application/json') ? await res.json() : await res.text().catch(() => '');
     if (!res.ok && !data?.status) {
-        throw new Error(data || `HTTP ${res.status}`);
+        throw buildHttpError(data || `HTTP ${res.status}`, data);
     }
 
     if (data?.status === 'error') {
-        throw new Error(data.message || 'Request failed');
+        throw buildHttpError(data.message || 'Request failed', data.data);
     }
 
     return data;
+}
+
+function buildHttpError(message: string, data?: any): Error {
+    const error = new Error(message);
+    (error as Error & {data?: any}).data = data;
+    return error;
 }
 
 /**

@@ -1,5 +1,7 @@
 import {BeforeInsert, BeforeUpdate, Column, Entity, Index, OneToMany, PrimaryGeneratedColumn,} from "typeorm";
 
+export type UserRole = 'user' | 'admin';
+
 @Index("email", ["email"], {unique: true})
 @Index("username", ["username"], {unique: true})
 @Entity("users")
@@ -15,6 +17,9 @@ export class User {
 
     @Column("varchar", {name: "email", unique: true, length: 100})
     email!: string;
+
+    @Column('varchar', {name: 'role', length: 20, default: 'user'})
+    role!: UserRole;
 
     @Column("varchar", {name: "PASSWORD", nullable: true, length: 255})
     password?: string | null;

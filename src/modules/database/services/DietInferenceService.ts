@@ -8,7 +8,7 @@ import {Restaurant} from '../entities/restaurant/Restaurant';
 import settings from '../../settings';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '8.2.0';
+export const ENGINE_VERSION = '8.2.1';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 

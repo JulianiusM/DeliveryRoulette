@@ -189,24 +189,29 @@ block body
                         span
                             i.bi.bi-link-45deg.me-2
                             | Provider References
-                        button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addProviderForm")
-                            i.bi.bi-plus-lg.me-1
-                            | Add Provider
+                        if userIsAdmin
+                            button.btn.btn-sm.btn-success(type="button" data-bs-toggle="collapse" data-bs-target="#addProviderForm")
+                                i.bi.bi-plus-lg.me-1
+                                | Add Provider
                     .card-body
-                        #addProviderForm.collapse.mb-4
-                            form(method="POST" action=`/restaurants/${r.id}/providers`)
-                                +csrf
-                                .row.g-2
-                                    .col-md-3
-                                        input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key" required)
-                                    .col-md-3
-                                        input.form-control.form-control-sm(type="text" name="externalId" placeholder="External ID")
-                                    .col-md-4
-                                        input.form-control.form-control-sm(type="url" name="url" placeholder="Provider URL" required)
-                                    .col-md-2
-                                        button.btn.btn-sm.btn-success.w-100(type="submit")
-                                            i.bi.bi-plus-lg.me-1
-                                            | Add
+                        if userIsAdmin
+                            #addProviderForm.collapse.mb-4
+                                form(method="POST" action=`/restaurants/${r.id}/providers`)
+                                    +csrf
+                                    .row.g-2
+                                        .col-md-3
+                                            input.form-control.form-control-sm(type="text" name="providerKey" placeholder="Provider key" required)
+                                        .col-md-3
+                                            input.form-control.form-control-sm(type="text" name="externalId" placeholder="External ID")
+                                        .col-md-4
+                                            input.form-control.form-control-sm(type="url" name="url" placeholder="Provider URL" required)
+                                        .col-md-2
+                                            button.btn.btn-sm.btn-success.w-100(type="submit")
+                                                i.bi.bi-plus-lg.me-1
+                                                | Add
+
+                        else if user
+                            p.text-white-50.small.mb-4 Shared provider references are managed by administrators. You can still use favorites, blocks, suggestions, and your own location imports.
 
                         if providerRefs.length === 0
                             .restaurant-empty-state
@@ -225,16 +230,17 @@ block body
                                                     a.link-info.small(href=ref.url target="_blank" rel="noopener noreferrer") #{ref.url}
                                                 span.badge.rounded-pill(class=ref.status === 'active' ? 'text-bg-success' : 'text-bg-secondary') #{ref.status}
                                             .d-flex.gap-2.mt-3
-                                                form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/sync-menu`)
-                                                    +csrf
-                                                    button.btn.btn-sm.btn-outline-info(type="submit")
-                                                        i.bi.bi-arrow-repeat.me-1
-                                                        | Sync menu
-                                                form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
-                                                    +csrf
-                                                    button.btn.btn-sm.btn-outline-danger(type="submit")
-                                                        i.bi.bi-trash.me-1
-                                                        | Remove
+                                                if userIsAdmin
+                                                    form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/sync-menu`)
+                                                        +csrf
+                                                        button.btn.btn-sm.btn-outline-info(type="submit")
+                                                            i.bi.bi-arrow-repeat.me-1
+                                                            | Sync menu
+                                                    form(method="POST" action=`/restaurants/${r.id}/providers/${ref.id}/delete`)
+                                                        +csrf
+                                                        button.btn.btn-sm.btn-outline-danger(type="submit")
+                                                            i.bi.bi-trash.me-1
+                                                            | Remove
 
                 section#menu.restaurant-section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
                     .card-header.d-flex.justify-content-between.align-items-center.flex-wrap.gap-2
@@ -243,10 +249,14 @@ block body
                                 i.bi.bi-menu-button-wide.me-2
                                 | Menu
                             small.text-white-50 #{menuSummary.itemCountLabel || 'No menu data'}
-                        a.btn.btn-sm.btn-success(href=`/restaurants/${r.id}/menu/categories/new`)
-                            i.bi.bi-plus-lg.me-1
-                            | Add Category
+                        if userIsAdmin
+                            a.btn.btn-sm.btn-success(href=`/restaurants/${r.id}/menu/categories/new`)
+                                i.bi.bi-plus-lg.me-1
+                                | Add Category
                     .card-body
+                        if user && !userIsAdmin
+                            p.text-white-50.small.mb-4 Shared menu editing is restricted to administrators.
+
                         if categories.length === 0
                             .restaurant-empty-state
                                 i.bi.bi-menu-button-wide
@@ -263,12 +273,13 @@ block body
                                                     span.badge.rounded-pill.text-bg-secondary Inactive
                                                 span.badge.rounded-pill.text-bg-dark.border.border-secondary #{items.length} item#{items.length === 1 ? '' : 's'}
                                             .d-flex.gap-2
-                                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/items/new`)
-                                                    i.bi.bi-plus-lg.me-1
-                                                    | Add Item
-                                                a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/edit`)
-                                                    i.bi.bi-pencil.me-1
-                                                    | Edit Category
+                                                if userIsAdmin
+                                                    a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/items/new`)
+                                                        i.bi.bi-plus-lg.me-1
+                                                        | Add Item
+                                                    a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/categories/${cat.id}/edit`)
+                                                        i.bi.bi-pencil.me-1
+                                                        | Edit Category
                                         .card-body
                                             if items.length === 0
                                                 p.text-white-50.mb-0 No items in this category yet.
@@ -286,8 +297,9 @@ block body
                                                                             .d-flex.flex-wrap.gap-1.mt-2
                                                                                 each chip in chips
                                                                                     span.badge.rounded-pill(class=chip.source === 'manual' ? 'text-bg-warning text-dark' : 'text-bg-success') #{chip.label}
-                                                                    a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit`)
-                                                                        i.bi.bi-pencil
+                                                                    if userIsAdmin
+                                                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/menu/items/${item.id}/edit`)
+                                                                            i.bi.bi-pencil
                                                                 if item.description
                                                                     p.text-white-50.small.mb-3 #{item.description}
                                                                 .d-flex.flex-wrap.gap-2.small.text-white-50
@@ -385,9 +397,13 @@ block body
                             | Quick Actions
                         .card-body
                             .d-grid.gap-2
-                                a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)
-                                    i.bi.bi-pencil.me-1
-                                    | Edit Restaurant
+                                if user
+                                    if userIsAdmin
+                                        a.btn.btn-primary(href=`/restaurants/${r.id}/edit`)
+                                            i.bi.bi-pencil.me-1
+                                            | Edit Restaurant
+                                    else
+                                        p.text-white-50.small.mb-0 Shared restaurant editing is restricted to administrators.
                                 a.btn.btn-outline-light(href="/restaurants")
                                     i.bi.bi-arrow-left.me-1
                                     | Back to List

@@ -3,7 +3,7 @@ import type {Request} from 'express';
 import {findOrCreateUserFromOidc} from "./database/services/UserService";
 import settings from "./settings";
 import {ExpectedError} from "./lib/errors";
-import {persistSession} from "./lib/session";
+import {destroySession, persistSession, regenerateSession} from "./lib/session";
 
 let config: oidc.Configuration;
 
@@ -98,9 +98,12 @@ export async function callback(req: Request) {
 
     // JIT-provision or load your local user
     // Persist your standard session identity (same model as manual login)
-    req.session.user = await findOrCreateUserFromOidc(issuer, identityClaims, {
+    const user = await findOrCreateUserFromOidc(issuer, identityClaims, {
         linkByEmail: true,
     });
+
+    await regenerateSession(req.session);
+    req.session.user = user;
 
     // Optionally keep tokens for logout/API calls
     req.session.tokens = {
@@ -121,11 +124,7 @@ export async function logout(session: Request['session']) {
     const id_token_hint = session.tokens?.id_token;
     const isOidc = !!session.tokens;
 
-    // Clear local session first
-    session.user = undefined;
-    session.tokens = undefined;
-
-    await persistSession(session);
+    await destroySession(session);
 
     // Only initialize OIDC if this is an OIDC session
     if (isOidc) {

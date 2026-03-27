@@ -1,5 +1,7 @@
 import {NextFunction, Request, Response} from 'express';
 import {ExpectedError} from '../modules/lib/errors';
+import settings from '../modules/settings';
+import {User} from '../modules/database/entities/user/User';
 
 /**
  * Middleware to require authentication
@@ -14,6 +16,37 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
         return;
     }
     next();
+}
+
+export function isAdminUser(user?: Partial<User> | null): boolean {
+    if (!user) {
+        return false;
+    }
+
+    if (user.role === 'admin') {
+        return true;
+    }
+
+    const adminUsernames = new Set(settings.value.adminUsernames.map((entry) => entry.toLowerCase()));
+    const adminEmails = new Set(settings.value.adminEmails.map((entry) => entry.toLowerCase()));
+    const username = typeof user.username === 'string' ? user.username.trim().toLowerCase() : '';
+    const email = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+
+    return (username.length > 0 && adminUsernames.has(username))
+        || (email.length > 0 && adminEmails.has(email));
+}
+
+export function isAdminSession(session: Request['session'] | undefined | null): boolean {
+    return isAdminUser(session?.user ?? null);
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+    requireAuth(req, res, () => {
+        if (!isAdminSession(req.session)) {
+            throw new ExpectedError('Administrator permissions are required.', 'error', 403);
+        }
+        next();
+    });
 }
 
 /**
@@ -57,5 +90,11 @@ export function checkOwnership(resource: { ownerId?: number | null }, userId?: n
 export function requireAuthenticatedUser(userId?: number): asserts userId is number {
     if (!userId) {
         throw new ExpectedError('Authentication required', 'error', 401);
+    }
+}
+
+export function requireAdminUser(session: Request['session'] | undefined | null): void {
+    if (!isAdminSession(session)) {
+        throw new ExpectedError('Administrator permissions are required.', 'error', 403);
     }
 }

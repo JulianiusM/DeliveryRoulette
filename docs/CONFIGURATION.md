@@ -45,6 +45,8 @@ Settings are loaded with the following priority (highest to lowest):
 
 ### Authentication Configuration
 - `localLoginEnabled` - Enable local login (default: true)
+- `adminUsernames` - Bootstrap usernames that should be promoted to the persisted `admin` role on login
+- `adminEmails` - Bootstrap emails that should be promoted to the persisted `admin` role on login
 - `oidcEnabled` - Enable OIDC authentication (default: false)
 - `oidcName` - OIDC provider name
 - `oidcClientId` - OIDC client ID
@@ -76,16 +78,47 @@ Settings are loaded with the following priority (highest to lowest):
 - `minSimilarityScore` - Minimum similarity score to create a pair (default: 50)
 
 ### Suggestion Configuration
-- `suggestionExcludeRecentCount` - Number of recent suggestions to exclude (default: 5)
+- `suggestionExcludeRecentCount` - Number of recent suggestions to exclude (default: 3)
+- `suggestionDefaultOpenOnly` - Default state for the "open now" filter (default: true)
+- `suggestionDefaultExcludeRecent` - Default state for recent-history exclusion (default: true)
+- `suggestionDefaultRespectDoNotSuggest` - Default state for respecting blocked restaurants (default: true)
+- `suggestionDefaultMinDietScore` - Default minimum inferred diet score (default: 10)
+- `suggestionDefaultFavoriteMode` - Default favorites behavior (`prefer`, `only`, `ignore`; default: `prefer`)
 
 ### Provider Sync Configuration
 - `syncIntervalMs` - Sync interval in milliseconds
-- `providerHttpTimeoutMs` - Provider HTTP request timeout (default: 30000)
-- `providerHttpMaxConcurrent` - Max concurrent provider HTTP requests (default: 5)
-- `providerCacheListingTtlSeconds` - Cache TTL for listing data (default: 3600)
-- `providerCacheMenuTtlSeconds` - Cache TTL for menu data (default: 1800)
+- `providerHttpTimeoutMs` - Provider HTTP request timeout (default: 10000)
+- `providerHttpMaxConcurrent` - Max concurrent provider HTTP requests (default: 2)
+- `providerCacheListingTtlSeconds` - Cache TTL for listing data (default: 21600)
+- `providerCacheMenuTtlSeconds` - Cache TTL for menu data (default: 86400)
+- `providerAvailabilityListingSnapshotTtlSeconds` - TTL for listing-derived availability snapshots (default: 5400)
+- `providerAvailabilityDynamicSnapshotTtlSeconds` - TTL for dynamic provider availability snapshots (default: 1800)
 - `credentialEncryptionKey` - Encryption key for provider credentials
-- `importMaxFileSizeBytes` - Maximum import file size (default: 10485760 = 10MB)
+- `importMaxFileSizeBytes` - Maximum import file size (default: 26214400 = 25MB)
+
+### Admin Access Configuration
+
+DeliveryRoulette separates user-facing workflows from global maintenance and shared-catalog writes.
+
+- normal users can save locations, run location imports, request suggestions, and manage personal favorites/blocks
+- admins can also edit the shared restaurant catalog, menus, provider refs, diet overrides, bulk import, review sync jobs, review sync alerts, run global provider refresh, and edit global diet heuristics
+
+Configure admin access with either or both of these environment variables:
+
+```bash
+export ADMIN_USERNAMES=alice,bob
+export ADMIN_EMAILS=alice@example.com,bob@example.com
+```
+
+These variables are now a bootstrap mechanism. When a matching user logs in, DeliveryRoulette persists the `admin` role on that user record.
+
+### Address Geocoding Configuration
+- `addressGeocodingEnabled` - Enables automatic coordinate lookup for saved user locations
+- `addressGeocodingBaseUrl` - Geocoding endpoint base URL
+- `addressGeocodingUserAgent` - Optional custom User-Agent for geocoding requests
+- `addressGeocodingTimeoutMs` - Timeout for geocoding HTTP requests
+- `addressGeocodingMinIntervalMs` - Minimum delay between geocoding requests
+- `addressGeocodingCacheTtlMs` - Cache TTL for repeated address lookups
 
 ### Legal Links
 - `imprintUrl` - Imprint page URL
@@ -155,7 +188,28 @@ DB_PORT,3306
 DB_NAME,inventory
 PAGINATION_DEFAULT_ITEMS,50
 TOKEN_EXPIRATION_MS,7200000
+ADDRESS_GEOCODING_ENABLED,true
+ADDRESS_GEOCODING_BASE_URL,https://nominatim.openstreetmap.org/search
+ADMIN_USERNAMES,alice,bob
 ```
+
+## Location-Aware Suggestion Notes
+
+Suggestions now depend on more than a global restaurant list. The effective pool is shaped by:
+
+- saved user location
+- provider availability snapshots for that location
+- service type (`delivery` vs `collection`)
+- open-now filtering
+- diet, cuisine, allergen, favorites, and blocked-restaurant rules
+
+If suggestions return no result, DeliveryRoulette now reports which stage removed the pool. Keep the following data fresh:
+
+1. saved user locations with correct coordinates
+2. location imports for the same saved location you plan to suggest against
+3. current menus for diet and allergen filtering
+
+When a saved location is edited, DeliveryRoulette now tries to queue refresh jobs for the user's saved location import sources automatically. Suggestions may still stay empty until those background jobs finish.
 
 ## Best Practices
 

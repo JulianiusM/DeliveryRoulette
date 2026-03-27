@@ -39,9 +39,10 @@ block body
                                     strong.restaurant-stat-value #{openCount}
                 .d-flex.flex-wrap.justify-content-between.align-items-center.gap-2.mt-4
                     p.text-white-50.small.mb-0 #{favoriteCount} favorites in current view
-                    a.btn.btn-success(href="/restaurants/new")
-                        i.bi.bi-plus-lg.me-1
-                        | Add Restaurant
+                    if userIsAdmin
+                        a.btn.btn-success(href="/restaurants/new")
+                            i.bi.bi-plus-lg.me-1
+                            | Add Restaurant
 
         section.card.text-bg-dark.border-secondary.shadow-sm.mt-4
             .card-header
@@ -83,6 +84,8 @@ block body
                     .col-12.d-flex.flex-wrap.gap-2.justify-content-between.align-items-center
                         if !user
                             p.text-white-50.small.mb-0 Preference filters use your personal flags once you are logged in. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
+                        else if !userIsAdmin
+                            p.text-white-50.small.mb-0 Favorites and suggestion blocks are personal. Shared restaurant and menu edits are restricted to administrators.
                         else
                             p.text-white-50.small.mb-0 Preference filters are based on your saved restaurant flags. "Shown in app" controls DeliveryRoulette visibility, not live provider availability.
                         .d-flex.gap-2
@@ -188,6 +191,7 @@ block body
                                         a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}#providers`)
                                             i.bi.bi-link-45deg.me-1
                                             | Providers
-                                        a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/edit`)
-                                            i.bi.bi-pencil.me-1
-                                            | Edit
+                                        if userIsAdmin
+                                            a.btn.btn-sm.btn-outline-light(href=`/restaurants/${r.id}/edit`)
+                                                i.bi.bi-pencil.me-1
+                                                | Edit
