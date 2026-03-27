@@ -139,6 +139,7 @@ describe('DietInferenceService', () => {
             const {score, confidence} = computeScoreAndConfidence(
                 testCase.matchRatio,
                 testCase.totalMenuItems,
+                testCase.context,
             );
             expect(score).toBe(testCase.expectedScore);
             expect(confidence).toBe(testCase.expectedConfidence);

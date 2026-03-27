@@ -137,6 +137,20 @@ export const scoreAndConfidenceData = [
         expectedScore: 22,
         expectedConfidence: 'MEDIUM',
     },
+    {
+        description: 'duplicate side-dish rows do not inflate confidence or score on a large menu',
+        matchRatio: 0.02,
+        totalMenuItems: 114,
+        context: {
+            strongSignalCount: 8,
+            excludedCount: 5,
+            matchedUniqueItems: 2,
+            varietyRatio: 0.33,
+            categoryCoverageRatio: 0.18,
+        },
+        expectedScore: 2,
+        expectedConfidence: 'LOW',
+    },
 ];
 
 // ── inferForTag test data ──────────────────────────────────
@@ -864,8 +878,8 @@ export const heuristicCoverageCases = [
         expected: {
             matchedUniqueItems: 2,
             totalUniqueItems: 10,
-            score: 23,
-            confidence: 'MEDIUM',
+            score: 21,
+            confidence: 'LOW',
             varietyPercent: 33,
         },
     },
@@ -965,7 +979,7 @@ export const germanKeywordExpectations = [
 
 export const engineVersionData = {
     validFormat: /^\d+\.\d+\.\d+$/,
-    expectedCurrent: '8.2.1',
+    expectedCurrent: '8.2.2',
 };
 
 

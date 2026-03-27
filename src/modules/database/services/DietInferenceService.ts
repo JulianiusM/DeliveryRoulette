@@ -8,7 +8,7 @@ import {Restaurant} from '../entities/restaurant/Restaurant';
 import settings from '../../settings';
 
 /** Current engine version - bump when rules change. */
-export const ENGINE_VERSION = '8.2.1';
+export const ENGINE_VERSION = '8.2.2';
 
 export type Confidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -867,14 +867,16 @@ export function computeScoreAndConfidence(
     const varietyScore = Math.round(varietyRatio * 100);
     const categoryScore = Math.round(categoryCoverageRatio * 100);
     const matchedUniqueItems = Math.max(0, context.matchedUniqueItems ?? Math.round(safeRatio * totalMenuItems));
-    const strongSignalCount = context.strongSignalCount ?? 0;
-    const manualOverrideCount = context.manualOverrideCount ?? 0;
-    const excludedCount = context.excludedCount ?? 0;
     const baseScore = Math.round(
         (coverageScore * s.inferenceCoverageWeight)
         + (varietyScore * s.inferenceVarietyWeight)
         + (categoryScore * s.inferenceCategoryWeight),
     );
+    const rawStrongSignalCount = context.strongSignalCount ?? 0;
+    // Deduped menu support should drive confidence and boosts, not repeated size/menu rows.
+    const strongSignalCount = Math.min(rawStrongSignalCount, matchedUniqueItems);
+    const manualOverrideCount = context.manualOverrideCount ?? 0;
+    const excludedCount = context.excludedCount ?? 0;
 
     let confidence: Confidence;
     if (totalMenuItems === 0 || matchedUniqueItems === 0) {
@@ -888,8 +890,14 @@ export function computeScoreAndConfidence(
         safeRatio >= s.inferenceMediumConfidenceMinRatio
         || matchedUniqueItems >= s.inferenceMediumConfidenceMinUniqueItems
         || (
-            strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals
+            totalMenuItems <= s.inferenceSmallMenuThreshold
+            && strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals
             && matchedUniqueItems >= Math.max(1, s.inferenceMediumConfidenceMinUniqueItems - 1)
+        )
+        || (
+            strongSignalCount >= s.inferenceHighConfidenceMinStrongSignals
+            && matchedUniqueItems >= s.inferenceMediumConfidenceMinUniqueItems
+            && safeRatio >= Math.max(0.1, s.inferenceMediumConfidenceMinRatio * 0.5)
         )
     ) {
         confidence = 'MEDIUM';
