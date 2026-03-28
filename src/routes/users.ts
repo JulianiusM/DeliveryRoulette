@@ -82,7 +82,7 @@ app.get('/login', asyncHandler((req: Request, res: Response) => {
 
 app.post('/login', authLimiter, validateLogin, handleValidationError, asyncHandler(async (req: Request, res: Response) => {
     if (!settings.value.localLoginEnabled) throw new ExpectedError('Login is not enabled!', 'error', 500);
-    await userController.loginUser(req.body, req);
+    await userController.loginUser(req.body, req.session);
     req.flash('success', 'Login successful');
     res.redirect('/users/dashboard');  // Weiterleitung nach dem Login
 }));

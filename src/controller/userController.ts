@@ -37,7 +37,7 @@ export async function registerUser(body: any) {
     await mailer.sendActivationEmail(email, activationLink);
 }
 
-export async function loginUser(body: any, req: Request) {
+export async function loginUser(body: any, session: Request["session"]) {
     const {username, password} = body;
     const returnInfo = {username};
 
@@ -68,9 +68,9 @@ export async function loginUser(body: any, req: Request) {
         throw new ValidationError(LOGIN_TEMPLATE, errorMsg, returnInfo);
     }
 
-    await regenerateSession(req.session);
-    req.session.user = user;
-    await persistSession(req.session);
+    const activeSession = await regenerateSession(session);
+    activeSession.user = user;
+    await persistSession(activeSession);
 }
 
 export async function getUserDashboardEntities(user: User) {
