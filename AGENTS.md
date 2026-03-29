@@ -433,7 +433,7 @@ DeliveryRoulette has comprehensive, well-organized documentation:
 ### For AI Agents
 - **This file** - General AI agent guidance
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - Copilot-specific
-- **[.github/copilot/](..github/copilot/)** - Modular Copilot guidelines
+- **[.github/copilot/](.github/copilot/)** - Modular Copilot guidelines
 
 ## Contributing Guidelines
 

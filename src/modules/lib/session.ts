@@ -28,11 +28,11 @@ export function persistSession(session: Request['session']): Promise<void> {
     });
 }
 
-export function regenerateSession(session: Request['session']): Promise<void> {
+export function regenerateSession(session: Request['session']): Promise<Request['session']> {
     return new Promise((resolve, reject) => {
         const regenerate = session.regenerate?.bind(session);
         if (!regenerate) {
-            resolve();
+            resolve(session);
             return;
         }
 
@@ -41,7 +41,8 @@ export function regenerateSession(session: Request['session']): Promise<void> {
                 reject(err);
                 return;
             }
-            resolve();
+            const refreshedSession = ((session as unknown as { req?: Request }).req?.session ?? session) as Request['session'];
+            resolve(refreshedSession);
         });
     });
 }
@@ -63,4 +64,3 @@ export function destroySession(session: Request['session']): Promise<void> {
         });
     });
 }
-

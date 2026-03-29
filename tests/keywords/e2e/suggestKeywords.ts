@@ -11,14 +11,11 @@ export async function requestSuggestion(page: Page): Promise<void> {
     await page.goto(urls.suggest);
     await page.waitForLoadState('networkidle');
     await page.click(selectors.suggestButton);
-    // Wait for the AJAX response – #resultName gets populated with text
-    await page.waitForFunction(
-        () => {
-            const el = document.getElementById('resultName');
-            return el && el.textContent && el.textContent.trim().length > 0;
-        },
-        { timeout: 10_000 },
-    );
+    await page.waitForFunction(() => {
+        const resultName = document.getElementById('resultName')?.textContent?.trim() ?? '';
+        const alertText = document.querySelector('#suggestionAlerts .alert')?.textContent?.trim() ?? '';
+        return resultName.length > 0 || alertText.length > 0;
+    }, { timeout: 10_000 });
 }
 
 /**

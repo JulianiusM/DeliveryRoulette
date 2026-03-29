@@ -68,9 +68,9 @@ export async function loginUser(body: any, session: Request["session"]) {
         throw new ValidationError(LOGIN_TEMPLATE, errorMsg, returnInfo);
     }
 
-    await regenerateSession(session);
-    session.user = user;
-    await persistSession(session);
+    const activeSession = await regenerateSession(session);
+    activeSession.user = user;
+    await persistSession(activeSession);
 }
 
 export async function getUserDashboardEntities(user: User) {
